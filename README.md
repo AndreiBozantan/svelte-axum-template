@@ -3,7 +3,7 @@
 Starting project template for Rust Axum backend and Svelte frontend.  Simple Single-Page-App (SPA) example.  Does not use SvelteKit.
 
 # New Version 0.5
-- embedding static files into the binary using `cargo-embed-file` see [pr#1]
+- embedding static files into the binary using `cargo-embed-file` see [pr#1](https://github.com/AndreiBozantan/svelte-axum-project/pull/1)
 - updated to `axum` 0.8.4
 
 # New Version 0.4.2
