@@ -2,8 +2,9 @@
 
 Starting project template for Rust Axum backend and Svelte frontend.  Simple Single-Page-App (SPA) example.  Does not use SvelteKit.
 
-![](FullScreenCapture.png)
-![](MobileScreenCapture.png)
+# New Version 0.5
+- embedding static files into the binary using `cargo-embed-file` see [pr#1]
+- updated to `axum` 0.8.4
 
 # New Version 0.4.2
 - migration of `axum-sessions` to `tower-sessions` see [pr#14](https://github.com/jbertovic/svelte-axum-project/pull/14)
