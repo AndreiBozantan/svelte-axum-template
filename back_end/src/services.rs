@@ -1,38 +1,26 @@
 use axum::{
-    handler::HandlerWithoutStateExt,
-    http::StatusCode,
     middleware,
     routing::{get, post},
     Router,
 };
 use std::sync::Arc;
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tower_sessions::{SessionManagerLayer, SessionStore};
 
 use crate::{
+    assets,
     middlewares, routes,
     store::{self, Store},
-    FRONT_PUBLIC,
 };
 
 // *********
 // FRONT END
 // *********
-// Front end to server svelte build bundle, css and index.html from public folder
+// Front end to serve svelte build bundle from embedded assets in the binary
 pub fn front_public_route() -> Router {
     Router::new()
-        .fallback_service(
-            ServeDir::new(FRONT_PUBLIC).not_found_service(handle_error.into_service()),
-        )
+        .fallback(assets::static_handler)
         .layer(TraceLayer::new_for_http())
-}
-
-#[allow(clippy::unused_async)]
-async fn handle_error() -> (StatusCode, &'static str) {
-    (
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "Something went wrong accessing static files...",
-    )
 }
 
 // ********
@@ -43,12 +31,14 @@ pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
     session_layer: SessionManagerLayer<S>,
     shared_state: Arc<store::Store>,
 ) -> Router {
-    // In newer axum versions, we need to construct the router with the session layer
+    // Create the backend routes
     Router::new()
         .merge(back_public_route())
         .merge(back_auth_route())
         .merge(back_token_route(shared_state))
-        .layer(session_layer) // Pass session_layer directly without reference
+        // In axum 0.8.4, we add the session layer
+        .with_state(())
+        .layer(session_layer)
 }
 
 // *********
@@ -76,6 +66,7 @@ pub fn back_auth_route() -> Router {
 // *********
 // BACKEND API
 // *********
+//
 //
 // invoked with State that stores API that is checked by the `middleware::auth`
 pub fn back_token_route<S>(state: Arc<Store>) -> Router<S> {
