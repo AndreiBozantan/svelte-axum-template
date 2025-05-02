@@ -10,7 +10,7 @@ pub async fn login(session: Session, Json(login): Json<Login>) -> impl IntoRespo
     tracing::info!("Logging in user: {}", login.username);
 
     if check_password(&login.username, &login.password) {
-        session.insert("user_id", login.username).unwrap();
+        session.insert("user_id", login.username).await.unwrap();
         Json(json!({"result": "ok"}))
     } else {
         Json(json!({"result": "error"}))
@@ -20,10 +20,10 @@ pub async fn login(session: Session, Json(login): Json<Login>) -> impl IntoRespo
 /// route to handle log out
 #[allow(clippy::unused_async)]
 pub async fn logout(session: Session) -> impl IntoResponse {
-    let user = session.get_value("user_id").unwrap_or_default();
-    tracing::info!("Logging out user: {}", user);
+    let user = session.get_value("user_id").await.unwrap_or_default();
+    tracing::info!("Logging out user: {:?}", user);
     // drop session
-    session.flush();
+    let _ = session.flush().await;
     Json(json!({"result": "ok"}))
 }
 

@@ -15,6 +15,6 @@ pub async fn handler(session: Session) -> impl IntoResponse {
 #[allow(clippy::unused_async)]
 pub async fn data_handler(session: Session) -> impl IntoResponse {
     tracing::info!("Seeking session data");
-    let user_id = session.get_value("user_id").unwrap_or_else(|| "".into());
+    let user_id = session.get_value("user_id").await.unwrap_or_default();
     Json(json!({ "user_id": user_id }))
 }

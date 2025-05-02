@@ -1,13 +1,11 @@
 use axum::{
-    error_handling::HandleErrorLayer,
     handler::HandlerWithoutStateExt,
     http::StatusCode,
     middleware,
     routing::{get, post},
-    BoxError, Router,
+    Router,
 };
 use std::sync::Arc;
-use tower::ServiceBuilder;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 use tower_sessions::{SessionManagerLayer, SessionStore};
 
@@ -41,23 +39,16 @@ async fn handle_error() -> (StatusCode, &'static str) {
 // BACK END
 // ********
 // Back end server built form various routes that are either public, require auth, or secure login
-pub fn backend<Store: SessionStore>(
-    session_layer: SessionManagerLayer<Store>,
+pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
+    session_layer: SessionManagerLayer<S>,
     shared_state: Arc<store::Store>,
 ) -> Router {
-    let session_service = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|_: BoxError| async {
-            StatusCode::BAD_REQUEST
-        }))
-        .layer(session_layer);
-
-    // could add tower::ServiceBuilder here to group layers, especially if you add more layers.
-    // see https://docs.rs/axum/latest/axum/middleware/index.html#ordering
+    // In newer axum versions, we need to construct the router with the session layer
     Router::new()
         .merge(back_public_route())
         .merge(back_auth_route())
         .merge(back_token_route(shared_state))
-        .layer(session_service)
+        .layer(session_layer) // Pass session_layer directly without reference
 }
 
 // *********

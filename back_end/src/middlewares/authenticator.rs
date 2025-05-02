@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
+    body::Body,
     extract::State,
     http::{self, Request, StatusCode},
     middleware::Next,
@@ -15,12 +16,12 @@ use crate::store::Store;
 /// check store that contains token and see if it matches authorization header starting with "Bearer"
 /// used example in axum docs on middleware <https://docs.rs/axum/latest/axum/middleware/index.html>
 ///
-/// Returns Error's in JSON format.  
+/// Returns Error's in JSON format.
 #[allow(clippy::missing_errors_doc)]
-pub async fn auth<B: Send + Sync>(
+pub async fn auth(
     State(store): State<Arc<Store>>,
-    req: Request<B>,
-    next: Next<B>,
+    req: Request<Body>,
+    next: Next,
 ) -> Result<Response, (StatusCode, Json<JsonError>)> {
     let auth_header = req
         .headers()
