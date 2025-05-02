@@ -10,6 +10,7 @@ use tower_sessions::{MemoryStore, SessionManagerLayer};
 use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+pub mod assets;
 pub mod middlewares;
 pub mod routes;
 mod services;
@@ -17,9 +18,8 @@ mod store;
 
 // SETUP Constants
 const SESSION_COOKIE_NAME: &str = "axum_svelte_session";
-const FRONT_PUBLIC: &str = "./front_end/dist";
-const SERVER_PORT: &str = "8080";
-const SERVER_HOST: &str = "0.0.0.0";
+const SERVER_PORT: &str = "80";
+const SERVER_HOST: &str = "127.0.0.80";
 
 /// Server that is split into a Frontend to serve static files (Svelte) and Backend
 /// Backend is further split into a non authorized area and a secure area
@@ -29,7 +29,7 @@ async fn main() {
     // start tracing - level set by either RUST_LOG env variable or defaults to debug
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "svelte_axum_project=debug".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "svelte_axum_template=debug,tower_http=info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -53,7 +53,8 @@ async fn main() {
         .merge(services::front_public_route())
         .merge(services::backend(session_layer, shared_state));
 
-    tracing::info!("listening on http://{}", addr);
+    // println!("🚀 Server starting on http://{}", addr);
+    tracing::info!("🚀 listening on http://{}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app)
