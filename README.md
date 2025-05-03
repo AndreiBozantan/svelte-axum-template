@@ -1,4 +1,4 @@
-# svelte-axum-project
+# svelte-axum-template
 
 Starting project template for Rust Axum backend and Svelte frontend.  Simple Single-Page-App (SPA) example.  Does not use SvelteKit.
 
