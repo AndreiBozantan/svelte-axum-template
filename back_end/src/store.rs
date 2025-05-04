@@ -34,11 +34,6 @@ impl Store {
     }
 
     pub fn api_token_check(&self, auth_header: &str) -> bool {
-        // For backward compatibility, also check against the default token
-        if auth_header == format!("Bearer {}", self.default_api_token) {
-            return true;
-        }
-
         // Extract token from the authorization header
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
             // Try to verify the token synchronously
