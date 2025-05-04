@@ -2,8 +2,11 @@
 
 Starting project template for Rust Axum backend and Svelte frontend.  Simple Single-Page-App (SPA) example.  Does not use SvelteKit.
 
+# New Version 0.7
+- update to use Rust edition 2024, see [pr#3](https://github.com/AndreiBozantan/svelte-axum-template/pull/3)
+
 # New Version 0.6
-- add sqlite database example with `sqlx` see [pr#2](https://github.com/AndreiBozantan/svelte-axum-template/pull/2)
+- add sqlite database example with `sqlx`, see [pr#2](https://github.com/AndreiBozantan/svelte-axum-template/pull/2)
 
 # New Version 0.5
 - embedding static files into the binary using `cargo-embed-file` see [pr#1](https://github.com/AndreiBozantan/svelte-axum-template/pull/1)
