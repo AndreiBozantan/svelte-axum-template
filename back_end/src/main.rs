@@ -11,6 +11,7 @@ use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub mod assets;
+pub mod db;
 pub mod middlewares;
 pub mod routes;
 mod services;
@@ -26,6 +27,9 @@ const SERVER_HOST: &str = "127.0.0.80";
 /// The Back end is using 2 middleware: sessions (managing session data) and user_secure (checking for authorization)
 #[tokio::main]
 async fn main() {
+    // Load environment variables from .env file if present
+    dotenv::dotenv().ok();
+
     // start tracing - level set by either RUST_LOG env variable or defaults to debug
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -34,6 +38,15 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // Initialize database connection pool
+    let db_pool = match db::init_db_pool().await {
+        Ok(pool) => pool,
+        Err(e) => {
+            tracing::error!("Failed to initialize database: {:?}", e);
+            std::process::exit(1);
+        }
+    };
+
     // configure server from environmental variables
     let (port, host) = from_env();
 
@@ -41,8 +54,9 @@ async fn main() {
         .parse()
         .expect("Can not parse address and port");
 
-    // create store for backend.  Stores an api_token.
-    let shared_state = Arc::new(store::Store::new("123456789"));
+    // create store for backend, including the database pool
+    let default_api_token = env::var("API_TOKEN").unwrap_or_else(|_| "123456789".to_string());
+    let shared_state = Arc::new(store::Store::new(&default_api_token, db_pool));
 
     // setup up sessions and store to keep track of session information
     let session_store = MemoryStore::default();
