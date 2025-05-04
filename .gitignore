@@ -1,5 +1,7 @@
 # Editor directories and files
 .vscode/*
+.env
+db.sqlite
 
 # from rust
 Cargo.lock

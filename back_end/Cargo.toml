@@ -1,6 +1,6 @@
 [package]
 name = "svelte-axum-template"
-version = "0.5"
+version = "0.6.0"
 edition = "2021"
 repository = "https://github.com/AndreiBozantan/svelte-axum-template"
 keywords = ["template", "backend", "frontend", "axum", "svelte"]
@@ -11,14 +11,26 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.8.4", features = ["json", "form", "multipart"] }
-tower = "0.5.2"
-tower-http = { version = "0.6.2", features = ["full"] }
-tower-sessions = "0.14.0"
+axum = { version = "0.8", features = ["json", "form", "multipart"] }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", features = ["full"] }
+tower-sessions = { version = "0.14" }
 tokio = { version = "1.36", features = ["full"] }
-tracing = "0.1"
+tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.114"
-rust-embed = "8.7.0"
-mime_guess = "2.0.4"
+serde_json = { version =  "1.0" }
+rust-embed =  { version = "8.7" }
+mime_guess =  { version = "2.0" }
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "macros", "migrate"] }
+anyhow =  { version = "1.0" }
+thiserror =  { version = "1.0" }
+dotenv =  { version = "0.15" }
+
+[features]
+# SQLx requires runtime-tokio and sqlite features, everything else is optional
+sqlite-offline = ["sqlx/sqlite"]
+
+# Important: This tells SQLx to skip compile-time verification of database queries
+[package.metadata.sqlx]
+offline = true
