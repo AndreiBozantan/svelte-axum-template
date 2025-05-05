@@ -11,6 +11,7 @@ use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 pub mod assets;
+pub mod cli;
 pub mod db;
 pub mod middlewares;
 pub mod routes;
@@ -37,6 +38,12 @@ async fn main() {
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
+
+    // Run migration CLI if requested
+    if let Err(e) = cli::run_migration_cli().await {
+        tracing::error!("Migration CLI error: {:?}", e);
+        std::process::exit(1);
+    }
 
     // Initialize database connection pool
     let db_pool = match db::init_db_pool().await {
