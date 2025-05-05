@@ -26,6 +26,8 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "macros"
 anyhow =  { version = "1.0" }
 thiserror =  { version = "1.0" }
 dotenv =  { version = "0.15" }
+clap = { version = "4.4", features = ["derive"] }
+chrono = { version = "0.4" }
 
 [features]
 # SQLx requires runtime-tokio and sqlite features, everything else is optional

@@ -1,5 +1,6 @@
 pub mod config;
 pub mod schema;
+pub mod migrations;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -32,31 +33,8 @@ pub async fn init_db_pool() -> Result<DbPoolRef> {
     // Determine the migrations path
     let migrations_path = Path::new("./back_end/migrations");
 
-    if !migrations_path.exists() {
-        tracing::warn!("Migrations directory not found at {:?}, falling back to embedded migrations", migrations_path);
-        // Run migrations from embedded
-        sqlx::migrate!()
-            .run(&pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to run database migrations: {:?}", e);
-                e
-            })?;
-    } else {
-        // Run migrations from the filesystem
-        sqlx::migrate::Migrator::new(migrations_path)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to create migrator: {:?}", e);
-                anyhow::anyhow!("Failed to create migrator: {}", e)
-            })?
-            .run(&pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to run database migrations: {:?}", e);
-                anyhow::anyhow!("Failed to run migrations: {}", e)
-            })?;
-    }
+    // Run migrations using our migrations module
+    migrations::run_migrations(&pool, migrations_path).await?;
 
     tracing::info!("Database initialized successfully");
     Ok(Arc::new(pool))
