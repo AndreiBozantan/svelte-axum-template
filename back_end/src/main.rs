@@ -36,8 +36,8 @@ pub enum AppError {
     #[error("CLI error: {0}")]
     CliError(#[from] cli::CliError),
 
-    #[error("Network error: {0}")]
-    Network(String),
+    #[error("Network address parsing error: {0}")]
+    AddrParse(#[from] std::net::AddrParseError),
 
     #[error("Server error: {0}")]
     Server(#[from] std::io::Error),
@@ -46,10 +46,9 @@ pub enum AppError {
 /// Server that is split into a Frontend to serve static files (Svelte) and Backend
 /// Backend is further split into a non authorized area and a secure area
 /// The Back end is using 2 middleware: sessions (managing session data) and user_secure (checking for authorization)
-#[tokio::main]
-async fn main() -> Result<(), AppError> {
+async fn run_app() -> Result<(), AppError> {
     // load config
-    let config = appconfig::AppConfig::new().map_err(AppError::Config)?;
+    let config = appconfig::AppConfig::new()?;
 
     // start tracing - level set by either RUST_LOG env variable or defaults to debug
     tracing_subscriber::registry()
@@ -58,21 +57,13 @@ async fn main() -> Result<(), AppError> {
         .init();
 
     // Initialize database connection pool
-    let db_pool = db::init_pool(&config.database).await
-        .map_err(|e| {
-            tracing::error!("Failed to initialize database: {:?}", e);
-            AppError::Database(e)
-        })?;
+    let db_pool = db::init_pool(&config.database).await?;
 
     // Run migration CLI if requested
-    if let Err(e) = cli::run_migration_cli(&db_pool).await {
-        tracing::error!("Migration CLI error: {:?}", e);
-        return Err(AppError::CliError(e));
-    }
+    cli::run_migration_cli(&db_pool).await?;
 
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port)
-        .parse()
-        .map_err(|e: std::net::AddrParseError| AppError::Network(e.to_string()))?;
+        .parse()?;
 
     // create store for backend, including the database pool
     let shared_state = Arc::new(store::Store::new(&config.server.api_token, db_pool));
@@ -86,26 +77,30 @@ async fn main() -> Result<(), AppError> {
         .merge(services::front_public_route())
         .merge(services::backend(session_layer, shared_state));
 
-    // println!("🚀 Server starting on http://{}", addr);
     tracing::info!("🚀 listening on http://{addr}");
 
-    let listener = tokio::net::TcpListener::bind(addr).await
-        .map_err(AppError::Server)?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
-        .await
-        .map_err(AppError::Server)?;
+        .await?;
 
     Ok(())
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run_app().await {
+        tracing::error!("Application error: {}", e);
+        std::process::exit(1);
+    }
 }
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.
 /// We use this in our `Server` method `with_graceful_shutdown`.
 async fn shutdown_signal() {
-    if let Err(e) = tokio::signal::ctrl_c().await {
-        tracing::error!("Failed to listen for shutdown signal: {}", e);
-    } else {
-        tracing::info!("Shutdown signal received, shutting down gracefully");
+    match tokio::signal::ctrl_c().await {
+        Ok(()) => tracing::info!("Shutdown signal received, shutting down gracefully"),
+        Err(e) => tracing::error!("Failed to listen for shutdown signal: {}", e),
     }
 }

@@ -8,11 +8,12 @@ use axum::{
 use serde_json::json;
 use thiserror::Error;
 use tower_sessions::Session;
+use tower_sessions::session::Error as SessionLibError;
 
 #[derive(Debug, Error)]
 pub enum UserSecureError {
-    #[error("Session error: {0}")]
-    SessionError(String),
+    #[error("Failed to query session data")]
+    SessionQueryFailed(#[source] SessionLibError),
 
     #[error("Unauthorized: user not authenticated")]
     Unauthorized,
@@ -20,8 +21,10 @@ pub enum UserSecureError {
 
 impl IntoResponse for UserSecureError {
     fn into_response(self) -> axum::response::Response {
+        tracing::error!("{}", &self);
+
         let (status, error_message) = match self {
-            Self::SessionError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            Self::SessionQueryFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
         };
 
@@ -42,17 +45,11 @@ pub async fn user_secure(
 ) -> Result<Response, UserSecureError> {
     tracing::info!("Middleware: checking if user exists");
 
-    let user_id = session
-        .get_value("user_id")
+    let user_id: String = session
+        .get("user_id")
         .await
-        .map_err(|e| {
-            tracing::error!("Session error: {}", e);
-            UserSecureError::SessionError(format!("Failed to get session data: {}", e))
-        })?
-        .ok_or_else(|| {
-            tracing::debug!("User not authenticated");
-            UserSecureError::Unauthorized
-        })?;
+        .map_err(UserSecureError::SessionQueryFailed)?
+        .ok_or(UserSecureError::Unauthorized)?;
 
     tracing::debug!("user_id Extracted: {}", user_id);
 

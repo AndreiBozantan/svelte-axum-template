@@ -1,23 +1,35 @@
-use axum::{response::IntoResponse, Json, http::StatusCode};
+use axum::{response::IntoResponse, http::StatusCode, Json};
 use serde::Deserialize;
 use serde_json::json;
-use tower_sessions::Session;
 use thiserror::Error;
+use tower_sessions::Session;
+use tower_sessions::session::Error as SessionLibError;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
 
-    #[error("Session error: {0}")]
-    SessionError(String),
+    #[error("Failed to insert session data")]
+    InsertSessionFailed(#[source] SessionLibError),
+
+    #[error("Failed to read session data")]
+    ReadSessionFailed(#[source] SessionLibError),
+
+    #[error("Failed to flush session")]
+    FlushSessionFailed(#[source] SessionLibError),
 }
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> axum::response::Response {
+        // Log the error (self.to_string() will include source error message via thiserror)
+        tracing::error!("{}", &self);
+
         let (status, error_message) = match self {
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::SessionError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+            Self::InsertSessionFailed(_)  => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::ReadSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::FlushSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         let body = Json(json!({
@@ -39,10 +51,7 @@ pub async fn login(session: Session, Json(login): Json<Login>) -> Result<impl In
     }
 
     session.insert("user_id", login.username).await
-        .map_err(|err| {
-            tracing::error!("Failed to insert session data: {}", err);
-            AuthError::SessionError(format!("Failed to insert session data: {}", err))
-        })?;
+        .map_err(AuthError::InsertSessionFailed)?;
 
     Ok(Json(json!({"result": "ok"})))
 }
@@ -50,21 +59,15 @@ pub async fn login(session: Session, Json(login): Json<Login>) -> Result<impl In
 /// route to handle log out
 #[allow(clippy::unused_async)]
 pub async fn logout(session: Session) -> Result<impl IntoResponse, AuthError> {
-    let user = session.get_value("user_id").await
-        .map_err(|err| {
-            tracing::error!("Failed to read session data: {}", err);
-            AuthError::SessionError(format!("Failed to read session data: {}", err))
-        })?
+    let user: String = session.get("user_id").await
+        .map_err(AuthError::ReadSessionFailed)?
         .unwrap_or_default();
 
     tracing::info!("Logging out user: {:?}", user);
 
     // drop session
     session.flush().await
-        .map_err(|err| {
-            tracing::error!("Failed to flush session: {}", err);
-            AuthError::SessionError(format!("Failed to flush session: {}", err))
-        })?;
+        .map_err(AuthError::FlushSessionFailed)?;
 
     Ok(Json(json!({"result": "ok"})))
 }

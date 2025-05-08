@@ -27,6 +27,8 @@ pub enum AuthError {
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> axum::response::Response {
+        tracing::error!("{}", &self);
+
         let status = match self {
             AuthError::MissingAuthorizationHeader => StatusCode::UNAUTHORIZED,
             AuthError::InvalidAuthorizationToken => StatusCode::UNAUTHORIZED,
@@ -61,10 +63,8 @@ pub async fn auth(
 
     tracing::debug!("Received Authorization Header: {}", auth_header);
 
-    if store.api_token_check(auth_header) {
-        Ok(next.run(req).await)
-    } else {
-        tracing::debug!("Authorization token does NOT match");
-        Err(AuthError::InvalidAuthorizationToken)
+    match store.api_token_check(auth_header) {
+        true => Ok(next.run(req).await),
+        false => Err(AuthError::InvalidAuthorizationToken),
     }
 }

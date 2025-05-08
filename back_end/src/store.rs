@@ -90,12 +90,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::UserNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::UserNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(user);
@@ -120,12 +117,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::UserNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::UserNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(user);
@@ -171,12 +165,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::TokenNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::TokenNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(token);

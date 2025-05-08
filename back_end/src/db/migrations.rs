@@ -1,35 +1,35 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, SystemTimeError as StdSystemTimeError};
 use chrono::{Utc, Local, TimeZone};
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, Sqlite, Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum MigrationError {
-    #[error("Failed to run embedded migrations: {0}")]
-    EmbeddedMigrationError(String),
+    #[error("Failed to run embedded migrations")]
+    EmbeddedMigrationFailed { #[source] source: SqlxMigrateError },
 
-    #[error("Failed to create migrator: {0}")]
-    MigratorCreationError(String),
+    #[error("Failed to create migrator")]
+    MigratorCreationFailed { #[source] source: SqlxMigrateError },
 
-    #[error("Failed to run migrations: {0}")]
-    MigrationRunError(String),
+    #[error("Failed to run migrations")]
+    MigrationRunFailed { #[source] source: SqlxMigrateError },
 
-    #[error("Error getting system time: {0}")]
-    SystemTimeError(String),
+    #[error("Error getting system time")]
+    SystemTimeFailed { #[source] source: StdSystemTimeError },
 
     #[error("Failed to create timestamp")]
     TimestampError,
 
-    #[error("Failed to fetch applied migrations: {0}")]
-    FetchAppliedMigrationsError(String),
+    #[error("Failed to fetch applied migrations")]
+    FetchAppliedMigrationsFailed { #[source] source: SqlxError },
 
     #[error("No migrations applied yet")]
     NoMigrationsApplied,
 
-    #[error("File system error: {0}")]
+    #[error("File system error")]
     FileSystemError(#[from] std::io::Error),
 }
 
@@ -41,15 +41,15 @@ pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), Migr
         sqlx::migrate!()
             .run(pool)
             .await
-            .map_err(|e| MigrationError::EmbeddedMigrationError(e.to_string()))?;
+            .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
     } else {
         // Run migrations from the filesystem
         sqlx::migrate::Migrator::new(migrations_path)
             .await
-            .map_err(|e| MigrationError::MigratorCreationError(e.to_string()))?
+            .map_err(|e| MigrationError::MigratorCreationFailed { source: e })?
             .run(pool)
             .await
-            .map_err(|e| MigrationError::MigrationRunError(e.to_string()))?;
+            .map_err(|e| MigrationError::MigrationRunFailed { source: e })?;
     }
 
     tracing::info!("Database migrations completed successfully");
@@ -67,7 +67,7 @@ pub fn create(name: &str) -> Result<String, MigrationError> {
 
     // Generate a timestamp in the format YYYYMMDDHHMMSS
     let seconds = SystemTime::now().duration_since(UNIX_EPOCH)
-        .map_err(|e| MigrationError::SystemTimeError(e.to_string()))?
+        .map_err(|e| MigrationError::SystemTimeFailed { source: e })?
         .as_secs();
 
     // Properly convert seconds to DateTime<Utc>
@@ -121,12 +121,10 @@ pub async fn check_pending(pool: &Pool<Sqlite>) -> Result<bool, MigrationError> 
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(pool)
         .await
-        .map_err(|e| {
-            if e.to_string().contains("no such table") {
-                // The _sqlx_migrations table doesn't exist yet, which means no migrations have been applied
-                MigrationError::NoMigrationsApplied
-            } else {
-                MigrationError::FetchAppliedMigrationsError(e.to_string())
+        .map_err(|err| {
+            match &err {
+                sqlx::Error::Database(db_err) if db_err.message().contains("no such table") => MigrationError::NoMigrationsApplied,
+                _ => MigrationError::FetchAppliedMigrationsFailed { source: err },
             }
         })?;
 

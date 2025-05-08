@@ -1,24 +1,29 @@
-// print out session
-
-use axum::{response::IntoResponse, Json, http::StatusCode};
+use axum::{response::IntoResponse, http::StatusCode, Json};
 use serde_json::json;
-use tower_sessions::Session;
 use thiserror::Error;
+use tower_sessions::Session;
+use tower_sessions::session::Error as SessionLibError;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
-    #[error("Session fetch error: {0}")]
-    FetchError(String),
-    
+    #[error("Failed to fetch session data")]
+    FetchError(#[source] SessionLibError),
+
+    #[error("Session value not found")]
+    ValueNotFound,
+
     #[error("Session not found")]
-    NotFound,
+    SessionNotFound,
 }
 
 impl IntoResponse for SessionError {
     fn into_response(self) -> axum::response::Response {
+        tracing::error!("{}", &self);
+
         let (status, error_message) = match self {
-            Self::FetchError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
-            Self::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            Self::FetchError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::ValueNotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            Self::SessionNotFound => (StatusCode::NOT_FOUND, self.to_string()),
         };
 
         let body = Json(json!({
@@ -41,12 +46,9 @@ pub async fn handler(session: Session) -> Result<impl IntoResponse, SessionError
 #[allow(clippy::unused_async)]
 pub async fn data_handler(session: Session) -> Result<impl IntoResponse, SessionError> {
     tracing::info!("Seeking session data");
-    let user_id = session.get_value("user_id").await
-        .map_err(|err| {
-            tracing::error!("Failed to get session data: {}", err);
-            SessionError::FetchError(format!("Failed to get session data: {}", err))
-        })?
-        .unwrap_or_default();
+    let user_id: String = session.get("user_id").await
+        .map_err(SessionError::FetchError)?
+        .ok_or(SessionError::ValueNotFound)?;
 
     Ok(Json(json!({ "user_id": user_id })))
 }

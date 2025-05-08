@@ -16,12 +16,12 @@ pub type DbPoolRef = Arc<DbPool>;
 
 #[derive(Debug, Error)]
 pub enum DbError {
-    #[error("Failed to parse database URL: {0}")]
+    #[error("Failed to parse database URL")]
     ConnectionStringError(#[from] sqlx::Error),
-    
-    #[error("Failed to connect to database: {0}")]
-    ConnectionError(String),
-    
+
+    #[error("Failed to connect to database")]
+    ConnectionError(#[source] sqlx::Error),
+
     #[error("Migration error: {0}")]
     MigrationError(#[from] migrations::MigrationError),
 }
@@ -37,7 +37,7 @@ pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError>
         .max_connections(db_config.max_connections)
         .connect_with(options)
         .await
-        .map_err(|e| DbError::ConnectionError(e.to_string()))?;
+        .map_err(DbError::ConnectionError)?; // Updated to use the new variant
 
     // Determine the migrations path
     let migrations_path = Path::new("./back_end/migrations");
