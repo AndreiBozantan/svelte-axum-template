@@ -28,10 +28,13 @@ pub enum AppError {
     Config(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    Database(anyhow::Error),
+    Database(#[from] db::DbError),
 
     #[error("Migration error: {0}")]
-    Migration(anyhow::Error),
+    Migration(#[from] db::migrations::MigrationError),
+
+    #[error("CLI error: {0}")]
+    CliError(#[from] cli::CliError),
 
     #[error("Network error: {0}")]
     Network(String),
@@ -64,7 +67,7 @@ async fn main() -> Result<(), AppError> {
     // Run migration CLI if requested
     if let Err(e) = cli::run_migration_cli(&db_pool).await {
         tracing::error!("Migration CLI error: {:?}", e);
-        return Err(AppError::Migration(e));
+        return Err(AppError::CliError(e));
     }
 
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port)
@@ -100,10 +103,9 @@ async fn main() -> Result<(), AppError> {
 /// Tokio signal handler that will wait for a user to press CTRL+C.
 /// We use this in our `Server` method `with_graceful_shutdown`.
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .unwrap_or_else(|e| {
-            tracing::error!("Failed to listen for shutdown signal: {}", e);
-        });
-    tracing::info!("Shutdown signal received, shutting down gracefully");
+    if let Err(e) = tokio::signal::ctrl_c().await {
+        tracing::error!("Failed to listen for shutdown signal: {}", e);
+    } else {
+        tracing::info!("Shutdown signal received, shutting down gracefully");
+    }
 }

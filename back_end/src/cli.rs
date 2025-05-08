@@ -1,10 +1,31 @@
 // cli.rs - CLI utility for database migrations
 use std::env;
 use std::path::Path;
-use anyhow::Result;
+use thiserror::Error;
 use clap::{Parser, Subcommand};
 
 use crate::db;
+
+#[derive(Debug, Error)]
+pub enum CliError {
+    #[error("Migration creation error: {0}")]
+    MigrationCreationError(String),
+
+    #[error("Failed to list migrations: {0}")]
+    ListMigrationsError(String),
+
+    #[error("Failed to check migration status: {0}")]
+    MigrationStatusError(String),
+
+    #[error("Failed to run migrations: {0}")]
+    RunMigrationsError(String),
+
+    #[error("File system error: {0}")]
+    FileSystemError(#[from] std::io::Error),
+
+    #[error("Other error: {0}")]
+    Other(String),
+}
 
 #[derive(Parser)]
 #[command(name = "migrate")]
@@ -29,7 +50,7 @@ enum MigrateSubCommands {
     Run,
 }
 
-pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<()> {
+pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -45,11 +66,13 @@ pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<()> {
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
-            let filename = db::migrations::create(&name)?;
+            let filename = db::migrations::create(&name)
+                .map_err(|e| CliError::MigrationCreationError(e.to_string()))?;
             println!("Created new migration file: {filename}");
         },
         MigrateSubCommands::List => {
-            let migrations = db::migrations::list()?;
+            let migrations = db::migrations::list()
+                .map_err(|e| CliError::ListMigrationsError(e.to_string()))?;
             if migrations.is_empty() {
                 println!("No migrations found.");
             } else {
@@ -64,17 +87,18 @@ pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<()> {
                 Ok(true) => println!("There are pending migrations that need to be applied."),
                 Ok(false) => println!("Database is up to date. No pending migrations."),
                 Err(e) => {
-                    if e.to_string().contains("No migrations applied yet") {
+                    if let db::migrations::MigrationError::NoMigrationsApplied = e {
                         println!("No migrations have been applied yet.");
                     } else {
-                        return Err(e);
+                        return Err(CliError::MigrationStatusError(e.to_string()));
                     }
                 }
             }
         },
         MigrateSubCommands::Run => {
             let migrations_path = Path::new("./back_end/migrations");
-            db::migrations::run(&db_pool, migrations_path).await?;
+            db::migrations::run(&db_pool, migrations_path).await
+                .map_err(|e| CliError::RunMigrationsError(e.to_string()))?;
             println!("Migrations applied successfully.");
         },
     }
