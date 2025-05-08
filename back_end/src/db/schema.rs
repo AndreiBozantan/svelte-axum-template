@@ -3,11 +3,44 @@ use sqlx::FromRow;
 use std::time::SystemTime;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Tenant {
+    pub id: i64,
+    pub name: String,
+    pub description: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl Tenant {
+    pub fn new(id: i64, name: String, description: Option<String>) -> Self {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        Self {
+            id,
+            name,
+            description,
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewTenant {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: i64,
     pub username: String,
     pub password_hash: String,
     pub email: Option<String>,
+    pub tenant_id: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -17,10 +50,11 @@ pub struct NewUser {
     pub username: String,
     pub password_hash: String,
     pub email: Option<String>,
+    pub tenant_id: Option<i64>,
 }
 
 impl User {
-    pub fn new(id: i64, username: String, password_hash: String, email: Option<String>) -> Self {
+    pub fn new(id: i64, username: String, password_hash: String, email: Option<String>, tenant_id: Option<i64>) -> Self {
         let now = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -31,6 +65,7 @@ impl User {
             username,
             password_hash,
             email,
+            tenant_id,
             created_at: now,
             updated_at: now,
         }

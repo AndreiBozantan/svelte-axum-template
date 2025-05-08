@@ -30,7 +30,6 @@ clap = { version = "4.4", features = ["derive"] }
 chrono = { version = "0.4" }
 
 [features]
-# SQLx requires runtime-tokio and sqlite features, everything else is optional
 sqlite-offline = ["sqlx/sqlite"]
 
 # Important: This tells SQLx to skip compile-time verification of database queries
