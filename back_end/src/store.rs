@@ -302,7 +302,7 @@ impl Store {
         let result = sqlx::query!(
             r#"
             DELETE FROM tenants
-            WHERE id = $1
+            WHERE id = ?
             "#,
             id
         )
@@ -339,8 +339,8 @@ impl Store {
         let result = sqlx::query!(
             r#"
             UPDATE users
-            SET tenant_id = $1
-            WHERE id = $2
+            SET tenant_id = ?
+            WHERE id = ?
             "#,
             tenant_id,
             user_id
