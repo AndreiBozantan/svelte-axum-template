@@ -3,7 +3,7 @@ use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
 use crate::db::DbPoolRef;
-use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User};
+use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User, current_timestamp};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -197,10 +197,7 @@ impl Store {
     }
 
     pub async fn verify_token(&self, token: &str) -> Result<bool, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let result = sqlx::query!(
             r#"
@@ -259,10 +256,7 @@ impl Store {
     }
 
     pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let tenant = sqlx::query_as!(
             Tenant,
@@ -283,10 +277,7 @@ impl Store {
     }
 
     pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let tenant = sqlx::query_as!(
             Tenant,

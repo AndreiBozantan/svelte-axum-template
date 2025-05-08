@@ -2,6 +2,13 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use std::time::SystemTime;
 
+pub fn current_timestamp() -> i64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+}
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Tenant {
     pub id: i64,
@@ -13,10 +20,7 @@ pub struct Tenant {
 
 impl Tenant {
     pub fn new(id: i64, name: String, description: Option<String>) -> Self {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         Self {
             id,
@@ -55,10 +59,7 @@ pub struct NewUser {
 
 impl User {
     pub fn new(id: i64, username: String, password_hash: String, email: Option<String>, tenant_id: Option<i64>) -> Self {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         Self {
             id,
@@ -72,6 +73,7 @@ impl User {
     }
 }
 
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct ApiToken {
     pub id: i64,
@@ -83,10 +85,7 @@ pub struct ApiToken {
 
 impl ApiToken {
     pub fn new(id: i64, token: String, user_id: i64, expires_at: Option<i64>) -> Self {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         Self {
             id,
