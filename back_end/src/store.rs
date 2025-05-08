@@ -234,7 +234,7 @@ impl Store {
         .fetch_all(&*self.db_pool)
         .await?;
 
-        Ok(tenants)
+        return Ok(tenants)
     }
 
     pub async fn get_tenant_by_id(&self, id: i64) -> Result<Tenant, StoreError> {
@@ -248,14 +248,14 @@ impl Store {
                 created_at as "created_at!",
                 updated_at as "updated_at!"
             FROM tenants
-            WHERE id = $1
+            WHERE id = ?
             "#,
             id
         )
         .fetch_one(&*self.db_pool)
         .await?;
 
-        Ok(tenant)
+        return Ok(tenant)
     }
 
     pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
@@ -279,7 +279,7 @@ impl Store {
         .fetch_one(&*self.db_pool)
         .await?;
 
-        Ok(tenant)
+        return Ok(tenant)
     }
 
     pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
@@ -292,8 +292,8 @@ impl Store {
             Tenant,
             r#"
             UPDATE tenants
-            SET name = $1, description = $2, updated_at = $3
-            WHERE id = $4
+            SET name = ?, description = ?, updated_at = ?
+            WHERE id = ?
             RETURNING id, name, description, created_at, updated_at
             "#,
             tenant.name,
@@ -304,7 +304,7 @@ impl Store {
         .fetch_one(&*self.db_pool)
         .await?;
 
-        Ok(tenant)
+        return Ok(tenant)
     }
 
     pub async fn delete_tenant(&self, id: i64) -> Result<SqliteQueryResult, StoreError> {
@@ -318,7 +318,7 @@ impl Store {
         .execute(&*self.db_pool)
         .await?;
 
-        Ok(result)
+        return Ok(result)
     }
 
     pub async fn get_users_by_tenant(&self, tenant_id: i64) -> Result<Vec<User>, StoreError> {
@@ -334,14 +334,14 @@ impl Store {
                 created_at as "created_at!",
                 updated_at as "updated_at!"
             FROM users
-            WHERE tenant_id = $1
+            WHERE tenant_id = ?
             "#,
             tenant_id
         )
         .fetch_all(&*self.db_pool)
         .await?;
 
-        Ok(users)
+        return Ok(users)
     }
 
     pub async fn assign_user_to_tenant(&self, user_id: i64, tenant_id: i64) -> Result<SqliteQueryResult, StoreError> {
@@ -357,6 +357,6 @@ impl Store {
         .execute(&*self.db_pool)
         .await?;
 
-        Ok(result)
+        return Ok(result)
     }
 }
