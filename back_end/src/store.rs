@@ -2,7 +2,8 @@ use anyhow::Result;
 use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
-use crate::db::{DbPoolRef, schema::{ApiToken, User, NewUser}};
+use crate::db::DbPoolRef;
+use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -17,6 +18,9 @@ pub enum StoreError {
 
     #[error("Token not found")]
     TokenNotFound,
+
+    #[error("Tenant not found")]
+    TenantNotFound,
 }
 
 #[derive(Clone, Debug)]
@@ -52,13 +56,14 @@ impl Store {
         let user = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (username, password_hash, email, created_at, updated_at)
-            VALUES (?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
-            RETURNING id, username, password_hash, email, created_at, updated_at
+            INSERT INTO users (username, password_hash, email, tenant_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+            RETURNING id, username, password_hash, email, tenant_id, created_at, updated_at
             "#,
             new_user.username,
             new_user.password_hash,
-            new_user.email
+            new_user.email,
+            new_user.tenant_id
         )
         .fetch_one(&*self.db_pool)
         .await?;
@@ -75,6 +80,7 @@ impl Store {
                 username "username!",
                 password_hash "password_hash!",
                 email,
+                tenant_id "tenant_id!",
                 created_at "created_at!",
                 updated_at "updated_at!"
             FROM users
@@ -104,6 +110,7 @@ impl Store {
                 username "username!",
                 password_hash "password_hash!",
                 email,
+                tenant_id "tenant_id!",
                 created_at "created_at!",
                 updated_at "updated_at!"
             FROM users
@@ -211,5 +218,145 @@ impl Store {
         return Ok(result.count > 0);
     }
 
-    // For future: add methods for updating user info, listing users, etc.
+    pub async fn get_tenants(&self) -> Result<Vec<Tenant>, StoreError> {
+        let tenants = sqlx::query_as!(
+            Tenant,
+            r#"
+            SELECT
+                id as "id!",
+                name as "name!",
+                description as "description!",
+                created_at as "created_at!",
+                updated_at as "updated_at!"
+            FROM tenants
+            "#
+        )
+        .fetch_all(&*self.db_pool)
+        .await?;
+
+        Ok(tenants)
+    }
+
+    pub async fn get_tenant_by_id(&self, id: i64) -> Result<Tenant, StoreError> {
+        let tenant = sqlx::query_as!(
+            Tenant,
+            r#"
+            SELECT
+                id as "id!",
+                name as "name!",
+                description as "description!",
+                created_at as "created_at!",
+                updated_at as "updated_at!"
+            FROM tenants
+            WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_one(&*self.db_pool)
+        .await?;
+
+        Ok(tenant)
+    }
+
+    pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let tenant = sqlx::query_as!(
+            Tenant,
+            r#"
+            INSERT INTO tenants (name, description, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            RETURNING id, name, description, created_at, updated_at
+            "#,
+            tenant.name,
+            tenant.description,
+            now,
+            now
+        )
+        .fetch_one(&*self.db_pool)
+        .await?;
+
+        Ok(tenant)
+    }
+
+    pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        let tenant = sqlx::query_as!(
+            Tenant,
+            r#"
+            UPDATE tenants
+            SET name = $1, description = $2, updated_at = $3
+            WHERE id = $4
+            RETURNING id, name, description, created_at, updated_at
+            "#,
+            tenant.name,
+            tenant.description,
+            now,
+            id
+        )
+        .fetch_one(&*self.db_pool)
+        .await?;
+
+        Ok(tenant)
+    }
+
+    pub async fn delete_tenant(&self, id: i64) -> Result<SqliteQueryResult, StoreError> {
+        let result = sqlx::query!(
+            r#"
+            DELETE FROM tenants
+            WHERE id = $1
+            "#,
+            id
+        )
+        .execute(&*self.db_pool)
+        .await?;
+
+        Ok(result)
+    }
+
+    pub async fn get_users_by_tenant(&self, tenant_id: i64) -> Result<Vec<User>, StoreError> {
+        let users = sqlx::query_as!(
+            User,
+            r#"
+            SELECT
+                id as "id!",
+                username as "username!",
+                password_hash as "password_hash!",
+                email,
+                tenant_id as "tenant_id!",
+                created_at as "created_at!",
+                updated_at as "updated_at!"
+            FROM users
+            WHERE tenant_id = $1
+            "#,
+            tenant_id
+        )
+        .fetch_all(&*self.db_pool)
+        .await?;
+
+        Ok(users)
+    }
+
+    pub async fn assign_user_to_tenant(&self, user_id: i64, tenant_id: i64) -> Result<SqliteQueryResult, StoreError> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE users
+            SET tenant_id = $1
+            WHERE id = $2
+            "#,
+            tenant_id,
+            user_id
+        )
+        .execute(&*self.db_pool)
+        .await?;
+
+        Ok(result)
+    }
 }

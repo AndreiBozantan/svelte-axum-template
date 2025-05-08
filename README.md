@@ -51,8 +51,6 @@ Starting project template for Rust Axum backend and Svelte frontend.  Simple Sin
 - /api route example using authorization header
 - /secure route example using sessions for authorization
 
-Note there is no persistance beyond what's held in memory while the application is running
-
 run as `cargo run` from parent directory and not needed to run inside `./back_end` folder
 
 # Front end - Svelte
@@ -71,8 +69,15 @@ Rust  - [Install](https://www.rust-lang.org/tools/install)
 
 Clone the repository
 - cd repository
+
+- initialize the database with `sqlx` by running the following command from the root of the project:
+    - `cargo install sqlx-cli`
+    - `sqlx database create --database-url sqlite:db.sqlite`
+    - `sqlx migrate run --database-url sqlite:db.sqlite --source back_end/migrations`
+
 - inside the `./front_end` folder run `npm install` to download all module dependencies inside root directory of project
 - inside the `./front_end` folder run `npm run build` to bundle the js/svelte code into public folder
+- inside the `./back_end` folder run `cargo build` to build the backend code
 - inside the top level folder run `cargo run` to start the the server
 - access in browser at http://localhost:8080/
 
