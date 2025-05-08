@@ -7,7 +7,7 @@ use chrono::{Utc, Local, TimeZone};
 use sqlx::{Pool, Sqlite};
 
 /// Runs all migrations from the filesystem migration path
-pub async fn run_migrations(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<()> {
+pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<()> {
     if !migrations_path.exists() {
         tracing::warn!("Migrations directory not found at {:?}, falling back to embedded migrations", migrations_path);
         // Run migrations from embedded
@@ -39,7 +39,7 @@ pub async fn run_migrations(pool: &Pool<Sqlite>, migrations_path: &Path) -> Resu
 }
 
 /// Create a new migration file with the current timestamp
-pub fn create_migration(name: &str) -> Result<String> {
+pub fn create(name: &str) -> Result<String> {
     let migrations_dir = Path::new("./back_end/migrations");
 
     // Create migrations directory if it doesn't exist
@@ -72,7 +72,7 @@ pub fn create_migration(name: &str) -> Result<String> {
 }
 
 /// List all available migrations
-pub fn list_migrations() -> Result<Vec<String>> {
+pub fn list() -> Result<Vec<String>> {
     let migrations_dir = Path::new("./back_end/migrations");
 
     if !migrations_dir.exists() {
@@ -98,7 +98,7 @@ pub fn list_migrations() -> Result<Vec<String>> {
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(pool: &Pool<Sqlite>) -> Result<bool> {
+pub async fn check_pending(pool: &Pool<Sqlite>) -> Result<bool> {
     // Get the list of applied migrations from the database
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(pool)
@@ -112,7 +112,7 @@ pub async fn check_pending_migrations(pool: &Pool<Sqlite>) -> Result<bool> {
         })?;
 
     // Get the list of available migrations
-    let available_migrations = list_migrations()?;
+    let available_migrations = list()?;
 
     // Check if there are any migrations that haven't been applied
     let applied_names: Vec<String> = applied_migrations.into_iter()
