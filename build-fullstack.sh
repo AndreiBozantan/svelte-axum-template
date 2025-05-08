@@ -13,6 +13,23 @@ cargo_output=$(mktemp)
 npm_status=$(mktemp)
 cargo_status=$(mktemp)
 
+# Initialize the database for sqlx compile time checks, before building the backend:
+cargo sqlx database create --database-url sqlite:db.sqlite` # create the database if it doesn't exist
+
+cargo sqlx migrate run --database-url sqlite:db.sqlite --source migrations` # run the migrations
+if [ $? -ne 0 ]; then
+    echo "Database migration failed:"
+    cat $cargo_output
+    exit 1
+fi
+
+cargo sqlx --workspace prepare --database-url sqlite:db.sqlite` # prepare the database for sqlx compile time checks
+if [ $? -ne 0 ]; then
+    echo "Database prepare failed:"
+    cat $cargo_output
+    exit 1
+fi
+
 # run in background, capture outputs, error codes
 script -q -c "cd front_end && npm i && npm run build; echo \$? > $npm_status" /dev/null > $npm_output 2> $npm_output
 npm_pid=$!

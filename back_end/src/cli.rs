@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-use crate::db::{init_db_pool, migrations};
+use crate::db;
 
 #[derive(Parser)]
 #[command(name = "migrate")]
@@ -29,7 +29,7 @@ enum MigrateSubCommands {
     Run,
 }
 
-pub async fn run_migration_cli() -> Result<()> {
+pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -45,11 +45,11 @@ pub async fn run_migration_cli() -> Result<()> {
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
-            let filename = migrations::create_migration(&name)?;
-            println!("Created new migration file: {}", filename);
+            let filename = db::migrations::create(&name)?;
+            println!("Created new migration file: {filename}");
         },
         MigrateSubCommands::List => {
-            let migrations = migrations::list_migrations()?;
+            let migrations = db::migrations::list()?;
             if migrations.is_empty() {
                 println!("No migrations found.");
             } else {
@@ -60,8 +60,7 @@ pub async fn run_migration_cli() -> Result<()> {
             }
         },
         MigrateSubCommands::Status => {
-            let pool = init_db_pool().await?;
-            match migrations::check_pending_migrations(&pool).await {
+            match db::migrations::check_pending(&db_pool).await {
                 Ok(true) => println!("There are pending migrations that need to be applied."),
                 Ok(false) => println!("Database is up to date. No pending migrations."),
                 Err(e) => {
@@ -74,9 +73,8 @@ pub async fn run_migration_cli() -> Result<()> {
             }
         },
         MigrateSubCommands::Run => {
-            let pool = init_db_pool().await?;
             let migrations_path = Path::new("./back_end/migrations");
-            migrations::run_migrations(&pool, migrations_path).await?;
+            db::migrations::run(&db_pool, migrations_path).await?;
             println!("Migrations applied successfully.");
         },
     }
