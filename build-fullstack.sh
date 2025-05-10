@@ -23,7 +23,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-cargo sqlx --workspace prepare --database-url sqlite:db.sqlite # prepare the database for sqlx compile time checks
+cargo sqlx prepare --workspace --database-url sqlite:db.sqlite # prepare the database for sqlx compile time checks
 if [ $? -ne 0 ]; then
     echo "Database prepare failed:"
     cat $cargo_output
