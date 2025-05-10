@@ -58,9 +58,7 @@
     {#if menu === 1}
         <div>
             <container>
-                {#if isInitializing}
-                    <h4>Loading...</h4>
-                {:else if !loggedin}
+                {#if !loggedin}
                     <h4>Requires Login</h4>
                 {:else}
                     <h4>Logged In as {$user}</h4>
