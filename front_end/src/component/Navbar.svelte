@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
-  export let navItems: { label: string; id: number }[] = [{ label: "logo", id: 0 }];
-  export let menu: number = 1;
+  let { navItems = [{ label: "logo", id: 0 }], menu = $bindable(1) } = $props();
 
   // Show mobile icon and display menu
-  let showMobileMenu: boolean = false;
+  let showMobileMenu = $state(false);
 
   // Mobile menu click event handler
   const handleMobileIconClick = (): void => {
@@ -44,8 +43,8 @@
     <div
       role="button"
       tabindex=0
-      on:keydown={handleKeyDown}
-      on:click={handleMobileIconClick}
+      onkeydown={handleKeyDown}
+      onclick={handleMobileIconClick}
       class={`mobile-icon${showMobileMenu ? " active" : ""}`}
     >
       <div class="middle-line"></div>
@@ -55,7 +54,10 @@
         <li>
           <a
             href="/"
-            on:click|preventDefault={() => handleMenuSelection(item.id)}
+            onclick={(e) => {
+              e.preventDefault();
+              handleMenuSelection(item.id);
+            }}
             >{item.label}</a
           >
         </li>

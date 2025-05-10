@@ -3,7 +3,8 @@
     import { getLogout } from "./../ts/auth";
     import { onMount } from "svelte";
 
-    $user;
+    // We don't need to access $user here just to make it reactive
+    // In Svelte 5, we'll just use it in the template
 
     onMount(getLogout);
 </script>

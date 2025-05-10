@@ -2,8 +2,9 @@
     import { user } from "./../ts/store";
     import { getSession, postLogin } from "./../ts/auth";
 
-    let username: string, password: string;
-    let errorMessage: string = "";
+    let username = $state("");
+    let password = $state("");
+    let errorMessage = $state("");
 
     async function handleLogin(): Promise<void> {
         let loginResponse = await postLogin(username, password);
@@ -38,7 +39,7 @@
                     placeholder="password"
                     bind:value={password}
                 />
-                <button on:click={handleLogin}> Login </button>
+                <button onclick={handleLogin}> Login </button>
             </div>
         </container>
     </div>

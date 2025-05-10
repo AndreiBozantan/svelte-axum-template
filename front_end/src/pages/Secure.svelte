@@ -3,7 +3,7 @@
   import { user } from "./../ts/store";
   import { getSecure } from "./../ts/fetch";
 
-  let response: string = '';
+  let response = $state('');
 
   onMount(async () => {
     response = await getSecure();

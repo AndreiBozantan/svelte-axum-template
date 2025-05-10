@@ -8,11 +8,11 @@
     import Apicheck from "./pages/Apicheck.svelte";
     import { onMount } from "svelte";
 
-    let menu: number = 1;
-    let isInitializing: boolean = true; // Flag to track initial loading state
+    let menu = $state(1);
+    let isInitializing = $state(true); // Flag to track initial loading state
 
-    // Use reactive statement (Svelte 4 style)
-    $: loggedin = $user !== "" && $user !== undefined;
+    // Use $derived for reactive derivations (replacing $:)
+    const loggedin = $derived($user !== "" && $user !== undefined);
 
     // check if logged in
     onMount(async () => {
@@ -20,7 +20,7 @@
         isInitializing = false; // Mark initialization as complete
     });
 
-    const set_menu_items = (loggedin: boolean) => {
+    const getMenuItems = (loggedin: boolean) => {
         if (loggedin) {
             return [
                 { label: "About", id: 1 },
@@ -40,7 +40,7 @@
 
 <!-- MENNU BAR ON TOP -->
 {#if !isInitializing}
-  <NavBar navItems={set_menu_items(loggedin)} bind:menu />
+  <NavBar navItems={getMenuItems(loggedin)} bind:menu />
 {:else}
   <nav>
     <div class="inner">

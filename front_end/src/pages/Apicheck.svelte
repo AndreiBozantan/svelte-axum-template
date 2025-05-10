@@ -1,8 +1,8 @@
 <script lang="ts">
     import { getApi } from "../ts/fetch";
 
-    let token: string = "123456789";
-    let response: string = "";
+    let token = $state("123456789");
+    let response = $state("");
 
     async function handlebutton(): Promise<void> {
         response = "<nothing returned>";
@@ -22,7 +22,7 @@
 
         <label for="apiToken">API Token</label>
         <input class="input" type="text" bind:value={token} />
-        <button on:click={handlebutton}> Get /api </button>
+        <button onclick={handlebutton}> Get /api </button>
 
         <p class="mono">RESPONSE: {response}</p>
     </container>
