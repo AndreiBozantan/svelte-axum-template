@@ -1,9 +1,9 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
-  import { user } from "./../js/store.js";
-  import { getSecure } from "./../js/fetch.js";
+  import { user } from "./../ts/store";
+  import { getSecure } from "./../ts/fetch";
 
-  let response;
+  let response: string = '';
 
   onMount(async () => {
     response = await getSecure();

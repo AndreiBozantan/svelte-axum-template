@@ -1,4 +1,4 @@
-import {user} from './store.js';
+import {user} from './store';
 
 export async function getSession() {
     const res = await fetch('/auth/session',{credentials: 'same-origin'});
@@ -11,7 +11,7 @@ export async function getSession() {
     }
 }
 
-export async function postLogin(username, password) {
+export async function postLogin(username: string, password: string) {
     const res = await fetch("/auth/login", {
         method: "POST",
         headers: {
@@ -23,7 +23,7 @@ export async function postLogin(username, password) {
     return await res.json();
 }
 
-export async function getLogout(username, password) {
+export async function getLogout() {
     const res = await fetch("/auth/logout", {credentials: 'same-origin'});
 
     let logoutResponse = await res.json();

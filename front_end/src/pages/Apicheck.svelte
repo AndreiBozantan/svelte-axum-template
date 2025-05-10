@@ -1,10 +1,10 @@
-<script>
-    import { getApi } from "../js/fetch.js";
+<script lang="ts">
+    import { getApi } from "../ts/fetch";
 
-    let token = "123456789";
-    let response = "";
+    let token: string = "123456789";
+    let response: string = "";
 
-    async function handlebutton() {
+    async function handlebutton(): Promise<void> {
         response = "<nothing returned>";
         response = JSON.stringify(await getApi(token));
         console.log(`TOKEN: ${token}`);
