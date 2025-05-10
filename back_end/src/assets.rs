@@ -34,7 +34,7 @@ impl IntoResponse for AssetError {
             Self::NotFound(path) => format!("Asset not found: {}", path),
         };
 
-        (status, body).into_response()
+        return (status, body).into_response();
     }
 }
 
@@ -44,45 +44,43 @@ pub async fn static_handler(uri: Uri) -> AxumResult<impl IntoResponse, AssetErro
         path_str = "index.html";
     }
 
-    match Assets::get(path_str) {
-        Some(content) => { // Asset found directly
-            let mime_type = mime_guess::from_path(path_str).first_or_octet_stream();
-            let mut builder = Response::builder()
-                .header(header::CONTENT_TYPE, mime_type.as_ref());
-
-            if path_str == "index.html" {
-                builder = builder.header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate");
-            } else {
-                // Aggressive caching for other assets
-                builder = builder.header(header::CACHE_CONTROL, "public, max-age=31536000, immutable"); // 1 year
-
-                let hash_bytes = content.metadata.sha256_hash();
-                let hex_hash: String = hash_bytes.iter().map(|b| format!("{:02x}", b)).collect();
-                let etag = format!("\"{}\"", hex_hash);
-                builder = builder.header(header::ETAG, etag);
-
-                if let Some(last_modified_ts) = content.metadata.last_modified() {
-                    if let Some(dt) = Utc.timestamp_opt(last_modified_ts as i64, 0).single() {
-                        builder = builder.header(header::LAST_MODIFIED, dt.to_rfc2822());
-                    }
-                }
-            }
-            Ok(builder.body(Body::from(content.data.to_vec()))?)
+    let asset = Assets::get(path_str);
+    if asset.is_none() {
+        let asset = Assets::get("index.html");
+        if asset.is_none() {
+            // Critical error: requested asset not found, AND index.html (SPA fallback) is also missing.
+            return Err(AssetError::NotFound(path_str.to_string()));
         }
-        None => { // Asset not found directly
-            // If the requested path was not "index.html", try serving "index.html" as a fallback for SPA routing.
-            if path_str != "index.html" {
-                if let Some(index_content) = Assets::get("index.html") {
-                    return Ok(Response::builder()
-                        .header(header::CONTENT_TYPE, "text/html")
-                        .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                        .body(Body::from(index_content.data.to_vec()))?);
-                } else {
-                    // Critical error: requested asset not found, AND index.html (SPA fallback) is also missing.
-                    return Err(AssetError::NotFound("index.html".to_string()));
-                }
+
+        let index_content = asset.unwrap(); // index.html found
+        let response = Response::builder()
+            .header(header::CONTENT_TYPE, "text/html")
+            .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+            .body(Body::from(index_content.data.to_vec()))?;
+
+        return Ok(response);
+    }
+
+    let content = asset.unwrap(); // Asset found directly
+    let mime_type = mime_guess::from_path(path_str).first_or_octet_stream();
+    let mut builder = Response::builder().header(header::CONTENT_TYPE, mime_type.as_ref());
+
+    if path_str == "index.html" {
+        builder = builder.header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate");
+    } else {
+        // Aggressive caching for other assets
+        builder = builder.header(header::CACHE_CONTROL, "public, max-age=31536000, immutable"); // 1 year
+
+        let hash_bytes = content.metadata.sha256_hash();
+        let hex_hash: String = hash_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        let etag = format!("\"{}\"", hex_hash);
+        builder = builder.header(header::ETAG, etag);
+
+        if let Some(last_modified_ts) = content.metadata.last_modified() {
+            if let Some(dt) = Utc.timestamp_opt(last_modified_ts as i64, 0).single() {
+                builder = builder.header(header::LAST_MODIFIED, dt.to_rfc2822());
             }
-            Err(AssetError::NotFound(path_str.to_string()))
         }
     }
+    return Ok(builder.body(Body::from(content.data.to_vec()))?);
 }
