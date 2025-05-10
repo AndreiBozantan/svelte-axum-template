@@ -1,17 +1,20 @@
-# Editor directories and files
+# editor files
 .vscode/*
 
-# from rust
+# rust files
 Cargo.lock
 target
 
-# from svelte
+# svelte files
 front_end/node_modules
 front_end/dist/
 front_end/package-lock.json
 
+# sqlx files
+.env
+.sqlx/*
+
 # app files
 db.sqlite
-.sqlx/*
 config/local.toml
 

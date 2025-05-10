@@ -31,7 +31,7 @@ Work in progress (new features coming), but should be usable as a starting point
     - `cd ..` - to go back to the root directory of the project
     - `cargo sqlx database create --database-url sqlite:db.sqlite` - to create the database
     - `cargo sqlx migrate run --database-url sqlite:db.sqlite --source migrations` - to run the migrations
-    - `cargo sqlx --workspace prepare --database-url sqlite:db.sqlite` - to create metadata for compile time checks
+    - `cargo sqlx prepare --workspace --database-url sqlite:db.sqlite` - to create metadata for compile time checks
 
 - Build the backend code and run the server:
     - `cargo build` - to build the backend code
@@ -62,10 +62,10 @@ run as `cargo run` from parent directory and not needed to run inside `./back_en
 run as `npm run build` from inside the `./front_end` directory to build the static serve file directory.
 
 # Version History
+
 ## Version 0.7.1
 - load config from toml files and env variables, see [pr#6](https://github.com/AndreiBozantan/svelte-axum-template/pull/6)
 - some cleanup of the backend code
-
 
 ## Version 0.7
 - update to use Rust edition 2024, see [pr#3](https://github.com/AndreiBozantan/svelte-axum-template/pull/3)

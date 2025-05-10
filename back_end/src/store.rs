@@ -3,7 +3,7 @@ use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
 use crate::db::DbPoolRef;
-use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User};
+use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User, current_timestamp};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -90,12 +90,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::UserNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::UserNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(user);
@@ -120,12 +117,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::UserNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::UserNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(user);
@@ -171,12 +165,9 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await
-        .map_err(|e| {
-            if let sqlx::Error::RowNotFound = e {
-                StoreError::TokenNotFound
-            } else {
-                StoreError::Database(e)
-            }
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::TokenNotFound,
+            _ => StoreError::Database(e),
         })?;
 
         return Ok(token);
@@ -197,10 +188,7 @@ impl Store {
     }
 
     pub async fn verify_token(&self, token: &str) -> Result<bool, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let result = sqlx::query!(
             r#"
@@ -259,10 +247,7 @@ impl Store {
     }
 
     pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let tenant = sqlx::query_as!(
             Tenant,
@@ -283,10 +268,7 @@ impl Store {
     }
 
     pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let now = current_timestamp();
 
         let tenant = sqlx::query_as!(
             Tenant,
@@ -311,7 +293,7 @@ impl Store {
         let result = sqlx::query!(
             r#"
             DELETE FROM tenants
-            WHERE id = $1
+            WHERE id = ?
             "#,
             id
         )
@@ -348,8 +330,8 @@ impl Store {
         let result = sqlx::query!(
             r#"
             UPDATE users
-            SET tenant_id = $1
-            WHERE id = $2
+            SET tenant_id = ?
+            WHERE id = ?
             "#,
             tenant_id,
             user_id

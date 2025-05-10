@@ -4,8 +4,8 @@ pub mod migrations;
 use std::path::Path;
 use std::sync::Arc;
 use std::str::FromStr;
+use thiserror::Error;
 
-use anyhow::Result;
 use sqlx::{Pool, Sqlite};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
@@ -14,7 +14,19 @@ pub use crate::appconfig::DatabaseConfig;
 pub type DbPool = Pool<Sqlite>;
 pub type DbPoolRef = Arc<DbPool>;
 
-pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef> {
+#[derive(Debug, Error)]
+pub enum DbError {
+    #[error("Failed to parse database URL")]
+    ConnectionStringError(#[from] sqlx::Error),
+
+    #[error("Failed to connect to database")]
+    ConnectionError(#[source] sqlx::Error),
+
+    #[error("Migration error: {0}")]
+    MigrationError(#[from] migrations::MigrationError),
+}
+
+pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
             .create_if_missing(true)
             .foreign_keys(true)
@@ -24,7 +36,8 @@ pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef> {
     let pool = SqlitePoolOptions::new()
         .max_connections(db_config.max_connections)
         .connect_with(options)
-        .await?;
+        .await
+        .map_err(DbError::ConnectionError)?; // Updated to use the new variant
 
     // Determine the migrations path
     let migrations_path = Path::new("./back_end/migrations");

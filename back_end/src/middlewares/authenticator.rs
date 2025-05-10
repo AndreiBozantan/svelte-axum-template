@@ -5,12 +5,44 @@ use axum::{
     extract::State,
     http::{self, Request, StatusCode},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde_json::json;
+use thiserror::Error;
 
 use crate::store::Store;
+
+#[derive(Debug, Error)]
+pub enum AuthError {
+    #[error("Authorization header missing")]
+    MissingAuthorizationHeader,
+
+    #[error("Authorization token does NOT match")]
+    InvalidAuthorizationToken,
+
+    #[error("Internal Server Error")]
+    InternalServerError,
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> axum::response::Response {
+        tracing::error!("{}", &self);
+
+        let status = match self {
+            AuthError::MissingAuthorizationHeader => StatusCode::UNAUTHORIZED,
+            AuthError::InvalidAuthorizationToken => StatusCode::UNAUTHORIZED,
+            AuthError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+
+        let body = Json(json!({
+            "result": "error",
+            "message": self.to_string()
+        }));
+
+        (status, body).into_response()
+    }
+}
 
 /// middleware function to authenticate authorization token
 /// check store that contains token and see if it matches authorization header starting with "Bearer"
@@ -22,50 +54,17 @@ pub async fn auth(
     State(store): State<Arc<Store>>,
     req: Request<Body>,
     next: Next,
-) -> Result<Response, (StatusCode, Json<JsonError>)> {
+) -> Result<Response, AuthError> {
     let auth_header = req
         .headers()
         .get(http::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok());
-
-    let auth_header = if let Some(auth_header) = auth_header {
-        auth_header
-    } else {
-        tracing::debug!("Authorization header missing");
-        return Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())));
-    };
+        .and_then(|header| header.to_str().ok())
+        .ok_or(AuthError::MissingAuthorizationHeader)?;
 
     tracing::debug!("Received Authorization Header: {}", auth_header);
 
-    // check bearer authorization to see if it matches
-    if store.api_token_check(auth_header) {
-        Ok(next.run(req).await)
-    } else {
-        tracing::debug!("Authorization token does NOT match");
-        //            return Ok(Json(json!( {"error": "Unauthorized"} )).into_response());
-        Err((StatusCode::UNAUTHORIZED, Json(JsonError::unauthorized())))
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct JsonError {
-    error: String,
-}
-
-impl JsonError {
-    pub const fn new(error: String) -> Self {
-        Self { error }
-    }
-
-    pub fn unauthorized() -> Self {
-        Self {
-            error: "Unauthorized".into(),
-        }
-    }
-
-    pub fn internal() -> Self {
-        Self {
-            error: "Internal Server Error".into(),
-        }
+    match store.api_token_check(auth_header) {
+        true => Ok(next.run(req).await),
+        false => Err(AuthError::InvalidAuthorizationToken),
     }
 }
