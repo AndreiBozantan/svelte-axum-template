@@ -1,11 +1,11 @@
-<script>
-    import { user } from "./../js/store.js";
-    import { getSession, postLogin } from "./../js/auth";
+<script lang="ts">
+    import { user } from "./../ts/store";
+    import { getSession, postLogin } from "./../ts/auth";
 
-    let username, password;
-    let errorMessage = "";
+    let username: string, password: string;
+    let errorMessage: string = "";
 
-    async function handleLogin() {
+    async function handleLogin(): Promise<void> {
         let loginResponse = await postLogin(username, password);
         if (loginResponse.result == "error") {
             errorMessage = loginResponse.message;

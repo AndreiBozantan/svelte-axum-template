@@ -1,17 +1,19 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
 
-  export let navItems = [{ label: "logo", id: 0 }];
-  export let menu = 1;
+  export let navItems: { label: string; id: number }[] = [{ label: "logo", id: 0 }];
+  export let menu: number = 1;
 
   // Show mobile icon and display menu
-  let showMobileMenu = false;
+  let showMobileMenu: boolean = false;
 
   // Mobile menu click event handler
-  const handleMobileIconClick = () => (showMobileMenu = !showMobileMenu);
+  const handleMobileIconClick = (): void => {
+    showMobileMenu = !showMobileMenu;
+  };
 
   // Media match query handler
-  const mediaQueryHandler = (e) => {
+  const mediaQueryHandler = (e: MediaQueryListEvent): void => {
     // Reset mobile state
     if (!e.matches) {
       showMobileMenu = false;
@@ -19,12 +21,12 @@
   };
 
   // Menu selection
-  const handleMenuSelection = (id) => {
+  const handleMenuSelection = (id: number): void => {
     menu = id;
     showMobileMenu = false;
   };
 
-  function handleKeyDown(e) {
+  function handleKeyDown(e: KeyboardEvent): void {
     if (e.keyCode === 13) {
       handleMobileIconClick();
     }
@@ -33,7 +35,7 @@
   // Attach media query listener on mount hook
   onMount(() => {
     const mediaListener = window.matchMedia("(max-width: 767px)");
-    mediaListener.addListener(mediaQueryHandler);
+    mediaListener.addEventListener("change", mediaQueryHandler);
   });
 </script>
 
@@ -46,7 +48,7 @@
       on:click={handleMobileIconClick}
       class={`mobile-icon${showMobileMenu ? " active" : ""}`}
     >
-      <div class="middle-line" />
+      <div class="middle-line"></div>
     </div>
     <ul class={`navbar-list${showMobileMenu ? " mobile" : ""}`}>
       {#each navItems as item}

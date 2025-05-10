@@ -1,6 +1,6 @@
-<script>
-    import { user } from "./../js/store.js";
-    import { getLogout } from "./../js/auth.js";
+<script lang="ts">
+    import { user } from "./../ts/store";
+    import { getLogout } from "./../ts/auth";
     import { onMount } from "svelte";
 
     $user;
