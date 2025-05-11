@@ -1,14 +1,9 @@
-import {user} from './store';
+import { appState } from '../AppState.svelte';
 
 export async function getSession() {
     const res = await fetch('/auth/session',{credentials: 'same-origin'});
     let sessionResponse = await res.json();
-    if (sessionResponse.user_id !== '') {
-        user.set(sessionResponse.user_id);
-    } else
-    {
-        user.set('');
-    }
+    appState.setUser(sessionResponse.user_id);
 }
 
 export async function postLogin(username: string, password: string) {
@@ -29,7 +24,7 @@ export async function getLogout() {
     let logoutResponse = await res.json();
     if (logoutResponse.result == "error") {
         // may want to return an error here
-    }else {
-        user.set('');
+    } else {
+        appState.clearUser();
     }
 }

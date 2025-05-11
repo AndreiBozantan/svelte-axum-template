@@ -1,18 +1,15 @@
 <script lang="ts">
-    import { user } from "./../ts/store";
-    import { getLogout } from "./../ts/auth";
+    import { appState } from "../AppState.svelte";
+    import { getLogout } from "../ts/auth";
     import { onMount } from "svelte";
-
-    // We don't need to access $user here just to make it reactive
-    // In Svelte 5, we'll just use it in the template
 
     onMount(getLogout);
 </script>
 
 <div>
     <container>
-        {#if $user}
-            You are still logged in as {$user}.
+        {#if appState.isLoggedIn}
+            You are still logged in as {appState.user}.
         {:else}
             You are now logged out.
         {/if}

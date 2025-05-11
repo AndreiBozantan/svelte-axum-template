@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { user } from "./../ts/store";
-    import { getSession, postLogin } from "./../ts/auth";
+    import { appState } from "../AppState.svelte";
+    import { getSession, postLogin } from "../ts/auth";
 
     let username = $state("");
     let password = $state("");
@@ -16,7 +16,14 @@
     }
 </script>
 
-{#if !$user}
+{#if appState.isLoggedIn}
+    <div>
+        <container>
+            Logged in as: {appState.user} <br />
+            Now you may access the <strong>secure area </strong>from the Nav above
+        </container>
+    </div>
+{:else}
     {#if errorMessage}
         <div>
             {errorMessage}
@@ -41,13 +48,6 @@
                 />
                 <button onclick={handleLogin}> Login </button>
             </div>
-        </container>
-    </div>
-{:else}
-    <div>
-        <container>
-            Logged in as: {$user} <br />
-            Now you may access the <strong>secure area </strong>from the Nav above
         </container>
     </div>
 {/if}

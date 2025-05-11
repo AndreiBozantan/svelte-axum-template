@@ -4,12 +4,10 @@ export async function getSecure() {
     return JSON.stringify(secureResponse.session);
 }
 
-export async function getApi(api_token: string) {
-    let res = await fetch('/api', {
-        headers: {
-            'Authorization': 'Bearer '+ api_token,
-            Accept: "application/json",
-        },
-    });
-    return await res.json();
+export async function getApi(api_token: string): Promise<any> {
+    let headers = {
+        Authorization: "Bearer " + api_token,
+        Accept: "application/json",
+    };
+    return await fetch('/api', { headers }).then(r => r.json());
 }
