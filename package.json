@@ -1,0 +1,24 @@
+{
+  "name": "svelte-axum-project",
+  "description": "svelte front end with axum backend template",
+  "author": "Andrei Bozantan",
+  "version": "0.7.2",
+  "type": "module",
+  "scripts": {
+    "db:create": "cargo sqlx database create --database-url sqlite:back_end/db.sqlite",
+    "db:migrate": "cargo sqlx migrate run --database-url sqlite:back_end/db.sqlite --source back_end/migrations",
+    "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:back_end/db.sqlite",
+    "db:init": "npm run db:create && npm run db:migrate && npm run db:sqlx",
+
+    "build:backend": "cd back_end && cargo build --release",
+    "build:frontend": "cd front_end && npm run build",
+    "build": "npm run db:init && npm run build:frontend && npm run build:backend",
+
+    "dev": "npm run db:init && cd back_end && cargo build && cd .. && node run-dev.js"
+  },
+  "devDependencies": {
+    "open": "^8.0"
+  },
+  "dependencies": {
+  }
+}

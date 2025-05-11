@@ -1,19 +1,23 @@
 # editor files
-.vscode/*
+.vscode
 
 # rust files
 Cargo.lock
 target
+local.toml
 
 # svelte files
-front_end/node_modules
 front_end/dist/
 
+# npm files
+node_modules
+package-lock.json
+
 # sqlx files
+.sqlx
+
+# db files
+db.sqlite*
+
+# misc
 .env
-.sqlx/*
-
-# app files
-db.sqlite
-config/local.toml
-

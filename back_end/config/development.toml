@@ -1,0 +1,10 @@
+[server]
+host = "127.0.0.1"
+port = 3000
+log_directives = "debug,tower_http=debug,axum=debug"
+session_cookie_name = "axum_svelte_session"
+api_token = "123456789"
+
+[database]
+url = "sqlite:db.sqlite"
+max_connections = 5

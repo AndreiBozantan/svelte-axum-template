@@ -14,32 +14,26 @@ Work in progress (new features coming), but should be usable as a starting point
 - if you have gh cli installed check out `--template` option
 
 
-# Building the project
+# Running the project
 - Install the following:
     - NodeJs - [Install](https://nodejs.org/en/download/)
     - Rust  - [Install](https://www.rust-lang.org/tools/install)
 
 - Change current directory in the project folder:
-    - `cd <your-project-name>` - to go to the project folder
+    - `cd <your-project-name>` - to go to the project root folder.
 
-- Build the frontend code:
-    - `cd front_end`
-    - `npm install` - to download all module dependencies inside root directory of project
-    - `npm run build` - to bundle the js/svelte code into public folder
+- Run in dev mode with
+    - `npm run dev`.
 
-- Initialize the database for sqlx compile time checks, before building the backend:
-    - `cd ..` - to go back to the root directory of the project
-    - `cargo sqlx database create --database-url sqlite:db.sqlite` - to create the database
-    - `cargo sqlx migrate run --database-url sqlite:db.sqlite --source migrations` - to run the migrations
-    - `cargo sqlx prepare --workspace --database-url sqlite:db.sqlite` - to create metadata for compile time checks
+This will start the backend and frontend in dev mode with hot reloading and will also open the browser.
+By default, the backend will be available at `http://localhost:3000` and the frontend at `http://localhost:5173`.
 
-- Build the backend code and run the server:
-    - `cargo build` - to build the backend code
-    - `cargo run` - to start the the server
+In dev mode, the vite config is set to proxy the backend requests to the backend server.
 
-- Access in browser at `http://localhost:8080/`
+# Build the release version
+Execute `npm run build` in the project root folder, to build the frontend and backend in release mode.
 
-In case you need to build both at once and use Linux, run `./build-fullstack.sh`
+The npm script will build the frontend before the backend, as the static files are embedded in the backend binary.
 
 
 # Back end - Rust Axum
@@ -51,7 +45,7 @@ In case you need to build both at once and use Linux, run `./build-fullstack.sh`
 - /api route example using authorization header
 - /secure route example using sessions for authorization
 
-run as `cargo run` from parent directory and not needed to run inside `./back_end` folder
+Run `cargo run` from inside the `./back_end` folder to start the backend server.
 
 # Front end - Svelte
 - Located in `./front_end`
@@ -59,9 +53,15 @@ run as `cargo run` from parent directory and not needed to run inside `./back_en
 - secure page that shows session information once logged in
 - api fetch example, log in not required
 
-run as `npm run build` from inside the `./front_end` directory to build the static serve file directory.
+Run `npm run dev` from inside the `./front_end` directory to start serving the frontend.
+
 
 # Version History
+
+## Version 0.7.2
+- update frontend to use Svelte 5
+- use npm scripts for the build process
+- add support for running the app in dev mode, with hot reloading
 
 ## Version 0.7.1
 - load config from toml files and env variables, see [pr#6](https://github.com/AndreiBozantan/svelte-axum-template/pull/6)
@@ -76,21 +76,3 @@ run as `npm run build` from inside the `./front_end` directory to build the stat
 ## Version 0.5
 - embedding static files into the binary using `cargo-embed-file` see [pr#1](https://github.com/AndreiBozantan/svelte-axum-template/pull/1)
 - updated to `axum` 0.8.4
-
-## Version 0.4.2
-- migration of `axum-sessions` to `tower-sessions` see [pr#14](https://github.com/jbertovic/svelte-axum-project/pull/14)
-- removal of secret key warning due to migration
-
-## Version 0.4.1
-- bumped version on backend; `axum` to 0.6.20, `axum-sessions` to 0.5, `tower-http` to 0.4
-- bumped versions on front-end; `vite-plugin-svelte` to 2.4.2, `svelte` to 4.0.5, `vite` to 4.4.5
-- backend changed how servedir works from `tower-http` for serving front end static assets
-
-## Version 0.4.0
-  - updated to `axum` 0.6
-  - changes to State usage; how its setup with route and called from middleware
-  - changes to ordering of parameters in functions; last parameter can consume request body
-  - eliminated `axum::extract::RequestParts` with help from update on `axum-sessions`
-- updated to `axum-sessions` 0.4 to match
-- incremented `tokio` version to 1.24
-- old `axum` 0.5 version is kept under branch `v0.3_Axum0.5`

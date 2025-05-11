@@ -28,7 +28,7 @@ impl AppConfig {
         let mut builder = Config::builder()
             // Start with default values
             .set_default("server.host", "127.0.0.1")?
-            .set_default("server.port", 8080)?
+            .set_default("server.port", 3000)?
             .set_default("server.session_cookie_name", "axum_svelte_session")?
             .set_default("server.api_token", "123456789")?
             .set_default("server.log_directives", "svelte_axum_template=debug,tower_http=info")?
