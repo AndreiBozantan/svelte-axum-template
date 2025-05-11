@@ -8,7 +8,6 @@ target
 # svelte files
 front_end/node_modules
 front_end/dist/
-front_end/package-lock.json
 
 # sqlx files
 .env

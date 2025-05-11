@@ -1,17 +1,28 @@
 {
   "name": "svelte-axum-project",
   "description": "svelte front end with axum backend template",
-  "author": "Jas Bertovic",
-  "version": "0.4.2",
+  "author": "Andrei Bozantan",
+  "version": "0.7.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^2.4.2",
-    "svelte": "^4.0.5",
-    "vite": "^4.4.5"
+    "@sveltejs/vite-plugin-svelte": "^5.0",
+    "@tsconfig/svelte": "^5.0",
+    "svelte": "^5.0",
+    "svelte-check": "^4.1",
+    "svelte-preprocess": "^5.1",
+    "tslib": "^2.8",
+    "typescript": "^5.8",
+    "vite": "^6.0"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7",
+    "@fortawesome/free-solid-svg-icons": "^6.7",
+    "svelte-fa": "^4.0"
   }
 }

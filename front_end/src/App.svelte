@@ -1,70 +1,75 @@
-<script>
-	import { user } from "./js/store.js";
-	import { getSession } from "./js/auth.js";
-	import NavBar from "./component/Navbar.svelte";
-	import LogIn from "./pages/Login.svelte";
-	import LogOut from "./pages/Logout.svelte";
-	import Secure from "./pages/Secure.svelte";
-	import Apicheck from "./pages/Apicheck.svelte";
-	import { onMount } from "svelte";
+<script lang="ts">
+    import { appState } from "./AppState.svelte";
+    import { getSession } from "./ts/auth";
+    import NavBar from "./component/Navbar.svelte";
+    import LogIn from "./pages/Login.svelte";
+    import LogOut from "./pages/Logout.svelte";
+    import Secure from "./pages/Secure.svelte";
+    import Apicheck from "./pages/Apicheck.svelte";
+    import { onMount } from "svelte";
 
-	let menu;
-	$: loggedin = $user !== "";
+    let menu = $state(1);
 
-	// check if logged in
-	onMount(getSession);
+    // check if logged in
+    onMount(async () => {
+        try {
+            // Simulate a delay for initialization
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            await getSession();
+        }
+        finally {
+            appState.stopLoading(); // Mark initialization as complete
+        }
+    });
 
-	const set_menu_items = (loggedin) => {
-		if (loggedin) {
-			return [
-				{ label: "About", id: 1 },
-				{ label: "Secure", id: 3 },
-				{ label: "API Check", id: 5 },
-				{ label: "Logout", id: 4 },
-			];
-		} else {
-			return [
-				{ label: "About", id: 1 },
-				{ label: "API Check", id: 5 },
-				{ label: "Login", id: 2 },
-			];
-		}
-	};
+    const menuItems = $derived(appState.isLoggedIn ?
+        [
+            { label: "About", id: 1 },
+            { label: "Secure", id: 3 },
+            { label: "API Check", id: 5 },
+            { label: "Logout", id: 4 },
+        ]
+        :
+        [
+            { label: "About", id: 1 },
+            { label: "API Check", id: 5 },
+            { label: "Login", id: 2 },
+        ]);
 </script>
 
-<!-- MENNU BAR ON TOP -->
-<NavBar navItems={set_menu_items(loggedin)} bind:menu />
+<!-- MENU BAR ON TOP -->
+<NavBar navItems={menuItems} bind:menu />
 
 <!-- PAGE LOADING -->
 {#if menu === 1}
-	<div>
-		<container>
-			{#if !loggedin}
-				<h4>Requires Login</h4>
-			{:else}
-				<h4>Logged In as {$user}</h4>
-			{/if}
-			<p>ABOUT</p>
-		</container>
-	</div>
+    <div>
+        <container>
+            {#if appState.isLoggedIn}
+                <h4>Logged In as {appState.user}</h4>
+            {:else}
+                <h4>Requires Login</h4>
+            {/if}
+            <p>ABOUT</p>
+        </container>
+    </div>
 {:else if menu === 2}
-	<LogIn />
+    <LogIn />
 {:else if menu === 3}
-	<Secure />
+    <Secure />
 {:else if menu === 4}
-	<LogOut />
+    <LogOut />
 {:else if menu === 5}
-	<Apicheck />
+    <Apicheck />
 {:else}
-	<h2>Page Not Found or Completed Yet</h2>
+    <h2>Page Not Found or Completed Yet</h2>
 {/if}
 
 <style>
-	div {
-		margin: 25px;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		text-align: center;
-	}
+    div {
+        margin: 25px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
 </style>

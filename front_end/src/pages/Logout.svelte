@@ -1,17 +1,15 @@
-<script>
-    import { user } from "./../js/store.js";
-    import { getLogout } from "./../js/auth.js";
+<script lang="ts">
+    import { appState } from "../AppState.svelte";
+    import { getLogout } from "../ts/auth";
     import { onMount } from "svelte";
-
-    $user;
 
     onMount(getLogout);
 </script>
 
 <div>
     <container>
-        {#if $user}
-            You are still logged in as {$user}.
+        {#if appState.isLoggedIn}
+            You are still logged in as {appState.user}.
         {:else}
             You are now logged out.
         {/if}
