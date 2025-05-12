@@ -1,6 +1,6 @@
 [package]
 name = "svelte-axum-template"
-version = "0.7.0"
+version = "0.7.2"
 edition = "2024"
 repository = "https://github.com/AndreiBozantan/svelte-axum-template"
 keywords = ["template", "backend", "frontend", "axum", "svelte"]
