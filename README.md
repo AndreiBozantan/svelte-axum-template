@@ -55,6 +55,38 @@ Run `cargo run` from inside the `./back_end` folder to start the backend server.
 
 Run `npm run dev` from inside the `./front_end` directory to start serving the frontend.
 
+# Authentication & User Management
+
+This project now includes an enhanced authentication and user management system:
+
+- **JWT-based API Authentication**:
+  - Secure token generation and validation
+  - Token expiration and refresh capabilities
+  - Proper authorization header handling
+
+- **Secure User Management**:
+  - Argon2 password hashing (industry standard)
+  - User creation and management API
+  - Session-based web authentication
+
+## Setting Up Security
+
+After cloning the project, run the security initialization script:
+
+```bash
+# On Windows
+initialize_security.bat
+
+# On Unix/Mac
+./initialize_security.sh
+```
+
+This will:
+1. Generate a secure JWT secret key
+2. Update configuration files
+3. Set up an admin user with default credentials
+
+See `back_end/README_AUTH.md` for detailed documentation on the authentication system.
 
 # Version History
 

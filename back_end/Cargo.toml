@@ -23,12 +23,17 @@ serde_json = { version =  "1.0" }
 rust-embed =  { version = "8.7" }
 mime_guess =  { version = "2.0" }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "macros", "migrate"] }
-anyhow =  { version = "1.0" }
 thiserror =  { version = "1.0" }
 dotenv =  { version = "0.15" }
 clap = { version = "4.4", features = ["derive"] }
-chrono = { version = "0.4" }
+chrono = { version = "0.4", features = ["serde"] }
 config = { version = "0.15" }
+# Added for enhanced security
+argon2 = { version = "0.5", features = ["std"] }
+rand = { version = "0.8" }
+jsonwebtoken = { version = "9.2" }
+# For random secure token generation
+uuid = { version = "1.7", features = ["v4", "serde"] }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]

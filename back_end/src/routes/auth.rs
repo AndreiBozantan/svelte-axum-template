@@ -1,9 +1,12 @@
-use axum::{response::IntoResponse, http::StatusCode, Json};
-use serde::Deserialize;
+use axum::{response::IntoResponse, http::StatusCode, Json, extract::State};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 use tower_sessions::Session;
 use tower_sessions::session::Error as SessionLibError;
+use std::sync::Arc;
+use crate::store::Store;
+use crate::auth_utils::{Claims, create_jwt};
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -18,6 +21,15 @@ pub enum AuthError {
 
     #[error("Failed to flush session")]
     FlushSessionFailed(#[source] SessionLibError),
+    
+    #[error("User not found")]
+    UserNotFound,
+    
+    #[error("Failed to create JWT token")]
+    TokenCreationFailed,
+    
+    #[error("Database error: {0}")]
+    DatabaseError(String),
 }
 
 impl IntoResponse for AuthError {
@@ -27,9 +39,12 @@ impl IntoResponse for AuthError {
 
         let (status, error_message) = match self {
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::InsertSessionFailed(_)  => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::InsertSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::ReadSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::FlushSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::UserNotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            Self::TokenCreationFailed => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
         let body = Json(json!({
@@ -43,17 +58,61 @@ impl IntoResponse for AuthError {
 
 /// route to handle log in
 #[allow(clippy::unused_async)]
-pub async fn login(session: Session, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(
+    session: Session,
+    State(store): State<Arc<Store>>,
+    Json(login): Json<Login>
+) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
-    if !check_password(&login.username, &login.password) {
+    // Get user from database
+    let user = store.get_user_by_username(&login.username).await
+        .map_err(|e| match e {
+            crate::store::StoreError::UserNotFound => AuthError::UserNotFound,
+            _ => AuthError::DatabaseError(e.to_string()),
+        })?;
+
+    // Verify password
+    if !crate::auth_utils::verify_password(&user.password_hash, &login.password) {
         return Err(AuthError::InvalidCredentials);
     }
 
-    session.insert("user_id", login.username).await
+    // Set user in session
+    session.insert("user_id", login.username.clone()).await
         .map_err(AuthError::InsertSessionFailed)?;
 
-    Ok(Json(json!({"result": "ok"})))
+    // Create JWT tokens (access and refresh)
+    let access_claims = Claims::new(
+        &login.username,
+        user.tenant_id,
+        store.jwt_config.access_token_expiry_mins,
+    );
+    
+    let access_token = create_jwt(&access_claims, &store.jwt_config)
+        .map_err(|_| AuthError::TokenCreationFailed)?;
+
+    // Create refresh token with longer expiration
+    let refresh_claims = Claims::new(
+        &login.username,
+        user.tenant_id,
+        store.jwt_config.refresh_token_expiry_mins,
+    );
+    
+    let refresh_token = create_jwt(&refresh_claims, &store.jwt_config)
+        .map_err(|_| AuthError::TokenCreationFailed)?;
+
+    // Store the token in the database with expiration for API access
+    let expires_at = Some(access_claims.exp);
+    store.create_token(user.id, &access_token, expires_at).await
+        .map_err(|e| AuthError::DatabaseError(e.to_string()))?;
+
+    // Return tokens to the client
+    Ok(Json(TokenResponse {
+        result: "ok".to_string(),
+        access_token,
+        refresh_token: Some(refresh_token),
+        expires_in: store.jwt_config.access_token_expiry_mins * 60, // convert to seconds
+    }))
 }
 
 /// route to handle log out
@@ -72,13 +131,16 @@ pub async fn logout(session: Session) -> Result<impl IntoResponse, AuthError> {
     Ok(Json(json!({"result": "ok"})))
 }
 
-// assume all passwords work
-const fn check_password(_username: &str, _password: &str) -> bool {
-    true
-}
-
 #[derive(Deserialize)]
 pub struct Login {
     username: String,
     password: String,
+}
+
+#[derive(Serialize)]
+pub struct TokenResponse {
+    result: String,
+    access_token: String,
+    refresh_token: Option<String>,
+    expires_in: i64,
 }

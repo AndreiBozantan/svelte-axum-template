@@ -17,6 +17,7 @@ pub mod cli;
 pub mod db;
 pub mod middlewares;
 pub mod routes;
+pub mod auth_utils;
 mod appconfig;
 mod services;
 mod store;
@@ -63,10 +64,12 @@ async fn run_app() -> Result<(), AppError> {
     cli::run_migration_cli(&db_pool).await?;
 
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port)
-        .parse()?;
-
-    // create store for backend, including the database pool
-    let shared_state = Arc::new(store::Store::new(&config.server.api_token, db_pool));
+        .parse()?;    // create store for backend, including the database pool
+    let shared_state = Arc::new(store::Store::new_with_jwt(
+        &config.server.api_token, 
+        db_pool,
+        &config.jwt
+    ));
 
     // setup up sessions and store to keep track of session information
     let session_store = MemoryStore::default();

@@ -18,13 +18,20 @@ pub struct DatabaseConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct JwtConfig {
+    pub secret: String,
+    pub access_token_expiry_mins: i64,
+    pub refresh_token_expiry_mins: i64,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
+    pub jwt: JwtConfig,
 }
 
-impl AppConfig {
-    pub fn new() -> Result<Self, ConfigError> {
+impl AppConfig {    pub fn new() -> Result<Self, ConfigError> {
         let mut builder = Config::builder()
             // Start with default values
             .set_default("server.host", "127.0.0.1")?
@@ -33,7 +40,10 @@ impl AppConfig {
             .set_default("server.api_token", "123456789")?
             .set_default("server.log_directives", "svelte_axum_template=debug,tower_http=info")?
             .set_default("database.url", "sqlite:db.sqlite")?
-            .set_default("database.max_connections", 5)?;
+            .set_default("database.max_connections", 5)?
+            .set_default("jwt.secret", "your-jwt-secret-should-be-very-strong-and-at-least-32-characters")?
+            .set_default("jwt.access_token_expiry_mins", 15)?
+            .set_default("jwt.refresh_token_expiry_mins", 1440)?;
 
         // Layer 1: Add default configuration from files
         if Path::new("./config/default.toml").exists() {

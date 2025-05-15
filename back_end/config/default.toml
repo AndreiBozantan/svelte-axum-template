@@ -5,6 +5,11 @@ log_directives = "debug"
 session_cookie_name = "axum_svelte_session"
 api_token = "123456789"
 
+[jwt]
+secret = "your-jwt-secret-should-be-very-strong-and-at-least-32-characters"
+access_token_expiry_mins = 15
+refresh_token_expiry_mins = 1440
+
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 5

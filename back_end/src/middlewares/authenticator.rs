@@ -18,8 +18,11 @@ pub enum AuthError {
     #[error("Authorization header missing")]
     MissingAuthorizationHeader,
 
-    #[error("Authorization token does NOT match")]
+    #[error("Invalid or expired token")]
     InvalidAuthorizationToken,
+
+    #[error("Token validation error")]
+    TokenValidationError,
 
     #[error("Internal Server Error")]
     InternalServerError,
@@ -32,6 +35,7 @@ impl IntoResponse for AuthError {
         let status = match self {
             AuthError::MissingAuthorizationHeader => StatusCode::UNAUTHORIZED,
             AuthError::InvalidAuthorizationToken => StatusCode::UNAUTHORIZED,
+            AuthError::TokenValidationError => StatusCode::UNAUTHORIZED,
             AuthError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
@@ -61,10 +65,19 @@ pub async fn auth(
         .and_then(|header| header.to_str().ok())
         .ok_or(AuthError::MissingAuthorizationHeader)?;
 
-    tracing::debug!("Received Authorization Header: {}", auth_header);
-
-    match store.api_token_check(auth_header) {
-        true => Ok(next.run(req).await),
-        false => Err(AuthError::InvalidAuthorizationToken),
+    tracing::debug!("Received Authorization Header: {}", auth_header);    // Use the async token check for more comprehensive validation
+    match store.api_token_check_async(auth_header).await {
+        Ok(true) => {
+            tracing::debug!("Token validation successful");
+            Ok(next.run(req).await)
+        },
+        Ok(false) => {
+            tracing::warn!("Invalid or expired token");
+            Err(AuthError::InvalidAuthorizationToken)
+        },
+        Err(e) => {
+            tracing::error!("Token validation error: {:?}", e);
+            Err(AuthError::TokenValidationError)
+        },
     }
 }

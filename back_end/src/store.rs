@@ -1,9 +1,9 @@
-use anyhow::Result;
 use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
 use crate::db::DbPoolRef;
 use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User, current_timestamp};
+use crate::auth_utils::{JwtConfig, validate_jwt};
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -27,6 +27,7 @@ pub enum StoreError {
 pub struct Store {
     db_pool: DbPoolRef,
     default_api_token: String,
+    pub jwt_config: JwtConfig,
 }
 
 impl Store {
@@ -34,19 +35,49 @@ impl Store {
         Self {
             db_pool,
             default_api_token: api_token.to_string(),
+            jwt_config: JwtConfig::default(),
+        }
+    }
+    
+    pub fn new_with_jwt(api_token: &str, db_pool: DbPoolRef, jwt_config: &crate::appconfig::JwtConfig) -> Self {
+        Self {
+            db_pool,
+            default_api_token: api_token.to_string(),
+            jwt_config: JwtConfig {
+                secret: jwt_config.secret.clone(),
+                access_token_expiry_mins: jwt_config.access_token_expiry_mins,
+                refresh_token_expiry_mins: jwt_config.refresh_token_expiry_mins,
+            },
+        }
+    }pub async fn api_token_check_async(&self, auth_header: &str) -> Result<bool, StoreError> {
+        // Extract token from the authorization header
+        if let Some(token) = auth_header.strip_prefix("Bearer ") {                // Attempt to validate the JWT token
+            match validate_jwt(token, &self.jwt_config) {
+                Ok(_claims) => {
+                    // Check if token is in database and not expired
+                    let result = self.verify_token(token).await?;
+                    Ok(result)
+                }
+                Err(_) => {
+                    // Fallback to the legacy token verification (for backward compatibility)
+                    let old_token_valid = token == self.default_api_token;
+                    Ok(old_token_valid)
+                }
+            }
+        } else {
+            Ok(false)
         }
     }
 
     pub fn api_token_check(&self, auth_header: &str) -> bool {
         // Extract token from the authorization header
         if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            // Try to verify the token synchronously
             // For the sync API, we'll just use the default token for now
-            // A more sophisticated implementation could cache tokens or use a blocking operation
+            // A more sophisticated implementation should use the async version
             return token == self.default_api_token;
         }
 
-        return false;
+        false
     }
 
     // Database methods
@@ -125,6 +156,31 @@ impl Store {
         return Ok(user);
     }
 
+    pub async fn update_user(&self, id: i64, user: User) -> Result<User, StoreError> {
+        let updated_user = sqlx::query_as!(
+            User,
+            r#"
+            UPDATE users
+            SET username = ?,
+                password_hash = ?,
+                email = ?,
+                tenant_id = ?,
+                updated_at = strftime('%s', 'now')
+            WHERE id = ?
+            RETURNING id, username, password_hash, email, tenant_id, created_at, updated_at
+            "#,
+            user.username,
+            user.password_hash,
+            user.email,
+            user.tenant_id,
+            id
+        )
+        .fetch_one(&*self.db_pool)
+        .await?;
+
+        Ok(updated_user)
+    }
+
     // Token operations
     pub async fn create_token(&self, user_id: i64, token: &str, expires_at: Option<i64>) -> Result<ApiToken, StoreError> {
         let token = sqlx::query_as!(
@@ -185,9 +241,7 @@ impl Store {
         .await?;
 
         return Ok(result);
-    }
-
-    pub async fn verify_token(&self, token: &str) -> Result<bool, StoreError> {
+    }    pub async fn verify_token(&self, token: &str) -> Result<bool, StoreError> {
         let now = current_timestamp();
 
         let result = sqlx::query!(
@@ -203,7 +257,7 @@ impl Store {
         .fetch_one(&*self.db_pool)
         .await?;
 
-        return Ok(result.count > 0);
+        Ok(result.count > 0)
     }
 
     pub async fn get_tenants(&self) -> Result<Vec<Tenant>, StoreError> {

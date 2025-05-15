@@ -1,6 +1,6 @@
 use axum::{
     middleware,
-    routing::{get, post},
+    routing::{get, post, patch},
     Router,
 };
 use std::sync::Arc;
@@ -31,26 +31,42 @@ pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
     session_layer: SessionManagerLayer<S>,
     shared_state: Arc<store::Store>,
 ) -> Router {
-    // Create the backend routes
+    // Routes that don't need state
+    let stateless_routes = Router::new()
+        .route("/auth/session", get(routes::session::data_handler))
+        .route("/auth/logout", get(routes::logout))
+        .route("/test", get(routes::not_implemented_route));
+        
+    // Routes that need state
+    let stateful_routes = Router::new()
+        .route("/auth/login", post(routes::login))
+        .route("/auth/token/refresh", post(routes::refresh_token))
+        .route("/auth/token/revoke", post(routes::revoke_token))
+        .with_state(shared_state.clone());
+    
+    // Secured routes
+    let auth_routes = back_auth_route();
+      // API routes with token authentication
+    let api_routes = back_user_routes(shared_state.clone())
+        .merge(back_token_route(shared_state));
+
+    // Create the final router with all routes
     Router::new()
-        .merge(back_public_route())
-        .merge(back_auth_route())
-        .merge(back_token_route(shared_state))
-        // In axum 0.8.4, we add the session layer
-        .with_state(())
+        .merge(front_public_route())
+        .merge(stateless_routes)
+        .merge(stateful_routes)
+        .merge(auth_routes)
+        .merge(api_routes)
         .layer(session_layer)
 }
 
-// *********
-// BACKEND NON-AUTH
-// *********
-//
-pub fn back_public_route() -> Router {
+// Add user routes with state separately
+pub fn back_user_routes<S>(state: Arc<Store>) -> Router<S> {
     Router::new()
-        .route("/auth/session", get(routes::session::data_handler)) // gets session data
-        .route("/auth/login", post(routes::login)) // sets username in session
-        .route("/auth/logout", get(routes::logout)) // deletes username in session
-        .route("/test", get(routes::not_implemented_route))
+        .route("/users", post(routes::create_user)) // create a new user
+        .route("/users/:id", get(routes::get_user)) // get user by ID
+        .route("/users/:id", patch(routes::update_user)) // update user
+        .with_state(state)
 }
 
 // *********
