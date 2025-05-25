@@ -15,11 +15,21 @@ use thiserror::Error;
 pub mod assets;
 pub mod cli;
 pub mod db;
+pub mod jwt;
 pub mod middlewares;
+pub mod password;
 pub mod routes;
 mod appconfig;
 mod services;
+mod state;
 mod store;
+
+use crate::jwt::JwtConfig;
+use crate::state::AppState;
+
+// TODO: JwtConfig should be in the config module, and have a section in the config file
+// TODO: AppState should have the whole config, not just jwt_config
+// TODO: split the store module in separate files for each table
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -63,10 +73,19 @@ async fn run_app() -> Result<(), AppError> {
     cli::run_migration_cli(&db_pool).await?;
 
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port)
-        .parse()?;
+        .parse()?;    // create store for backend, including the database pool
 
-    // create store for backend, including the database pool
-    let shared_state = Arc::new(store::Store::new(&config.server.api_token, db_pool));
+
+    // Create JWT configuration
+    let jwt_config = Arc::new(JwtConfig {
+        secret: config.server.jwt_secret.unwrap_or_else(|| "your-secret-key-change-this-in-production".to_string()),
+        access_token_expiry: config.server.jwt_access_expiry.unwrap_or(900),    // 15 minutes for access token
+        refresh_token_expiry: config.server.jwt_refresh_expiry.unwrap_or(604800), // 7 days for refresh token
+    });
+
+    // Create AppState with store and JWT config
+    let store = Arc::new(store::Store::new(&config.server.api_token, db_pool));
+    let app_state = AppState::new(store, jwt_config);
 
     // setup up sessions and store to keep track of session information
     let session_store = MemoryStore::default();
@@ -75,7 +94,7 @@ async fn run_app() -> Result<(), AppError> {
     // combine the front and backend into server
     let app = Router::new()
         .merge(services::front_public_route())
-        .merge(services::backend(session_layer, shared_state));
+        .merge(services::backend(session_layer, app_state));
 
     tracing::info!("🚀 listening on http://{addr}");
 

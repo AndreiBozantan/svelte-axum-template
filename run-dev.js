@@ -1,7 +1,7 @@
 // A script to orchestrate the startup of both backend and frontend servers
 // and open the browser only when both are ready
-import { spawn } from 'child_process';
-import { createServer } from 'net';
+import spawn from 'child_process';
+import createServer from 'net';
 import http from 'http';
 import open from 'open';
 

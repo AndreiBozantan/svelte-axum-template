@@ -5,10 +5,12 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
+    "db:drop": "cargo sqlx database drop -y --database-url sqlite:back_end/db.sqlite",
     "db:create": "cargo sqlx database create --database-url sqlite:back_end/db.sqlite",
     "db:migrate": "cargo sqlx migrate run --database-url sqlite:back_end/db.sqlite --source back_end/migrations",
     "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:back_end/db.sqlite",
     "db:init": "npm run db:create && npm run db:migrate && npm run db:sqlx",
+    "db:reset": "npm run db:drop && npm run db:init",
 
     "build:backend": "cd back_end && cargo build --release",
     "build:frontend": "cd front_end && npm run build",

@@ -3,14 +3,13 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use std::sync::Arc;
 use tower_http::trace::TraceLayer;
 use tower_sessions::{SessionManagerLayer, SessionStore};
 
 use crate::{
     assets,
     middlewares, routes,
-    store::{self, Store},
+    state::AppState,
 };
 
 // *********
@@ -29,52 +28,28 @@ pub fn front_public_route() -> Router {
 // Back end server built form various routes that are either public, require auth, or secure login
 pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
     session_layer: SessionManagerLayer<S>,
-    shared_state: Arc<store::Store>,
+    app_state: AppState,
 ) -> Router {
-    // Create the backend routes
-    Router::new()
-        .merge(back_public_route())
-        .merge(back_auth_route())
-        .merge(back_token_route(shared_state))
-        // In axum 0.8.4, we add the session layer
-        .with_state(())
-        .layer(session_layer)
-}
-
-// *********
-// BACKEND NON-AUTH
-// *********
-//
-pub fn back_public_route() -> Router {
-    Router::new()
+    // Create auth routes that need AppState
+    let auth_routes = Router::new()
         .route("/auth/session", get(routes::session::data_handler)) // gets session data
-        .route("/auth/login", post(routes::login)) // sets username in session
-        .route("/auth/logout", get(routes::logout)) // deletes username in session
-        .route("/test", get(routes::not_implemented_route))
-}
-
-// *********
-// BACKEND SESSION
-// *********
-//
-pub fn back_auth_route() -> Router {
-    Router::new()
-        .route("/secure", get(routes::session::handler))
-        .route_layer(middleware::from_fn(middlewares::user_secure))
-}
-
-// *********
-// BACKEND API
-// *********
-//
-//
-// invoked with State that stores API that is checked by the `middleware::auth`
-pub fn back_token_route<S>(state: Arc<Store>) -> Router<S> {
-    Router::new()
+        .route("/auth/login", post(routes::login)) // sets username in session and returns JWT
+        .route("/auth/logout", get(routes::logout)) // deletes username in session and revokes tokens
+        .route("/auth/refresh", post(routes::refresh_token)) // refresh access token
+        .route("/auth/revoke", post(routes::revoke_token)) // revoke refresh token
+        .with_state(app_state.clone());    // Create API routes that need AppState and auth middleware
+    let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            middlewares::auth,
-        ))
-        .with_state(state)
+        .layer(middleware::from_fn_with_state(app_state.clone(), middlewares::auth));
+
+    // Create session routes
+    let session_routes = Router::new()
+        .route("/secure", get(routes::session::handler))
+        .route_layer(middleware::from_fn(middlewares::user_secure));    // Combine all routes
+    Router::new()
+        .merge(auth_routes)
+        .merge(api_routes)
+        .merge(session_routes)
+        .route("/test", get(routes::not_implemented_route))
+        .layer(session_layer)
 }

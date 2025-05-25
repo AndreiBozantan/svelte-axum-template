@@ -9,6 +9,9 @@ pub struct ServerConfig {
     pub session_cookie_name: String,
     pub api_token: String,
     pub log_directives: String,
+    pub jwt_secret: Option<String>,
+    pub jwt_access_expiry: Option<i64>,
+    pub jwt_refresh_expiry: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -30,8 +33,10 @@ impl AppConfig {
             .set_default("server.host", "127.0.0.1")?
             .set_default("server.port", 3000)?
             .set_default("server.session_cookie_name", "axum_svelte_session")?
-            .set_default("server.api_token", "123456789")?
-            .set_default("server.log_directives", "svelte_axum_template=debug,tower_http=info")?
+            .set_default("server.api_token", "123456789")?            .set_default("server.log_directives", "svelte_axum_template=debug,tower_http=info")?
+            .set_default("server.jwt_secret", "your-secret-key-change-this-in-production")?
+            .set_default("server.jwt_access_expiry", 15 * 60)?    // 15 minutes
+            .set_default("server.jwt_refresh_expiry", 90 * 24 * 60 * 60)? // 90 days
             .set_default("database.url", "sqlite:db.sqlite")?
             .set_default("database.max_connections", 5)?;
 

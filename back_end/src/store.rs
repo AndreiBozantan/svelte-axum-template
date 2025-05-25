@@ -1,9 +1,9 @@
-use anyhow::Result;
+use chrono::{Utc, NaiveDateTime};
 use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
 use crate::db::DbPoolRef;
-use crate::db::schema::{ApiToken, NewTenant, NewUser, Tenant, User, current_timestamp};
+use crate::db::schema::{NewRefreshToken, NewTenant, NewUser, RefreshToken, Tenant, User };
 
 #[derive(Debug, Error)]
 pub enum StoreError {
@@ -47,24 +47,23 @@ impl Store {
         }
 
         return false;
-    }
-
-    // Database methods
+    }    // Database methods
 
     // User operations
     pub async fn create_user(&self, new_user: NewUser) -> Result<User, StoreError> {
         let user = sqlx::query_as!(
             User,
             r#"
-            INSERT INTO users (username, password_hash, email, tenant_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
-            RETURNING id, username, password_hash, email, tenant_id, created_at, updated_at
+            INSERT INTO users (username, password_hash, email, tenant_id, sso_provider, sso_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+            RETURNING id, username, password_hash, email, tenant_id, sso_provider, sso_id, created_at, updated_at
             "#,
             new_user.username,
             new_user.password_hash,
             new_user.email,
-            new_user.tenant_id
-        )
+            new_user.tenant_id,
+            new_user.sso_provider,
+            new_user.sso_id)
         .fetch_one(&*self.db_pool)
         .await?;
 
@@ -78,9 +77,11 @@ impl Store {
             SELECT
                 id "id!",
                 username "username!",
-                password_hash "password_hash!",
+                password_hash,
                 email,
-                tenant_id "tenant_id!",
+                tenant_id,
+                sso_provider,
+                sso_id,
                 created_at "created_at!",
                 updated_at "updated_at!"
             FROM users
@@ -105,9 +106,11 @@ impl Store {
             SELECT
                 id "id!",
                 username "username!",
-                password_hash "password_hash!",
+                password_hash,
                 email,
-                tenant_id "tenant_id!",
+                tenant_id,
+                sso_provider,
+                sso_id,
                 created_at "created_at!",
                 updated_at "updated_at!"
             FROM users
@@ -121,89 +124,99 @@ impl Store {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,
             _ => StoreError::Database(e),
         })?;
-
         return Ok(user);
     }
 
-    // Token operations
-    pub async fn create_token(&self, user_id: i64, token: &str, expires_at: Option<i64>) -> Result<ApiToken, StoreError> {
-        let token = sqlx::query_as!(
-            ApiToken,
+    // JWT Token audit and refresh token operations
+    pub async fn store_refresh_token(&self, new_refresh_token: NewRefreshToken) -> Result<(), StoreError> {
+        sqlx::query!(
             r#"
-            INSERT INTO api_tokens (token, user_id, created_at, expires_at)
-            VALUES (?, ?, strftime('%s', 'now'), ?)
-            RETURNING
-                id "id!",
-                token "token!",
-                user_id "user_id!",
-                created_at "created_at!",
-                expires_at
+            INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at)
+            VALUES (?, ?, ?, strftime('%s', 'now'), ?)
             "#,
-            token,
-            user_id,
-            expires_at
-        )
-        .fetch_one(&*self.db_pool)
-        .await?;
-
-        return Ok(token);
-    }
-
-    pub async fn get_token(&self, token: &str) -> Result<ApiToken, StoreError> {
-        let token = sqlx::query_as!(
-            ApiToken,
-            r#"
-            SELECT
-                id as "id!",
-                token as "token!",
-                user_id as "user_id!",
-                created_at as "created_at!",
-                expires_at
-            FROM api_tokens
-            WHERE token = ?"#,
-            token
-        )
-        .fetch_one(&*self.db_pool)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => StoreError::TokenNotFound,
-            _ => StoreError::Database(e),
-        })?;
-
-        return Ok(token);
-    }
-
-    pub async fn delete_token(&self, token: &str) -> Result<SqliteQueryResult, StoreError> {
-        let result = sqlx::query!(
-            r#"
-            DELETE FROM api_tokens
-            WHERE token = ?
-            "#,
-            token
+            new_refresh_token.jti,
+            new_refresh_token.user_id,
+            new_refresh_token.token_hash,
+            new_refresh_token.expires_at
         )
         .execute(&*self.db_pool)
         .await?;
-
-        return Ok(result);
+        Ok(())
     }
 
-    pub async fn verify_token(&self, token: &str) -> Result<bool, StoreError> {
-        let now = current_timestamp();
+    pub async fn revoke_refresh_token(&self, jti: &str) -> Result<(), StoreError> {
+        sqlx::query!(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked_at = strftime('%s', 'now')
+            WHERE jti = ?
+            "#,
+            jti
+        )
+        .execute(&*self.db_pool)
+        .await?;
+        Ok(())
+    }
 
+    pub async fn is_refresh_token_revoked(&self, jti: &str) -> Result<bool, StoreError> {
         let result = sqlx::query!(
             r#"
-            SELECT COUNT(*) as count
-            FROM api_tokens
-            WHERE token = ?
-              AND (expires_at IS NULL OR expires_at > ?)
+            SELECT revoked_at FROM refresh_tokens
+            WHERE jti = ?
             "#,
-            token,
-            now
+            jti
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_optional(&*self.db_pool)
         .await?;
 
-        return Ok(result.count > 0);
+        // If token doesn't exist or has revoked_at set, it's considered revoked
+        Ok(match result {
+            Some(row) => row.revoked_at.is_some(),
+            None => true, // Token not found = revoked
+        })
+    }
+
+    pub async fn audit_access_token(&self, jti: &str, user_id: i64, issued_at: NaiveDateTime, expires_at: NaiveDateTime, user_agent: Option<&str>, ip_address: Option<&str>) -> Result<(), StoreError> {
+        sqlx::query!(
+            r#"
+            INSERT INTO access_token_audit (jti, user_id, issued_at, expires_at, user_agent, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?)
+            "#,
+            jti,
+            user_id,
+            issued_at,
+            expires_at,
+            user_agent,
+            ip_address
+        )
+        .execute(&*self.db_pool)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn is_access_token_revoked(&self, jti: &str) -> Result<bool, StoreError> {
+        // For now, we can check if the associated refresh token was revoked
+        // In a more advanced implementation, you might also track access token revocations
+        let result = sqlx::query!(
+            r#"
+            SELECT r.revoked_at
+            FROM access_token_audit a
+            JOIN refresh_tokens r ON a.user_id = r.user_id
+            WHERE a.jti = ?
+            AND r.expires_at > strftime('%s', 'now')
+            ORDER BY r.issued_at DESC
+            LIMIT 1
+            "#,
+            jti
+        )
+        .fetch_optional(&*self.db_pool)
+        .await?;
+
+        // If we can't find an active refresh token, consider the access token revoked
+        Ok(match result {
+            Some(row) => row.revoked_at.is_some(),
+            None => false, // No corresponding refresh token found, but access token may still be valid
+        })
     }
 
     pub async fn get_tenants(&self) -> Result<Vec<Tenant>, StoreError> {
@@ -221,7 +234,6 @@ impl Store {
         )
         .fetch_all(&*self.db_pool)
         .await?;
-
         return Ok(tenants)
     }
 
@@ -242,13 +254,11 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await?;
-
         return Ok(tenant)
     }
 
     pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = current_timestamp();
-
+        let now = Utc::now().naive_utc();
         let tenant = sqlx::query_as!(
             Tenant,
             r#"
@@ -263,13 +273,11 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await?;
-
         return Ok(tenant)
     }
 
     pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = current_timestamp();
-
+        let now = Utc::now().naive_utc();
         let tenant = sqlx::query_as!(
             Tenant,
             r#"
@@ -285,7 +293,6 @@ impl Store {
         )
         .fetch_one(&*self.db_pool)
         .await?;
-
         return Ok(tenant)
     }
 
@@ -310,9 +317,11 @@ impl Store {
             SELECT
                 id as "id!",
                 username as "username!",
-                password_hash as "password_hash!",
+                password_hash,
                 email,
-                tenant_id as "tenant_id!",
+                tenant_id,
+                sso_provider,
+                sso_id,
                 created_at as "created_at!",
                 updated_at as "updated_at!"
             FROM users
@@ -338,7 +347,64 @@ impl Store {
         )
         .execute(&*self.db_pool)
         .await?;
+        Ok(result)
+    }
 
-        return Ok(result)
+    // JWT Refresh Token operations
+
+    pub async fn get_refresh_token_by_jti(&self, jti: &str) -> Result<RefreshToken, StoreError> {
+        let token = sqlx::query_as!(
+            RefreshToken,
+            r#"
+            SELECT
+                id "id!",
+                jti "jti!",
+                user_id "user_id!",
+                token_hash "token_hash!",
+                issued_at "issued_at!",
+                expires_at "expires_at!",
+                revoked_at
+            FROM refresh_tokens
+            WHERE jti = ? AND revoked_at IS NULL
+            "#,
+            jti
+        )
+        .fetch_one(&*self.db_pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::TokenNotFound,
+            _ => StoreError::Database(e),
+        })?;
+        Ok(token)
+    }
+
+    pub async fn revoke_all_user_refresh_tokens(&self, user_id: i64) -> Result<SqliteQueryResult, StoreError> {
+        let now = Utc::now().naive_utc();
+        let result = sqlx::query!(
+            r#"
+            UPDATE refresh_tokens
+            SET revoked_at = ?
+            WHERE user_id = ? AND revoked_at IS NULL
+            "#,
+            now,
+            user_id
+        )
+        .execute(&*self.db_pool)
+        .await?;
+        Ok(result)
+    }
+
+    pub async fn cleanup_expired_refresh_tokens(&self) -> Result<SqliteQueryResult, StoreError> {
+        let now = Utc::now().naive_utc();
+        let result = sqlx::query!(
+            r#"
+            DELETE FROM refresh_tokens
+            WHERE expires_at < ?
+            "#,
+            now
+        )
+        .execute(&*self.db_pool)
+        .await?;
+        Ok(result)
     }
 }
