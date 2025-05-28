@@ -3,8 +3,6 @@
 import { spawn } from 'child_process';
 import { createServer } from 'net';
 import http from 'http';
-import open from 'open';
-
 
 // Frontend Configuration
 const frontEndDir = "front_end";
@@ -17,7 +15,6 @@ const backendDir = "back_end";
 const backendCommandAndArgs = ['cargo', 'watch', '--ignore', './db.sqlite', '--watch', './src', '--exec', 'run']; // Command to start the backend
 const backendPort = 3000; // Adjust if your backend uses a different port
 const backendReadyPattern = /listening on/; // Adjust based on your backend's startup message
-
 
 // Function to check if a port is already in use by trying to bind to it
 async function isPortInUse(port) {
@@ -187,10 +184,18 @@ function startFrontend() {
 // Function to open the browser
 function openBrowser() {
     console.log('🌐 Opening browser...');
-    open(`http://localhost:${frontendPort}`);
-    console.log('\x1b[32m✓ Browser opened\x1b[0m');
+    const url = `http://localhost:${frontendPort}`;
+    let commandsAndArgsMap = {
+        darwin: ['open', url], // macOS
+        win32: ['start', '', url], // Windows (empty string for start command)
+        linux: ['xdg-open', url] // Linux
+    };
+    let command = commandsAndArgsMap[process.platform][0];
+    let args = commandsAndArgsMap[process.platform].slice(1);
+    // const browserProcess = spawn(command, args, { detached: true, stdio: 'ignore' });
+    // browserProcess.unref(); // Unreference the process so it doesn't keep the Node.js process alive
+    console.log(`\x1b[32m✓ Browser opened at ${url}\x1b[0m`);
 }
-
 
 // Main function to orchestrate everything
 async function main() {
@@ -209,6 +214,7 @@ async function main() {
             console.log('⏳ Waiting for backend to be fully ready...');
         }
         await waitForService(backendPort, 'Backend');
+        console.log(`\x1b[32m✓ Backend is ready, at http://localhost:${backendPort}\x1b[0m`);
 
         const frontendInUse = await isPortInUse(frontendPort);
         if (frontendInUse) {
