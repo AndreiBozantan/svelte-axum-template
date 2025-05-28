@@ -5,16 +5,17 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
+    "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
     "db:create": "cargo sqlx database create --database-url sqlite:back_end/db.sqlite",
     "db:migrate": "cargo sqlx migrate run --database-url sqlite:back_end/db.sqlite --source back_end/migrations",
     "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:back_end/db.sqlite",
-    "db:init": "npm run db:create && npm run db:migrate && npm run db:sqlx",
+    "db:init": "npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
 
-    "build:backend": "cd back_end && cargo build --release",
-    "build:frontend": "cd front_end && npm run build",
-    "build": "npm run db:init && npm run build:frontend && npm run build:backend",
+    "build:backend": "npm run db:init && cd back_end && cargo build --release",
+    "build:frontend": "cd front_end && npm install && npm run build",
+    "build": "npm run build:frontend && npm run build:backend",
 
-    "dev": "npm run db:init && cd back_end && cargo build && cd .. && node run-dev.js"
+    "dev": "npm run build && node run-dev.js"
   },
   "devDependencies": {
     "open": "^8.0"
