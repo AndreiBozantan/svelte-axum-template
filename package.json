@@ -18,7 +18,6 @@
     "dev": "npm run build && node run-dev.js"
   },
   "devDependencies": {
-    "open": "^8.0"
   },
   "dependencies": {
   }
