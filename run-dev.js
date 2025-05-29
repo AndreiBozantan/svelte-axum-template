@@ -201,6 +201,7 @@ function openBrowser() {
 async function main() {
     let backendProcess;
     let frontendProcess;
+    let keepAliveInterval;
 
     try {
         // Start the backend and frontend processes
@@ -233,19 +234,22 @@ async function main() {
             console.log('\n🛑 Shutting down...');
             if (backendProcess) backendProcess.kill();
             if (frontendProcess) frontendProcess.kill();
+            if (keepAliveInterval) clearInterval(keepAliveInterval);
             process.exit(0);
         });
 
         console.log('\x1b[32m✅ Application started successfully!\x1b[0m');
         console.log('Press Ctrl+C to stop all processes and exit');
 
+        // This will keep the Node.js event loop active
+        keepAliveInterval = setInterval(() => { }, 1000);
     } catch (error) {
-        console.error('\x1b[31m❌ Error starting application:\x1b[0m', error);
-        process.exit(1);
-    } finally {
         // Ensure processes are killed on exit
         if (backendProcess) backendProcess.kill();
         if (frontendProcess) frontendProcess.kill();
+        if (keepAliveInterval) clearInterval(keepAliveInterval);
+        console.error('\x1b[31m❌ Error starting application:\x1b[0m', error);
+        process.exit(1);
     }
 }
 
