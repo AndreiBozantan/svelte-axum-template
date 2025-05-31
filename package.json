@@ -5,7 +5,7 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
-    "clean": "rimraf .sqlx target node_modules front_end/dist front_end/node_modules",
+    "clean": "rm -rf .sqlx node_modules target  front_end/dist front_end/node_modules || rmdir /s /q .sqlx node_modules target front_end/dist front_end/node_modules",
     "reset": "npm run clean && npm run db:drop",
 
     "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
@@ -30,7 +30,6 @@
   "devDependencies": {
     "concurrently": "^9.1",
     "open": "^10.1",
-    "rimraf": "^6.0",
     "wait-on": "^8.0"
   }
 }
