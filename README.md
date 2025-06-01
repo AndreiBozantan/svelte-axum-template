@@ -22,18 +22,22 @@ Work in progress (new features coming), but should be usable as a starting point
 - Change current directory in the project folder:
     - `cd <your-project-name>` - to go to the project root folder.
 
-- Run in dev mode with
-    - `npm run dev`.
+- Initialization - run once before starting in dev mode:
+    - `npm run dev:init`
 
-This will start the backend and frontend in dev mode with hot reloading and will also open the browser.
+- Run the project in dev mode, with hot reloading:
+    - `npm run dev`
+
 By default, the backend will be available at `http://localhost:3000` and the frontend at `http://localhost:5173`.
 
 In dev mode, the vite config is set to proxy the backend requests to the backend server.
 
-# Build the release version
-Execute `npm run build` in the project root folder, to build the frontend and backend in release mode.
 
-The npm script will build the frontend before the backend, as the static files are embedded in the backend binary.
+# Build the release version
+Execute `npm run build` in the project root folder, to build the frontend and backend in release mode. The npm script will build the frontend before the backend, as the static files are embedded in the backend binary.
+
+Optionally, you can execute `npm run clean` before the build, to remove all previous build artifacts, including the node_modules folders, so that the build starts from a clean state.
+After running the clean command, you have to run `npm run dev:init` once, to reinitialize the project before running in dev mode.
 
 
 # Back end - Rust Axum

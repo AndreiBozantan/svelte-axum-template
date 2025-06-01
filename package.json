@@ -5,22 +5,31 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
+    "clean": "node clean.js",
+    "reset": "npm run clean && npm run db:drop",
+
+    "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
     "db:drop": "cargo sqlx database drop -y --database-url sqlite:back_end/db.sqlite",
     "db:create": "cargo sqlx database create --database-url sqlite:back_end/db.sqlite",
     "db:migrate": "cargo sqlx migrate run --database-url sqlite:back_end/db.sqlite --source back_end/migrations",
     "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:back_end/db.sqlite",
-    "db:init": "npm run db:create && npm run db:migrate && npm run db:sqlx",
-    "db:reset": "npm run db:drop && npm run db:init",
+    "db:init": "npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
 
-    "build:backend": "cd back_end && cargo build --release",
-    "build:frontend": "cd front_end && npm run build",
-    "build": "npm run db:init && npm run build:frontend && npm run build:backend",
+    "build:backend": "npm run db:init && cd back_end && cargo build --release",
+    "build:frontend": "cd front_end && npm install && npm run build",
+    "build": "npm run build:frontend && npm run build:backend",
 
-    "dev": "npm run db:init && cd back_end && cargo build && cd .. && node run-dev.js"
+    "dev:init": "npm install && npm run build:frontend && npm run db:init",
+    "dev:backend": "cd back_end && cargo watch --ignore db.sqlite --watch src --exec run",
+    "dev:frontend": "wait-on http://localhost:3000 && cd front_end && npm run dev",
+    "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && open http://localhost:5173",
+    "dev": "concurrently --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green npm:dev:frontend npm:dev:backend npm:dev:open",
+
+    "start": "npm run dev"
   },
   "devDependencies": {
-    "open": "^8.0"
-  },
-  "dependencies": {
+    "concurrently": "^9.1",
+    "open": "^10.1",
+    "wait-on": "^8.0"
   }
 }
