@@ -2,17 +2,14 @@ pub mod schema;
 pub mod migrations;
 
 use std::path::Path;
-use std::sync::Arc;
 use std::str::FromStr;
 use thiserror::Error;
 
-use sqlx::{Pool, Sqlite};
+use sqlx::{SqlitePool};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
 pub use crate::appconfig::DatabaseConfig;
-
-pub type DbPool = Pool<Sqlite>;
-pub type DbPoolRef = Arc<DbPool>;
+pub type DbPool = SqlitePool;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -26,7 +23,7 @@ pub enum DbError {
     MigrationError(#[from] migrations::MigrationError),
 }
 
-pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError> {
+pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPool, DbError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
             .create_if_missing(true)
             .foreign_keys(true)
@@ -46,5 +43,5 @@ pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError>
     migrations::run(&pool, migrations_path).await?;
 
     tracing::info!("Database initialized successfully");
-    Ok(Arc::new(pool))
+    Ok(pool)
 }

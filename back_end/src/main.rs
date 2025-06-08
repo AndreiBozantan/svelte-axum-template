@@ -4,10 +4,8 @@
 #![allow(missing_docs)]
 
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use axum::Router;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
 use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use thiserror::Error;
@@ -24,11 +22,8 @@ mod services;
 mod state;
 mod store;
 
-use crate::jwt::JwtConfig;
 use crate::state::AppState;
 
-// TODO: JwtConfig should be in the config module, and have a section in the config file
-// TODO: AppState should have the whole config, not just jwt_config
 // TODO: split the store module in separate files for each table
 
 /// Application-level error type
@@ -57,7 +52,6 @@ pub enum AppError {
 /// Backend is further split into a non authorized area and a secure area
 /// The Back end is using 2 middleware: sessions (managing session data) and user_secure (checking for authorization)
 async fn run_app() -> Result<(), AppError> {
-    // load config
     let config = appconfig::AppConfig::new()?;
 
     // start tracing - level set by either RUST_LOG env variable or defaults to debug
@@ -66,53 +60,24 @@ async fn run_app() -> Result<(), AppError> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Initialize database connection pool
+    // initialize database
     let db_pool = db::init_pool(&config.database).await?;
-
-    // Run migration CLI if requested
     cli::run_migration_cli(&db_pool).await?;
 
-    let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port)
-        .parse()?;    // create store for backend, including the database pool
-
-
-    // Create JWT configuration
-    let jwt_config = Arc::new(JwtConfig {
-        secret: config.server.jwt_secret.unwrap_or_else(|| "your-secret-key-change-this-in-production".to_string()),
-        access_token_expiry: config.server.jwt_access_expiry.unwrap_or(900),    // 15 minutes for access token
-        refresh_token_expiry: config.server.jwt_refresh_expiry.unwrap_or(604800), // 7 days for refresh token
-    });
-
-    // Create AppState with store and JWT config
-    let store = Arc::new(store::Store::new(&config.server.api_token, db_pool));
-    let app_state = AppState::new(store, jwt_config);
-
-    // setup up sessions and store to keep track of session information
-    let session_store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(session_store).with_name(config.server.session_cookie_name);
-
-    // combine the front and backend into server
-    let app = Router::new()
+    // setup server
+    let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port).parse()?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let app_state = AppState::new(db_pool, config);
+    let router = Router::new()
         .merge(services::front_public_route())
-        .merge(services::backend(session_layer, app_state));
+        .merge(services::backend(&app_state));
 
     tracing::info!("🚀 listening on http://{addr}");
-
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-
-    axum::serve(listener, app)
+    axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
     Ok(())
-}
-
-#[tokio::main]
-async fn main() {
-    if let Err(e) = run_app().await {
-        tracing::error!("Application error: {}", e);
-        std::process::exit(1);
-    }
 }
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.
@@ -121,5 +86,13 @@ async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
         Ok(()) => tracing::info!("Shutdown signal received, shutting down gracefully"),
         Err(e) => tracing::error!("Failed to listen for shutdown signal: {}", e),
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run_app().await {
+        tracing::error!("Application error: {}", e);
+        std::process::exit(1);
     }
 }

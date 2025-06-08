@@ -50,7 +50,7 @@ enum MigrateSubCommands {
     Run,
 }
 
-pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<(), CliError> {
+pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments

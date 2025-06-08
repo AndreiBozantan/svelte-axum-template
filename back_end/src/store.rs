@@ -2,7 +2,7 @@ use chrono::{Utc, NaiveDateTime};
 use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
-use crate::db::DbPoolRef;
+use crate::db::DbPool;
 use crate::db::schema::{NewRefreshToken, NewTenant, NewUser, RefreshToken, Tenant, User };
 
 #[derive(Debug, Error)]
@@ -25,29 +25,15 @@ pub enum StoreError {
 
 #[derive(Clone, Debug)]
 pub struct Store {
-    db_pool: DbPoolRef,
-    default_api_token: String,
+    db_pool: DbPool,
 }
 
 impl Store {
-    pub fn new(api_token: &str, db_pool: DbPoolRef) -> Self {
+    pub fn new(db_pool: DbPool) -> Self {
         Self {
             db_pool,
-            default_api_token: api_token.to_string(),
         }
     }
-
-    pub fn api_token_check(&self, auth_header: &str) -> bool {
-        // Extract token from the authorization header
-        if let Some(token) = auth_header.strip_prefix("Bearer ") {
-            // Try to verify the token synchronously
-            // For the sync API, we'll just use the default token for now
-            // A more sophisticated implementation could cache tokens or use a blocking operation
-            return token == self.default_api_token;
-        }
-
-        return false;
-    }    // Database methods
 
     // User operations
     pub async fn create_user(&self, new_user: NewUser) -> Result<User, StoreError> {
@@ -64,7 +50,7 @@ impl Store {
             new_user.tenant_id,
             new_user.sso_provider,
             new_user.sso_id)
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await?;
 
         return Ok(user);
@@ -89,7 +75,7 @@ impl Store {
             "#,
             id
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,
@@ -118,7 +104,7 @@ impl Store {
             "#,
             username
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,
@@ -139,7 +125,7 @@ impl Store {
             new_refresh_token.token_hash,
             new_refresh_token.expires_at
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(())
     }
@@ -153,7 +139,7 @@ impl Store {
             "#,
             jti
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(())
     }
@@ -166,7 +152,7 @@ impl Store {
             "#,
             jti
         )
-        .fetch_optional(&*self.db_pool)
+        .fetch_optional(&self.db_pool)
         .await?;
 
         // If token doesn't exist or has revoked_at set, it's considered revoked
@@ -189,7 +175,7 @@ impl Store {
             user_agent,
             ip_address
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(())
     }
@@ -209,7 +195,7 @@ impl Store {
             "#,
             jti
         )
-        .fetch_optional(&*self.db_pool)
+        .fetch_optional(&self.db_pool)
         .await?;
 
         // If we can't find an active refresh token, consider the access token revoked
@@ -232,7 +218,7 @@ impl Store {
             FROM tenants
             "#
         )
-        .fetch_all(&*self.db_pool)
+        .fetch_all(&self.db_pool)
         .await?;
         return Ok(tenants)
     }
@@ -252,7 +238,7 @@ impl Store {
             "#,
             id
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await?;
         return Ok(tenant)
     }
@@ -271,7 +257,7 @@ impl Store {
             now,
             now
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await?;
         return Ok(tenant)
     }
@@ -291,7 +277,7 @@ impl Store {
             now,
             id
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await?;
         return Ok(tenant)
     }
@@ -304,7 +290,7 @@ impl Store {
             "#,
             id
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
 
         return Ok(result)
@@ -329,7 +315,7 @@ impl Store {
             "#,
             tenant_id
         )
-        .fetch_all(&*self.db_pool)
+        .fetch_all(&self.db_pool)
         .await?;
 
         return Ok(users)
@@ -345,7 +331,7 @@ impl Store {
             tenant_id,
             user_id
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(result)
     }
@@ -369,7 +355,7 @@ impl Store {
             "#,
             jti
         )
-        .fetch_one(&*self.db_pool)
+        .fetch_one(&self.db_pool)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::TokenNotFound,
@@ -389,7 +375,7 @@ impl Store {
             now,
             user_id
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(result)
     }
@@ -403,7 +389,7 @@ impl Store {
             "#,
             now
         )
-        .execute(&*self.db_pool)
+        .execute(&self.db_pool)
         .await?;
         Ok(result)
     }

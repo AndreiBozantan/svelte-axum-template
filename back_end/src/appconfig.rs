@@ -4,41 +4,95 @@ use config::{Config, ConfigError, Environment, File};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
+    #[serde(default)]
     pub host: String,
+
+    #[serde(default)]
     pub port: u16,
+
+    #[serde(default)]
     pub session_cookie_name: String,
-    pub api_token: String,
+
+    #[serde(default)]
     pub log_directives: String,
-    pub jwt_secret: Option<String>,
-    pub jwt_access_expiry: Option<i64>,
-    pub jwt_refresh_expiry: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
+    #[serde(default)]
     pub url: String,
+
+    #[serde(default)]
     pub max_connections: u32,
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct JwtConfig {
+    #[serde(default)]
+    pub secret: String,
+
+    #[serde(default)]
+    pub access_token_expiry: i64,  // In seconds (e.g., 15 minutes = 900)
+
+    #[serde(default)]
+    pub refresh_token_expiry: i64, // In seconds (e.g., 7 days = 604800)
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
+    #[serde(default)]
     pub server: ServerConfig,
+
+    #[serde(default)]
     pub database: DatabaseConfig,
+
+    #[serde(default)]
+    pub jwt: JwtConfig,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".to_string(),
+            port: 3000,
+            session_cookie_name: "axum_svelte_session".to_string(),
+            log_directives: "svelte_axum_template=debug,tower_http=info".to_string(),
+        }
+    }
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            url: "sqlite:db.sqlite".to_string(),
+            max_connections: 5,
+        }
+    }
+}
+
+impl Default for JwtConfig {
+    fn default() -> Self {
+        Self {
+            secret: "your-secret-key-change-this-in-production".to_string(),
+            access_token_expiry: 15 * 60,    // 15 minutes
+            refresh_token_expiry: 90 * 24 * 60 * 60, // 90 days
+        }
+    }
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            server: ServerConfig::default(),
+            database: DatabaseConfig::default(),
+            jwt: JwtConfig::default(),
+        }
+    }
 }
 
 impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut builder = Config::builder()
-            // Start with default values
-            .set_default("server.host", "127.0.0.1")?
-            .set_default("server.port", 3000)?
-            .set_default("server.session_cookie_name", "axum_svelte_session")?
-            .set_default("server.api_token", "123456789")?            .set_default("server.log_directives", "svelte_axum_template=debug,tower_http=info")?
-            .set_default("server.jwt_secret", "your-secret-key-change-this-in-production")?
-            .set_default("server.jwt_access_expiry", 15 * 60)?    // 15 minutes
-            .set_default("server.jwt_refresh_expiry", 90 * 24 * 60 * 60)? // 90 days
-            .set_default("database.url", "sqlite:db.sqlite")?
-            .set_default("database.max_connections", 5)?;
+        let mut builder = Config::builder();
 
         // Layer 1: Add default configuration from files
         if Path::new("./config/default.toml").exists() {
@@ -62,9 +116,11 @@ impl AppConfig {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let config = builder.build()?;
+        let config = builder
+            .build()?
+            .try_deserialize()
+            .unwrap_or_default();
 
-        // Deserialize the config into our config struct
-        config.try_deserialize()
+        Ok(config)
     }
 }

@@ -4,7 +4,7 @@ use axum::{
     Router,
 };
 use tower_http::trace::TraceLayer;
-use tower_sessions::{SessionManagerLayer, SessionStore};
+use tower_sessions::{MemoryStore, SessionManagerLayer};
 
 use crate::{
     assets,
@@ -26,10 +26,12 @@ pub fn front_public_route() -> Router {
 // BACK END
 // ********
 // Back end server built form various routes that are either public, require auth, or secure login
-pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
-    session_layer: SessionManagerLayer<S>,
-    app_state: AppState,
+pub fn backend(
+    app_state: &AppState
 ) -> Router {
+    let session_store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(session_store).with_name(app_state.config.server.session_cookie_name.clone());
+
     // Create auth routes that need AppState
     let auth_routes = Router::new()
         .route("/auth/session", get(routes::session::data_handler)) // gets session data
@@ -37,7 +39,9 @@ pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
         .route("/auth/logout", get(routes::logout)) // deletes username in session and revokes tokens
         .route("/auth/refresh", post(routes::refresh_token)) // refresh access token
         .route("/auth/revoke", post(routes::revoke_token)) // revoke refresh token
-        .with_state(app_state.clone());    // Create API routes that need AppState and auth middleware
+        .with_state(app_state.clone());
+
+    // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
         .layer(middleware::from_fn_with_state(app_state.clone(), middlewares::auth));
@@ -45,7 +49,9 @@ pub fn backend<S: SessionStore + Clone + Send + Sync + 'static>(
     // Create session routes
     let session_routes = Router::new()
         .route("/secure", get(routes::session::handler))
-        .route_layer(middleware::from_fn(middlewares::user_secure));    // Combine all routes
+        .route_layer(middleware::from_fn(middlewares::user_secure));
+
+    // Combine all routes
     Router::new()
         .merge(auth_routes)
         .merge(api_routes)

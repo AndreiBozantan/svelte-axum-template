@@ -103,19 +103,19 @@ pub async fn login(
 
     // Generate JWT tokens with appropriate expiration
     let access_token = jwt::generate_access_token(
-        &app_state.jwt_config,
+        &app_state.config.jwt,
         user.id,
         &user.username,
         user.tenant_id
     )?;
 
     let refresh_token = jwt::generate_refresh_token_for_client(
-        &app_state.jwt_config,
+        &app_state.config.jwt,
         user.id,
         client_type.clone())?;
 
     // Store refresh token in database
-    let refresh_claims = jwt::decode_refresh_token(&app_state.jwt_config, &refresh_token)?;
+    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
     let token_hash = format!("{:x}", md5::compute(&refresh_token)); // Simple hash for storage
 
@@ -133,15 +133,15 @@ pub async fn login(
         .map_err(AuthError::InsertSessionFailed)?;    // Calculate actual refresh token expiry based on client type
 
     let refresh_expiry = match client_type {
-        ClientType::Web => app_state.jwt_config.refresh_token_expiry,
-        ClientType::Mobile => app_state.jwt_config.refresh_token_expiry * 2,
-        ClientType::Service => app_state.jwt_config.refresh_token_expiry * 4
+        ClientType::Web => app_state.config.jwt.refresh_token_expiry,
+        ClientType::Mobile => app_state.config.jwt.refresh_token_expiry * 2,
+        ClientType::Service => app_state.config.jwt.refresh_token_expiry * 4
     };
 
     let token_response = TokenResponse::new(
         access_token,
         refresh_token,
-        app_state.jwt_config.access_token_expiry,
+        app_state.config.jwt.access_token_expiry,
         refresh_expiry,
     );
 
@@ -190,7 +190,7 @@ pub async fn refresh_token(
     tracing::info!("Refreshing access token");
 
     // Decode and validate refresh token
-    let refresh_claims = jwt::decode_refresh_token(&app_state.jwt_config, &request.refresh_token)
+    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;    // Check if refresh token exists in database and is not revoked
     let stored_token = app_state.store.get_refresh_token_by_jti(&refresh_claims.jti).await
         .map_err(|_| AuthError::TokenInvalid)?;
@@ -206,14 +206,14 @@ pub async fn refresh_token(
 
     // Generate new access token
     let new_access_token = jwt::generate_access_token(
-        &app_state.jwt_config,
+        &app_state.config.jwt,
         user.id,
         &user.username,
         user.tenant_id,
     )?;    Ok(Json(json!({
         "result": "ok",
         "access_token": new_access_token,
-        "expires_in": app_state.jwt_config.access_token_expiry,
+        "expires_in": app_state.config.jwt.access_token_expiry,
         "user": {
             "id": user.id,
             "username": user.username,
@@ -231,7 +231,7 @@ pub async fn revoke_token(
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
-    let refresh_claims = jwt::decode_refresh_token(&app_state.jwt_config, &request.refresh_token)
+    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Revoke the token

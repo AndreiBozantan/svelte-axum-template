@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{
     body::Body,
     extract::State,
@@ -14,7 +12,6 @@ use thiserror::Error;
 use crate::jwt;
 use crate::jwt::JwtError;
 use crate::state::AppState;
-use crate::store::Store;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -76,7 +73,7 @@ pub async fn auth(
     let token = auth_header
         .strip_prefix("Bearer ")
         .ok_or(AuthError::InvalidAuthorizationToken)?;    // Decode and validate JWT token
-    let claims = jwt::decode_access_token(&app_state.jwt_config, token)?;
+    let claims = jwt::decode_access_token(&app_state.config.jwt, token)?;
 
     // Check if token has been revoked
     match app_state.store.is_access_token_revoked(&claims.jti).await {
@@ -89,26 +86,4 @@ pub async fn auth(
 
     // Token is valid, proceed with the request
     Ok(next.run(req).await)
-}
-
-/// Legacy middleware function for simple token authentication (keeping for backward compatibility)
-/// This can be used for API keys or simple tokens
-#[allow(clippy::missing_errors_doc)]
-pub async fn simple_auth(
-    State(store): State<Arc<Store>>,
-    req: Request<Body>,
-    next: Next,
-) -> Result<Response, AuthError> {
-    let auth_header = req
-        .headers()
-        .get(http::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .ok_or(AuthError::MissingAuthorizationHeader)?;
-
-    tracing::debug!("Received Authorization Header: {}", auth_header);
-
-    match store.api_token_check(auth_header) {
-        true => Ok(next.run(req).await),
-        false => Err(AuthError::InvalidAuthorizationToken),
-    }
 }

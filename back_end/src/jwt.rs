@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use thiserror::Error;
 
+use crate::appconfig::JwtConfig;
+
 #[derive(Debug, Clone)]
 pub enum ClientType {
     Web,      // Browser-based applications
@@ -69,23 +71,6 @@ impl TokenResponse {
             token_type: "Bearer".to_string(),
             expires_in: access_expires_in,
             refresh_expires_in,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct JwtConfig {
-    pub secret: String,
-    pub access_token_expiry: i64,  // In seconds (e.g., 15 minutes = 900)
-    pub refresh_token_expiry: i64, // In seconds (e.g., 7 days = 604800)
-}
-
-impl Default for JwtConfig {
-    fn default() -> Self {
-        Self {
-            secret: "your-secret-key-change-this-in-production".to_string(),
-            access_token_expiry: 900,    // 15 minutes
-            refresh_token_expiry: 604800, // 7 days
         }
     }
 }
