@@ -5,6 +5,8 @@ use thiserror::Error;
 use crate::db::DbPool;
 use crate::db::schema::{NewRefreshToken, NewTenant, NewUser, RefreshToken, Tenant, User };
 
+// TODO: split the store module in separate files for each table
+
 #[derive(Debug, Error)]
 pub enum StoreError {
     #[error("Database error: {0}")]

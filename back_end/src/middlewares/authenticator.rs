@@ -72,7 +72,9 @@ pub async fn auth(
     // Extract Bearer token
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or(AuthError::InvalidAuthorizationToken)?;    // Decode and validate JWT token
+        .ok_or(AuthError::InvalidAuthorizationToken)?;
+
+    // Decode and validate JWT token
     let claims = jwt::decode_access_token(&app_state.config.jwt, token)?;
 
     // Check if token has been revoked

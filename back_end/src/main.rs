@@ -24,8 +24,6 @@ mod store;
 
 use crate::state::AppState;
 
-// TODO: split the store module in separate files for each table
-
 /// Application-level error type
 #[derive(Debug, Error)]
 pub enum AppError {
