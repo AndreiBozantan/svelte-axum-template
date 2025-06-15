@@ -6,13 +6,6 @@ use thiserror::Error;
 
 use crate::appconfig::JwtConfig;
 
-#[derive(Debug, Clone)]
-pub enum ClientType {
-    Web,      // Browser-based applications
-    Mobile,   // Mobile applications
-    Service,  // Service-to-service communication
-}
-
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Failed to encode JWT token")]
@@ -78,6 +71,8 @@ impl TokenResponse {
 /// Generate a new access token
 pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
+    let header = Header::new(Algorithm::HS256);
+    let encoding_key = EncodingKey::from_secret(config.secret.as_ref());
     let claims = AccessTokenClaims {
         sub: user_id.to_string(),
         username: user_name.to_string(),
@@ -87,17 +82,14 @@ pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, 
         jti: Uuid::new_v4().to_string(),
         token_type: "access".to_string(),
     };
-
-    let header = Header::new(Algorithm::HS256);
-    let encoding_key = EncodingKey::from_secret(config.secret.as_ref());
-
-    encode(&header, &claims, &encoding_key)
-        .map_err(JwtError::EncodingError)
+    encode(&header, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
 
 /// Generate a new refresh token with custom expiration
 pub fn generate_refresh_token_with_expiry(config: &JwtConfig, user_id: i64, expiry_seconds: i64) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
+    let header = Header::new(Algorithm::HS256);
+    let encoding_key = EncodingKey::from_secret(config.secret.as_ref());
     let claims = RefreshTokenClaims {
         sub: user_id.to_string(),
         exp: now + expiry_seconds,
@@ -105,27 +97,12 @@ pub fn generate_refresh_token_with_expiry(config: &JwtConfig, user_id: i64, expi
         jti: Uuid::new_v4().to_string(),
         token_type: "refresh".to_string(),
     };
-
-    let header = Header::new(Algorithm::HS256);
-    let encoding_key = EncodingKey::from_secret(config.secret.as_ref());
-
-    encode(&header, &claims, &encoding_key)
-        .map_err(JwtError::EncodingError)
+    encode(&header, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
 
 /// Generate a new refresh token with default expiration
 pub fn generate_refresh_token(config: &JwtConfig, user_id: i64) -> Result<String, JwtError> {
     generate_refresh_token_with_expiry(config, user_id, config.refresh_token_expiry)
-}
-
-/// Generate refresh token based on client type
-pub fn generate_refresh_token_for_client(config: &JwtConfig, user_id: i64, client_type: ClientType) -> Result<String, JwtError> {
-    let expiry = match client_type {
-        ClientType::Web => config.refresh_token_expiry,        // 7 days
-        ClientType::Mobile => config.refresh_token_expiry * 4, // 28 days
-        ClientType::Service => config.refresh_token_expiry * 13, // ~90 days
-    };
-    generate_refresh_token_with_expiry(config, user_id, expiry)
 }
 
 /// Validate and decode an access token

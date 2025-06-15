@@ -74,8 +74,8 @@ impl Default for JwtConfig {
     fn default() -> Self {
         Self {
             secret: "your-secret-key-change-this-in-production".to_string(),
-            access_token_expiry: 15 * 60,    // 15 minutes
-            refresh_token_expiry: 90 * 24 * 60 * 60, // 90 days
+            access_token_expiry: 15 * 60,             // 15 minutes
+            refresh_token_expiry: 200 * 24 * 60 * 60, // 200 days
         }
     }
 }

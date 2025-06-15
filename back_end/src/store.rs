@@ -1,4 +1,4 @@
-use chrono::{Utc, NaiveDateTime};
+use chrono::Utc;
 use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
@@ -37,7 +37,6 @@ impl Store {
         }
     }
 
-    // User operations
     pub async fn create_user(&self, new_user: NewUser) -> Result<User, StoreError> {
         let user = sqlx::query_as!(
             User,
@@ -115,7 +114,6 @@ impl Store {
         return Ok(user);
     }
 
-    // JWT Token audit and refresh token operations
     pub async fn store_refresh_token(&self, new_refresh_token: NewRefreshToken) -> Result<(), StoreError> {
         sqlx::query!(
             r#"
@@ -294,8 +292,6 @@ impl Store {
         .await?;
         Ok(result)
     }
-
-    // JWT Refresh Token operations
 
     pub async fn get_refresh_token_by_jti(&self, jti: &str) -> Result<RefreshToken, StoreError> {
         let token = sqlx::query_as!(

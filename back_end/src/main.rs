@@ -6,7 +6,6 @@
 use std::net::SocketAddr;
 
 use axum::Router;
-use tracing::log::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use thiserror::Error;
 

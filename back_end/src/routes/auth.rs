@@ -7,7 +7,7 @@ use tower_sessions::Session;
 use tower_sessions::session::Error as SessionLibError;
 
 use crate::jwt;
-use crate::jwt::{JwtError, TokenResponse, ClientType};
+use crate::jwt::{JwtError, TokenResponse};
 use crate::password::{verify_password, PasswordError};
 use crate::store::StoreError;
 use crate::state::AppState;
@@ -94,15 +94,6 @@ pub async fn login(
         }
     }
 
-    // Parse client type
-    let client_type = login.client_type.unwrap_or("web".to_string());
-    let client_type = match client_type.as_str() {
-        "web" => ClientType::Web,
-        "mobile" => ClientType::Mobile,
-        "service" => ClientType::Service,
-        _ => ClientType::Web, // Default to web
-    };
-
     // Generate JWT tokens with appropriate expiration
     let access_token = jwt::generate_access_token(
         &app_state.config.jwt,
@@ -111,10 +102,9 @@ pub async fn login(
         user.tenant_id
     )?;
 
-    let refresh_token = jwt::generate_refresh_token_for_client(
+    let refresh_token = jwt::generate_refresh_token(
         &app_state.config.jwt,
-        user.id,
-        client_type.clone())?;
+        user.id)?;
 
     // Store refresh token in database
     let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &refresh_token)?;
@@ -134,17 +124,11 @@ pub async fn login(
     session.insert("user_id", user.username.clone()).await
         .map_err(AuthError::InsertSessionFailed)?;    // Calculate actual refresh token expiry based on client type
 
-    let refresh_expiry = match client_type {
-        ClientType::Web => app_state.config.jwt.refresh_token_expiry,
-        ClientType::Mobile => app_state.config.jwt.refresh_token_expiry * 2,
-        ClientType::Service => app_state.config.jwt.refresh_token_expiry * 4
-    };
-
     let token_response = TokenResponse::new(
         access_token,
         refresh_token,
         app_state.config.jwt.access_token_expiry,
-        refresh_expiry,
+        app_state.config.jwt.refresh_token_expiry,
     );
 
     Ok(Json(json!({
@@ -244,7 +228,6 @@ pub async fn revoke_token(
 pub struct Login {
     username: String,
     password: String,
-    client_type: Option<String>, // "web", "mobile", "service"
 }
 
 #[derive(Deserialize)]
