@@ -1,7 +1,6 @@
 pub mod api;
 mod auth;
 mod notimplemented;
-pub mod session;
 
 pub use auth::login;
 pub use auth::logout;

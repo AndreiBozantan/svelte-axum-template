@@ -1,10 +1,8 @@
-use axum::{
-    middleware,
-    routing::{get, post},
-    Router,
-};
+use axum::middleware;
+use axum::routing::get;
+use axum::routing::post;
+use axum::Router;
 use tower_http::trace::TraceLayer;
-use tower_sessions::{MemoryStore, SessionManagerLayer};
 
 use crate::{
     assets,
@@ -29,12 +27,8 @@ pub fn front_public_route() -> Router {
 pub fn backend(
     app_state: &AppState
 ) -> Router {
-    let session_store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(session_store).with_name(app_state.config.server.session_cookie_name.clone());
-
-    // Create auth routes that need AppState
+    // Create auth routes
     let auth_routes = Router::new()
-        .route("/auth/session", get(routes::session::data_handler)) // gets session data
         .route("/auth/login", post(routes::login)) // sets username in session and returns JWT
         .route("/auth/logout", get(routes::logout)) // deletes username in session and revokes tokens
         .route("/auth/refresh", post(routes::refresh_token)) // refresh access token
@@ -46,16 +40,9 @@ pub fn backend(
         .route("/api", get(routes::api::handler))
         .layer(middleware::from_fn_with_state(app_state.clone(), middlewares::auth));
 
-    // Create session routes
-    let session_routes = Router::new()
-        .route("/secure", get(routes::session::handler))
-        .route_layer(middleware::from_fn(middlewares::user_secure));
-
     // Combine all routes
     Router::new()
         .merge(auth_routes)
         .merge(api_routes)
-        .merge(session_routes)
         .route("/test", get(routes::not_implemented_route))
-        .layer(session_layer)
 }

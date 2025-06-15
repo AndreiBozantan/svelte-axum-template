@@ -1,7 +1,6 @@
-use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
-};
+use argon2::Argon2;
+use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::rand_core::OsRng;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -15,7 +14,7 @@ pub enum PasswordError {
 
 /// Hash a password using Argon2
 pub fn hash_password(password: &str) -> Result<String, PasswordError> {
-    let salt = SaltString::generate(&mut OsRng);
+    let salt = SaltString::generate(OsRng);
     let argon2 = Argon2::default();
 
     let password_hash = argon2

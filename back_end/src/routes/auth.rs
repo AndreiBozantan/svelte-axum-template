@@ -1,10 +1,12 @@
-use axum::{response::IntoResponse, http::StatusCode, Json, extract::State};
-use chrono::{DateTime};
+use axum::body::Body;
+use axum::extract::State;
+use axum::http::{Request, StatusCode};
+use axum::Json;
+use axum::response::IntoResponse;
+use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
-use tower_sessions::Session;
-use tower_sessions::session::Error as SessionLibError;
 
 use crate::jwt;
 use crate::jwt::{JwtError, TokenResponse};
@@ -17,15 +19,6 @@ use crate::db::schema::NewRefreshToken;
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
-
-    #[error("Failed to insert session data")]
-    InsertSessionFailed(#[source] SessionLibError),
-
-    #[error("Failed to read session data")]
-    ReadSessionFailed(#[source] SessionLibError),
-
-    #[error("Failed to flush session")]
-    FlushSessionFailed(#[source] SessionLibError),
 
     #[error("JWT error: {0}")]
     JwtError(#[from] JwtError),
@@ -52,9 +45,6 @@ impl IntoResponse for AuthError {
 
         let (status, error_message) = match self {
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::InsertSessionFailed(_)  => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::ReadSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::FlushSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::JwtError(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::PasswordError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
@@ -74,7 +64,6 @@ impl IntoResponse for AuthError {
 /// route to handle log in
 #[allow(clippy::unused_async)]
 pub async fn login(
-    session: Session,
     State(app_state): State<AppState>,
     Json(login): Json<Login>)
 -> Result<impl IntoResponse, AuthError>
@@ -124,10 +113,6 @@ pub async fn login(
 
     app_state.store.store_refresh_token(new_refresh_token).await?;
 
-    // Also store in session for backward compatibility
-    session.insert("user_id", user.username.clone()).await
-        .map_err(AuthError::InsertSessionFailed)?;    // Calculate actual refresh token expiry based on client type
-
     let token_response = TokenResponse::new(
         access_token,
         refresh_token,
@@ -149,24 +134,17 @@ pub async fn login(
 /// route to handle log out
 #[allow(clippy::unused_async)]
 pub async fn logout(
-    session: Session,
-    State(app_state): State<AppState>)
--> Result<impl IntoResponse, AuthError>
-{
-    let user: String = session.get("user_id").await
-        .map_err(AuthError::ReadSessionFailed)?
-        .unwrap_or_default();
+    State(app_state): State<AppState>,
+    req: Request<Body>)
+-> Result<impl IntoResponse, AuthError> {
+    let claims = jwt::decode_access_token_from_req(&app_state.config.jwt, &req)?;
+    tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
-    tracing::info!("Logging out user: {:?}", user);    // If we have a user session, revoke all their refresh tokens
-    if !user.is_empty() {
-        if let Ok(db_user) = app_state.store.get_user_by_username(&user).await {
-            let _ = app_state.store.revoke_all_user_refresh_tokens(db_user.id).await;
-        }
+    // If we have a user session, revoke all their refresh tokens
+    let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
+    if let Ok(db_user) = app_state.store.get_user_by_id(user_id).await {
+        let _ = app_state.store.revoke_all_user_refresh_tokens(db_user.id).await;
     }
-
-    // Drop session
-    session.flush().await
-        .map_err(AuthError::FlushSessionFailed)?;
 
     Ok(Json(json!({"result": "ok"})))
 }

@@ -1,11 +1,9 @@
-use axum::{
-    body::Body,
-    extract::State,
-    http::{self, Request, StatusCode},
-    middleware::Next,
-    response::{IntoResponse, Response},
-    Json,
-};
+use axum::body::Body;
+use axum::extract::State;
+use axum::http::{Request, StatusCode};
+use axum::middleware::Next;
+use axum::Json;
+use axum::response::{IntoResponse, Response};
 use serde_json::json;
 use thiserror::Error;
 
@@ -68,19 +66,8 @@ pub async fn auth(
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, AuthMiddlewareError> {
-    let auth_header = req
-        .headers()
-        .get(http::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .ok_or(AuthMiddlewareError::MissingAuthorizationHeader)?;
-
-    // Extract Bearer token
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or(AuthMiddlewareError::InvalidAuthorizationToken)?;
-
     // Decode and validate JWT token
-    let claims = jwt::decode_access_token(&app_state.config.jwt, token)?;
+    let claims = jwt::decode_access_token_from_req(&app_state.config.jwt, &req)?;
 
     tracing::info!(
         jti = claims.jti,
