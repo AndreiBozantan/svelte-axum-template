@@ -75,7 +75,9 @@ pub async fn login(
     Json(login): Json<Login>)
 -> Result<impl IntoResponse, AuthError>
 {
-    tracing::info!("Logging in user: {}", login.username);    // Get user from database
+    tracing::info!("Logging in user: {}", login.username);
+
+    // Get user from database
     let user = app_state.store.get_user_by_username(&login.username).await
         .map_err(|_| AuthError::InvalidCredentials)?;
 

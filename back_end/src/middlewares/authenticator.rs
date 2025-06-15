@@ -50,12 +50,14 @@ impl IntoResponse for AuthError {
     }
 }
 
-/// middleware function to authenticate JWT tokens
-/// check JWT token validity and ensure it hasn't been revoked
-/// used example in axum docs on middleware <https://docs.rs/axum/latest/axum/middleware/index.html>
-///
-/// Returns Error's in JSON format.
-#[allow(clippy::missing_errors_doc)]
+/// Middleware function to authenticate JWT tokens.
+/// If the token is valid, it allows the request to proceed.
+/// If the token is invalid or missing, it returns an error response.
+/// # Errors
+/// Returns `AuthError` in the following cases:
+/// - the authorization header is missing.
+/// - the token is invalid.
+/// - there is an error decoding the JWT token.
 pub async fn auth(
     State(app_state): State<AppState>,
     req: Request<Body>,
@@ -67,8 +69,6 @@ pub async fn auth(
         .and_then(|header| header.to_str().ok())
         .ok_or(AuthError::MissingAuthorizationHeader)?;
 
-    tracing::debug!("Received Authorization Header: {}", auth_header);
-
     // Extract Bearer token
     let token = auth_header
         .strip_prefix("Bearer ")
@@ -77,14 +77,7 @@ pub async fn auth(
     // Decode and validate JWT token
     let claims = jwt::decode_access_token(&app_state.config.jwt, token)?;
 
-    // Check if token has been revoked
-    match app_state.store.is_access_token_revoked(&claims.jti).await {
-        Ok(true) => return Err(AuthError::TokenRevoked),
-        Ok(false) => {}, // Token is valid
-        Err(_) => return Err(AuthError::InternalServerError),
-    }
-
-    tracing::debug!("JWT token validated for user: {}", claims.username);
+    tracing::debug!("JWT token validated: jti={}, username={}", claims.jti, claims.username);
 
     // Token is valid, proceed with the request
     Ok(next.run(req).await)

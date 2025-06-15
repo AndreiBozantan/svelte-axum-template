@@ -28,7 +28,7 @@ pub enum JwtError {
     InvalidToken,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AccessTokenClaims {
     pub sub: String,        // Subject (user ID)
     pub username: String,   // Username for convenience
@@ -39,7 +39,7 @@ pub struct AccessTokenClaims {
     pub token_type: String, // "access"
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct RefreshTokenClaims {
     pub sub: String,        // Subject (user ID)
     pub exp: i64,          // Expiration time

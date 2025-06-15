@@ -34,26 +34,12 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create access_token_audit table
-CREATE TABLE IF NOT EXISTS access_token_audit (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    jti TEXT NOT NULL UNIQUE,  -- JWT ID (safe to store)
-    user_id INTEGER NOT NULL,
-    issued_at DATETIME NOT NULL,
-    expires_at DATETIME NOT NULL,
-    user_agent TEXT,
-    ip_address TEXT,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_sso_provider_id ON users(sso_provider, sso_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_jti ON refresh_tokens(jti);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
-CREATE INDEX IF NOT EXISTS idx_access_token_audit_jti ON access_token_audit(jti);
-CREATE INDEX IF NOT EXISTS idx_access_token_audit_user_id ON access_token_audit(user_id);
 
 -- Create a default tenant for existing users
 INSERT OR IGNORE INTO tenants (name, description, created_at, updated_at)

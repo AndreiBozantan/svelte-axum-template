@@ -164,49 +164,6 @@ impl Store {
         })
     }
 
-    pub async fn audit_access_token(&self, jti: &str, user_id: i64, issued_at: NaiveDateTime, expires_at: NaiveDateTime, user_agent: Option<&str>, ip_address: Option<&str>) -> Result<(), StoreError> {
-        sqlx::query!(
-            r#"
-            INSERT INTO access_token_audit (jti, user_id, issued_at, expires_at, user_agent, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?)
-            "#,
-            jti,
-            user_id,
-            issued_at,
-            expires_at,
-            user_agent,
-            ip_address
-        )
-        .execute(&self.db_pool)
-        .await?;
-        Ok(())
-    }
-
-    pub async fn is_access_token_revoked(&self, jti: &str) -> Result<bool, StoreError> {
-        // For now, we can check if the associated refresh token was revoked
-        // In a more advanced implementation, you might also track access token revocations
-        let result = sqlx::query!(
-            r#"
-            SELECT r.revoked_at
-            FROM access_token_audit a
-            JOIN refresh_tokens r ON a.user_id = r.user_id
-            WHERE a.jti = ?
-            AND r.expires_at > strftime('%s', 'now')
-            ORDER BY r.issued_at DESC
-            LIMIT 1
-            "#,
-            jti
-        )
-        .fetch_optional(&self.db_pool)
-        .await?;
-
-        // If we can't find an active refresh token, consider the access token revoked
-        Ok(match result {
-            Some(row) => row.revoked_at.is_some(),
-            None => false, // No corresponding refresh token found, but access token may still be valid
-        })
-    }
-
     pub async fn get_tenants(&self) -> Result<Vec<Tenant>, StoreError> {
         let tenants = sqlx::query_as!(
             Tenant,
