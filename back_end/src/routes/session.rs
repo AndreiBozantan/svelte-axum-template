@@ -18,7 +18,11 @@ pub enum SessionError {
 
 impl IntoResponse for SessionError {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!("{}", &self);
+        tracing::error!(
+            error_type = %std::any::type_name::<Self>(),
+            error_subtype = %std::any::type_name_of_val(&self),
+            error_message = %self);
+
 
         let (status, error_message) = match self {
             Self::FetchError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),

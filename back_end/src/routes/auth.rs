@@ -45,8 +45,12 @@ pub enum AuthError {
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> axum::response::Response {
-        // Log the error (self.to_string() will include source error message via thiserror)
-        tracing::error!("{}", &self);        let (status, error_message) = match self {
+        tracing::error!(
+            error_type = %std::any::type_name::<Self>(),
+            error_subtype = %std::any::type_name_of_val(&self),
+            error_message = %self);
+
+        let (status, error_message) = match self {
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::InsertSessionFailed(_)  => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::ReadSessionFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),

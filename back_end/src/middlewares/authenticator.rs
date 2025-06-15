@@ -14,7 +14,7 @@ use crate::jwt::JwtError;
 use crate::state::AppState;
 
 #[derive(Debug, Error)]
-pub enum AuthError {
+pub enum AuthMiddlewareError {
     #[error("Authorization header missing")]
     MissingAuthorizationHeader,
 
@@ -31,14 +31,19 @@ pub enum AuthError {
     InternalServerError,
 }
 
-impl IntoResponse for AuthError {
+impl IntoResponse for AuthMiddlewareError {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!("{}", &self);        let status = match self {
-            AuthError::MissingAuthorizationHeader => StatusCode::UNAUTHORIZED,
-            AuthError::InvalidAuthorizationToken => StatusCode::UNAUTHORIZED,
-            AuthError::JwtError(_) => StatusCode::UNAUTHORIZED,
-            AuthError::TokenRevoked => StatusCode::UNAUTHORIZED,
-            AuthError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
+        tracing::error!(
+            error_type = %std::any::type_name::<Self>(),
+            error_subtype = %std::any::type_name_of_val(&self),
+            error_message = %self);
+
+        let status = match self {
+            AuthMiddlewareError::MissingAuthorizationHeader => StatusCode::UNAUTHORIZED,
+            AuthMiddlewareError::InvalidAuthorizationToken => StatusCode::UNAUTHORIZED,
+            AuthMiddlewareError::JwtError(_) => StatusCode::UNAUTHORIZED,
+            AuthMiddlewareError::TokenRevoked => StatusCode::UNAUTHORIZED,
+            AuthMiddlewareError::InternalServerError => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         let body = Json(json!({
@@ -62,22 +67,27 @@ pub async fn auth(
     State(app_state): State<AppState>,
     req: Request<Body>,
     next: Next,
-) -> Result<Response, AuthError> {
+) -> Result<Response, AuthMiddlewareError> {
     let auth_header = req
         .headers()
         .get(http::header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
-        .ok_or(AuthError::MissingAuthorizationHeader)?;
+        .ok_or(AuthMiddlewareError::MissingAuthorizationHeader)?;
 
     // Extract Bearer token
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or(AuthError::InvalidAuthorizationToken)?;
+        .ok_or(AuthMiddlewareError::InvalidAuthorizationToken)?;
 
     // Decode and validate JWT token
     let claims = jwt::decode_access_token(&app_state.config.jwt, token)?;
 
-    tracing::debug!("JWT token validated: jti={}, username={}", claims.jti, claims.username);
+    tracing::info!(
+        jti = claims.jti,
+        username = claims.username,
+        userid = claims.sub,
+        exp = claims.exp,
+        "JWT validated");
 
     // Token is valid, proceed with the request
     Ok(next.run(req).await)
