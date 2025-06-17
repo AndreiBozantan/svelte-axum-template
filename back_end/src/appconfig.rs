@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs, path::Path};
 use serde::Deserialize;
 use config::{Config, ConfigError, Environment, File};
 
@@ -73,7 +73,7 @@ impl Default for DatabaseConfig {
 impl Default for JwtConfig {
     fn default() -> Self {
         Self {
-            secret: "your-secret-key-change-this-in-production".to_string(),
+            secret: "".to_string(),
             access_token_expiry: 15 * 60,             // 15 minutes
             refresh_token_expiry: 200 * 24 * 60 * 60, // 200 days
         }
@@ -116,11 +116,68 @@ impl AppConfig {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let config = builder
+        let mut config: AppConfig = builder
             .build()?
             .try_deserialize()
             .unwrap_or_default();
 
+        // handle JWT secret initialization
+        config.jwt.secret = Self::ensure_jwt_secret()?;
+
         Ok(config)
+    }
+
+    fn ensure_jwt_secret() -> Result<String, ConfigError> {
+        // Priority 1: Check environment variable
+        if let Ok(env_secret) = std::env::var("APP_JWT_SECRET") {
+            if !env_secret.is_empty() && env_secret.len() >= 32 {
+                return Ok(env_secret);
+            }
+        }
+
+        // Priority 2: Check persisted secret file
+        let secret_file_path = "./config/.jwt_secret";
+        if let Ok(file_secret) = fs::read_to_string(secret_file_path) {
+            let trimmed_secret = file_secret.trim();
+            if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
+                return Ok(trimmed_secret.to_string());
+            }
+        }
+
+        // Priority 3: Generate new secret and persist it
+        let new_secret = Self::generate_secure_secret();
+
+        // Create config directory if it doesn't exist
+        if let Some(parent) = Path::new(secret_file_path).parent() {
+            fs::create_dir_all(parent).map_err(|e| {
+                ConfigError::Message(format!("Failed to create config directory: {}", e))
+            })?;
+        }
+
+        // Write the secret to file with restricted permissions
+        fs::write(secret_file_path, &new_secret).map_err(|e| {
+            ConfigError::Message(format!("Failed to write JWT secret to file: {}", e))
+        })?;
+
+        // Set file permissions to be readable only by owner (Unix-like systems)
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(secret_file_path)
+                .map_err(|e| ConfigError::Message(format!("Failed to get file metadata: {}", e)))?
+                .permissions();
+            perms.set_mode(0o600); // rw-------
+            fs::set_permissions(secret_file_path, perms)
+                .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {}", e)))?;
+        }
+
+        println!("Generated new JWT secret and saved to {}", secret_file_path);
+        Ok(new_secret)
+    }
+
+    fn generate_secure_secret() -> String {
+        use rand::Rng;
+        let random_bytes: [u8; 32] = rand::rng().random();
+        hex::encode(random_bytes)
     }
 }
