@@ -14,14 +14,13 @@ pub mod cli;
 pub mod db;
 pub mod jwt;
 pub mod middlewares;
-pub mod password;
 pub mod routes;
 mod appconfig;
 mod services;
-mod state;
+mod appcontext;
 mod store;
 
-use crate::state::AppState;
+use crate::appcontext::AppContext;
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -64,10 +63,10 @@ async fn run_app() -> Result<(), AppError> {
     // setup server
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port).parse()?;
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    let app_state = AppState::new(db_pool, config);
+    let context = AppContext::new(db_pool, config);
     let router = Router::new()
         .merge(services::front_public_route())
-        .merge(services::backend(&app_state));
+        .merge(services::backend(&context));
 
     tracing::info!("🚀 listening on http://{addr}");
     axum::serve(listener, router)

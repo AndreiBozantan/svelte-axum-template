@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::jwt;
 use crate::jwt::{JwtError, TokenResponse};
 use crate::store::StoreError;
-use crate::state::AppState;
+use crate::appcontext::AppContext;
 use crate::db::schema::NewRefreshToken;
 
 #[derive(Deserialize)]
@@ -80,28 +80,28 @@ impl IntoResponse for AuthError {
 }
 
 /// Login route
-pub async fn login(State(app_state): State<AppState>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(State(context): State<AppContext>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
-    let user = app_state.store.get_user_by_username(&login.username).await
+    let user = context.store.get_user_by_username(&login.username).await
         .map_err(|_| AuthError::InvalidCredentials)?;
 
     verify_password(&login.password, user.password_hash)?;
 
     // Generate JWT tokens with appropriate expiration
     let access_token = jwt::generate_access_token(
-        &app_state.config.jwt,
+        &context.config.jwt,
         user.id,
         &user.username,
         user.tenant_id)?;
 
     let refresh_token = jwt::generate_refresh_token(
-        &app_state.config.jwt,
+        &context.config.jwt,
         user.id)?;
 
     // store refresh token in database
-    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &refresh_token)?;
+    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
     let token_hash = format!("{:x}", md5::compute(&refresh_token)); // simple hash for storage
     let new_refresh_token = NewRefreshToken {
@@ -110,9 +110,9 @@ pub async fn login(State(app_state): State<AppState>, Json(login): Json<Login>) 
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    app_state.store.store_refresh_token(new_refresh_token).await?;
+    context.store.store_refresh_token(new_refresh_token).await?;
 
-    let token_response = TokenResponse::new(access_token, refresh_token, &app_state.config.jwt);
+    let token_response = TokenResponse::new(access_token, refresh_token, &context.config.jwt);
     Ok(Json(json!({
         "result": "ok",
         "tokens": token_response,
@@ -126,27 +126,27 @@ pub async fn login(State(app_state): State<AppState>, Json(login): Json<Login>) 
 
 /// Logout route
 #[allow(clippy::unused_async)]
-pub async fn logout(State(app_state): State<AppState>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
-    let claims = jwt::decode_access_token_from_req(&app_state.config.jwt, &req)?;
+pub async fn logout(State(context): State<AppContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
+    let claims = jwt::decode_access_token_from_req(&context.config.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
     // revoke all the associated refresh tokens
     let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
-    if let Ok(db_user) = app_state.store.get_user_by_id(user_id).await {
-        let _ = app_state.store.revoke_all_user_refresh_tokens(db_user.id).await;
+    if let Ok(db_user) = context.store.get_user_by_id(user_id).await {
+        let _ = context.store.revoke_all_user_refresh_tokens(db_user.id).await;
     }
 
     Ok(Json(json!({"result": "ok"})))
 }
 
 /// Route to refresh access token using refresh token
-pub async fn refresh_access_token(State(app_state): State<AppState>, Json(request): Json<RefreshTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn refresh_access_token(State(context): State<AppContext>, Json(request): Json<RefreshTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
 
     // Decode and validate refresh token
-    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &request.refresh_token)
+    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;    // Check if refresh token exists in database and is not revoked
-    let stored_token = app_state.store.get_refresh_token_by_jti(&refresh_claims.jti).await
+    let stored_token = context.store.get_refresh_token_by_jti(&refresh_claims.jti).await
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Verify token hash
@@ -156,9 +156,9 @@ pub async fn refresh_access_token(State(app_state): State<AppState>, Json(reques
     }
 
     // Generate new access token for the user
-    let user = app_state.store.get_user_by_id(stored_token.user_id).await?;
+    let user = context.store.get_user_by_id(stored_token.user_id).await?;
     let new_access_token = jwt::generate_access_token(
-        &app_state.config.jwt,
+        &context.config.jwt,
         user.id,
         &user.username,
         user.tenant_id,
@@ -167,7 +167,7 @@ pub async fn refresh_access_token(State(app_state): State<AppState>, Json(reques
     Ok(Json(json!({
         "result": "ok",
         "access_token": new_access_token,
-        "expires_in": app_state.config.jwt.access_token_expiry,
+        "expires_in": context.config.jwt.access_token_expiry,
         "user": {
             "id": user.id,
             "username": user.username,
@@ -177,15 +177,15 @@ pub async fn refresh_access_token(State(app_state): State<AppState>, Json(reques
 }
 
 /// Route to revoke a refresh token
-pub async fn revoke_token(State(app_state): State<AppState>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn revoke_token(State(context): State<AppContext>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
-    let refresh_claims = jwt::decode_refresh_token(&app_state.config.jwt, &request.refresh_token)
+    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Revoke the token
-    app_state.store.revoke_refresh_token(&refresh_claims.jti).await?;
+    context.store.revoke_refresh_token(&refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
 }
 

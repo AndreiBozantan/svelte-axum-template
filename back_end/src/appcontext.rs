@@ -4,12 +4,12 @@ use crate::db::DbPool;
 use crate::store::Store;
 
 #[derive(Clone)]
-pub struct AppState {
+pub struct AppContext {
     pub store: Arc<Store>,
     pub config: Arc<AppConfig>,
 }
 
-impl AppState {
+impl AppContext {
     pub fn new(db_pool: DbPool, config: AppConfig) -> Self {
         Self {
             store: Arc::new(Store::new(db_pool)),

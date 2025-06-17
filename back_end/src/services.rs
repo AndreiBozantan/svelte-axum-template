@@ -7,7 +7,7 @@ use tower_http::trace::TraceLayer;
 use crate::{
     assets,
     middlewares, routes,
-    state::AppState,
+    appcontext::AppContext,
 };
 
 // *********
@@ -25,7 +25,7 @@ pub fn front_public_route() -> Router {
 // ********
 // Back end server built form various routes that are either public, require auth, or secure login
 pub fn backend(
-    app_state: &AppState
+    context: &AppContext
 ) -> Router {
     // Create auth routes
     let auth_routes = Router::new()
@@ -33,12 +33,12 @@ pub fn backend(
         .route("/auth/logout", get(routes::logout)) // deletes username in session and revokes tokens
         .route("/auth/refresh", post(routes::refresh_access_token)) // refresh access token
         .route("/auth/revoke", post(routes::revoke_token)) // revoke refresh token
-        .with_state(app_state.clone());
+        .with_state(context.clone());
 
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
-        .layer(middleware::from_fn_with_state(app_state.clone(), middlewares::auth));
+        .layer(middleware::from_fn_with_state(context.clone(), middlewares::auth));
 
     // Combine all routes
     Router::new()

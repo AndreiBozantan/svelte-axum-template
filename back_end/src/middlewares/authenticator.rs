@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::jwt;
 use crate::jwt::JwtError;
-use crate::state::AppState;
+use crate::appcontext::AppContext;
 
 #[derive(Debug, Error)]
 pub enum AuthMiddlewareError {
@@ -62,12 +62,12 @@ impl IntoResponse for AuthMiddlewareError {
 /// - the token is invalid.
 /// - there is an error decoding the JWT token.
 pub async fn auth(
-    State(app_state): State<AppState>,
+    State(context): State<AppContext>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, AuthMiddlewareError> {
     // Decode and validate JWT token
-    let claims = jwt::decode_access_token_from_req(&app_state.config.jwt, &req)?;
+    let claims = jwt::decode_access_token_from_req(&context.config.jwt, &req)?;
 
     tracing::info!(
         jti = claims.jti,
