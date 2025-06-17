@@ -31,7 +31,7 @@ pub fn backend(
     let auth_routes = Router::new()
         .route("/auth/login", post(routes::login)) // sets username in session and returns JWT
         .route("/auth/logout", get(routes::logout)) // deletes username in session and revokes tokens
-        .route("/auth/refresh", post(routes::refresh_token)) // refresh access token
+        .route("/auth/refresh", post(routes::refresh_access_token)) // refresh access token
         .route("/auth/revoke", post(routes::revoke_token)) // revoke refresh token
         .with_state(app_state.clone());
 

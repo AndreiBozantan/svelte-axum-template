@@ -4,6 +4,6 @@ mod notimplemented;
 
 pub use auth::login;
 pub use auth::logout;
-pub use auth::refresh_token;
+pub use auth::refresh_access_token;
 pub use auth::revoke_token;
 pub use notimplemented::not_implemented_route;
