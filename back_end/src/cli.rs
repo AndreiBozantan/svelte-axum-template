@@ -1,5 +1,6 @@
 // cli.rs - CLI utility for database migrations
 use std::env;
+use std::io::{self, Write};
 use std::path::Path;
 use thiserror::Error;
 use clap::{Parser, Subcommand};
@@ -48,6 +49,15 @@ enum MigrateSubCommands {
     Status,
     /// Run all pending migrations
     Run,
+    /// Create an admin user
+    CreateAdmin {
+        /// Username for the admin user
+        #[arg(short, long)]
+        username: String,
+        /// Email for the admin user (optional)
+        #[arg(short, long)]
+        email: Option<String>,
+    },
 }
 
 pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
@@ -102,8 +112,55 @@ pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
                 .map_err(|e| CliError::MigrationRunFailed { source: e })?;
             println!("Migrations applied successfully.");
         },
+        MigrateSubCommands::CreateAdmin { username, email } => {
+            // Prompt for password securely
+            print!("Enter password for admin user '{}': ", username);
+            io::stdout().flush().unwrap();
+            let password = rpassword::read_password().map_err(|e| CliError::Other(e.to_string()))?;
+
+            if password.trim().is_empty() {
+                return Err(CliError::Other("Password cannot be empty".to_string()));
+            }
+
+            create_admin_user(db_pool, &username, &password, email.as_deref()).await
+                .map_err(|e| CliError::Other(e.to_string()))?;
+
+            println!("Admin user '{}' created successfully!", username);
+        },
+
     }
 
     // Exit the process since this is a CLI command
     std::process::exit(0);
+}
+
+async fn create_admin_user(
+    db_pool: &db::DbPool,
+    username: &str,
+    password: &str,
+    email: Option<&str>
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::db::schema::NewUser;
+    use crate::store::Store;
+    use crate::routes::hash_password;
+
+    let store = Store::new(db_pool.clone());
+
+    // Check if user already exists
+    if store.get_user_by_username(username).await.is_ok() {
+        return Err("User already exists".into());
+    }
+
+    let password_hash = hash_password(password)?;
+    let new_user = NewUser {
+        username: username.to_string(),
+        password_hash: Some(password_hash),
+        email: email.map(|e| e.to_string()),
+        tenant_id: Some(1), // Default tenant
+        sso_provider: None,
+        sso_id: None,
+    };
+
+    store.create_user(new_user).await?;
+    Ok(())
 }

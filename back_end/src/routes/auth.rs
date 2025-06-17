@@ -190,7 +190,7 @@ pub async fn revoke_token(State(context): State<AppContext>, Json(request): Json
 }
 
 /// Hash a password using Argon2
-fn hash_password(password: &str) -> Result<String, AuthError> {
+pub fn hash_password(password: &str) -> Result<String, AuthError> {
     let salt = SaltString::generate(OsRng);
     let password_hash = Argon2::default()
         .hash_password(password.as_bytes(), &salt)

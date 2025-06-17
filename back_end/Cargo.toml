@@ -30,6 +30,7 @@ jsonwebtoken = { version = "9.0" }
 uuid = { version = "1.0", features = ["v4"] }
 argon2 = { version = "0.5", features = ["std"] }
 md5 = { version = "0.7" }
+rpassword = { version = "7.4" }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]

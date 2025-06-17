@@ -19,7 +19,8 @@
     "build:frontend": "cd front_end && npm install && npm run build",
     "build": "npm run build:frontend && npm run build:backend",
 
-    "dev:init": "npm install && npm run build:frontend && npm run db:init",
+    "dev:init": "npm install && npm run build:frontend && npm run db:init && npm run dev:init:admin",
+    "dev:init:admin": "cd back_end && cargo run migrate create-admin --username admin --email admin@localhost",
     "dev:backend": "cd back_end && cargo watch --ignore db.sqlite --watch src --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd front_end && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && open http://localhost:5173",
