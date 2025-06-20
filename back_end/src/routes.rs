@@ -1,5 +1,5 @@
 pub mod api;
-mod auth;
+pub mod auth;
 mod notimplemented;
 
 pub use auth::login;

@@ -19,8 +19,8 @@ use crate::db::schema::NewRefreshToken;
 
 #[derive(Deserialize)]
 pub struct Login {
-    username: String,
-    password: String,
+    pub username: String,
+    pub password: String,
 }
 
 #[derive(Deserialize)]
