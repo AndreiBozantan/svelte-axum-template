@@ -1,11 +1,13 @@
-use axum::{
-    body::Body,
-    http::{self, header, Response, StatusCode, Uri},
-    response::{IntoResponse, Result as AxumResult},
-};
+use axum::body::Body;
+use axum::http;
+use axum::http::Uri;
+use axum::http::header;
+use axum::response::IntoResponse;
+use axum::response::Result;
+use axum::response::Response;
 use rust_embed::RustEmbed;
 use thiserror::Error;
-use chrono::{Utc, TimeZone}; // Added for Last-Modified header
+use chrono::{Utc, TimeZone};
 
 #[derive(RustEmbed)]
 #[folder = "../front_end/dist"]
@@ -25,8 +27,8 @@ impl IntoResponse for AssetError {
         tracing::error!("{}", &self);
 
         let status = match self {
-            Self::ResponseBuildError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::NotFound(_) => StatusCode::NOT_FOUND,
+            Self::ResponseBuildError(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
+            Self::NotFound(_) => http::StatusCode::NOT_FOUND,
         };
 
         let body = match self {
@@ -38,7 +40,7 @@ impl IntoResponse for AssetError {
     }
 }
 
-pub async fn static_handler(uri: Uri) -> AxumResult<impl IntoResponse, AssetError> {
+pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     let mut path_str = uri.path().trim_start_matches('/');
     if path_str.is_empty() {
         path_str = "index.html";

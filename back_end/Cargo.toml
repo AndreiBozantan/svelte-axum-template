@@ -33,6 +33,8 @@ md5 = { version = "0.7" }
 rpassword = { version = "7.4" }
 rand = {version = "0.9" }
 hex = { version = "0.4" }
+tempfile = { version = "3.20" }
+axum-test = { version = "17.3.0" }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]

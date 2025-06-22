@@ -1,6 +1,3 @@
-use argon2::Argon2;
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
-use argon2::password_hash::rand_core::OsRng;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
@@ -11,10 +8,11 @@ use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
 
-use crate::jwt;
-use crate::jwt::{JwtError, TokenResponse};
-use crate::store::StoreError;
-use crate::appcontext::AppContext;
+use crate::app;
+use crate::auth;
+use crate::auth::jwt;
+use crate::auth::jwt::{JwtError, TokenResponse};
+use crate::db::StoreError;
 use crate::db::schema::NewRefreshToken;
 
 #[derive(Deserialize)]
@@ -41,8 +39,8 @@ pub enum AuthError {
     #[error("JWT error: {0}")]
     JwtError(#[from] JwtError),
 
-    #[error("Password hashing error: {0}")]
-    PasswordHashingError(String),
+    #[error("Password error: {0}")]
+    PasswordHashingError(#[from] argon2::password_hash::Error),
 
     #[error("Database error: {0}")]
     DatabaseError(#[from] StoreError),
@@ -80,14 +78,17 @@ impl IntoResponse for AuthError {
 }
 
 /// Login route
-pub async fn login(State(context): State<AppContext>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
     let user = context.store.get_user_by_username(&login.username).await
-        .map_err(|_| AuthError::InvalidCredentials)?;
+        .map_err(|_| AuthError::UserNotFound)?;
 
-    verify_password(&login.password, user.password_hash)?;
+    if !auth::verify_password(&login.password, user.password_hash)? {
+        tracing::warn!("Invalid password for user: {}", login.username);
+        return Err(AuthError::InvalidCredentials);
+    }
 
     // Generate JWT tokens with appropriate expiration
     let access_token = jwt::generate_access_token(
@@ -125,8 +126,7 @@ pub async fn login(State(context): State<AppContext>, Json(login): Json<Login>) 
 }
 
 /// Logout route
-#[allow(clippy::unused_async)]
-pub async fn logout(State(context): State<AppContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
+pub async fn logout(State(context): State<app::Context>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
     let claims = jwt::decode_access_token_from_req(&context.config.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
@@ -140,7 +140,7 @@ pub async fn logout(State(context): State<AppContext>, req: Request<Body>) -> Re
 }
 
 /// Route to refresh access token using refresh token
-pub async fn refresh_access_token(State(context): State<AppContext>, Json(request): Json<RefreshTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn refresh_access_token(State(context): State<app::Context>, Json(request): Json<RefreshTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
 
     // Decode and validate refresh token
@@ -177,7 +177,7 @@ pub async fn refresh_access_token(State(context): State<AppContext>, Json(reques
 }
 
 /// Route to revoke a refresh token
-pub async fn revoke_token(State(context): State<AppContext>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn revoke_token(State(context): State<app::Context>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
@@ -187,26 +187,4 @@ pub async fn revoke_token(State(context): State<AppContext>, Json(request): Json
     // Revoke the token
     context.store.revoke_refresh_token(&refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
-}
-
-/// Hash a password using Argon2
-pub fn hash_password(password: &str) -> Result<String, AuthError> {
-    let salt = SaltString::generate(OsRng);
-    let password_hash = Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|e| AuthError::PasswordHashingError(e.to_string()))?
-        .to_string();
-    Ok(password_hash)
-}
-
-/// Verify a password against a hash
-fn verify_password(password: &str, hash: Option<String>) -> Result<bool, AuthError> {
-    // User has no password set (SSO only), cannot login with password
-    let hash = hash.ok_or(AuthError::InvalidCredentials)?;
-    let parsed_hash = PasswordHash::new(&hash).map_err(|e| AuthError::PasswordHashingError(e.to_string()))?;
-    match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
-        Ok(()) => Ok(true),
-        Err(argon2::password_hash::Error::Password) => Ok(false),
-        Err(e) => Err(AuthError::PasswordHashingError(e.to_string())),
-    }
 }

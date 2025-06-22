@@ -3,7 +3,7 @@ use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
 
 use crate::db::DbPool;
-use crate::db::schema::{NewRefreshToken, NewTenant, NewUser, RefreshToken, Tenant, User };
+use crate::db::schema::{NewRefreshToken, NewUser, RefreshToken, Tenant, User };
 
 // TODO: split the store module in separate files for each table
 
@@ -15,9 +15,6 @@ pub enum StoreError {
     #[error("User not found")]
     UserNotFound,
 
-    #[error("Invalid credentials")]
-    InvalidCredentials,
-
     #[error("Token not found")]
     TokenNotFound,
 
@@ -27,7 +24,7 @@ pub enum StoreError {
 
 #[derive(Clone, Debug)]
 pub struct Store {
-    db_pool: DbPool,
+    pub db_pool: DbPool,
 }
 
 impl Store {
@@ -144,42 +141,6 @@ impl Store {
         Ok(())
     }
 
-    pub async fn is_refresh_token_revoked(&self, jti: &str) -> Result<bool, StoreError> {
-        let result = sqlx::query!(
-            r#"
-            SELECT revoked_at FROM refresh_tokens
-            WHERE jti = ?
-            "#,
-            jti
-        )
-        .fetch_optional(&self.db_pool)
-        .await?;
-
-        // If token doesn't exist or has revoked_at set, it's considered revoked
-        Ok(match result {
-            Some(row) => row.revoked_at.is_some(),
-            None => true, // Token not found = revoked
-        })
-    }
-
-    pub async fn get_tenants(&self) -> Result<Vec<Tenant>, StoreError> {
-        let tenants = sqlx::query_as!(
-            Tenant,
-            r#"
-            SELECT
-                id as "id!",
-                name as "name!",
-                description as "description!",
-                created_at as "created_at!",
-                updated_at as "updated_at!"
-            FROM tenants
-            "#
-        )
-        .fetch_all(&self.db_pool)
-        .await?;
-        return Ok(tenants)
-    }
-
     pub async fn get_tenant_by_id(&self, id: i64) -> Result<Tenant, StoreError> {
         let tenant = sqlx::query_as!(
             Tenant,
@@ -196,101 +157,12 @@ impl Store {
             id
         )
         .fetch_one(&self.db_pool)
-        .await?;
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::TenantNotFound,
+            _ => StoreError::Database(e),
+        })?;
         return Ok(tenant)
-    }
-
-    pub async fn create_tenant(&self, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = Utc::now().naive_utc();
-        let tenant = sqlx::query_as!(
-            Tenant,
-            r#"
-            INSERT INTO tenants (name, description, created_at, updated_at)
-            VALUES (?, ?, ?, ?)
-            RETURNING id, name, description, created_at, updated_at
-            "#,
-            tenant.name,
-            tenant.description,
-            now,
-            now
-        )
-        .fetch_one(&self.db_pool)
-        .await?;
-        return Ok(tenant)
-    }
-
-    pub async fn update_tenant(&self, id: i64, tenant: NewTenant) -> Result<Tenant, StoreError> {
-        let now = Utc::now().naive_utc();
-        let tenant = sqlx::query_as!(
-            Tenant,
-            r#"
-            UPDATE tenants
-            SET name = ?, description = ?, updated_at = ?
-            WHERE id = ?
-            RETURNING id, name, description, created_at, updated_at
-            "#,
-            tenant.name,
-            tenant.description,
-            now,
-            id
-        )
-        .fetch_one(&self.db_pool)
-        .await?;
-        return Ok(tenant)
-    }
-
-    pub async fn delete_tenant(&self, id: i64) -> Result<SqliteQueryResult, StoreError> {
-        let result = sqlx::query!(
-            r#"
-            DELETE FROM tenants
-            WHERE id = ?
-            "#,
-            id
-        )
-        .execute(&self.db_pool)
-        .await?;
-
-        return Ok(result)
-    }
-
-    pub async fn get_users_by_tenant(&self, tenant_id: i64) -> Result<Vec<User>, StoreError> {
-        let users = sqlx::query_as!(
-            User,
-            r#"
-            SELECT
-                id as "id!",
-                username as "username!",
-                password_hash,
-                email,
-                tenant_id,
-                sso_provider,
-                sso_id,
-                created_at as "created_at!",
-                updated_at as "updated_at!"
-            FROM users
-            WHERE tenant_id = ?
-            "#,
-            tenant_id
-        )
-        .fetch_all(&self.db_pool)
-        .await?;
-
-        return Ok(users)
-    }
-
-    pub async fn assign_user_to_tenant(&self, user_id: i64, tenant_id: i64) -> Result<SqliteQueryResult, StoreError> {
-        let result = sqlx::query!(
-            r#"
-            UPDATE users
-            SET tenant_id = ?
-            WHERE id = ?
-            "#,
-            tenant_id,
-            user_id
-        )
-        .execute(&self.db_pool)
-        .await?;
-        Ok(result)
     }
 
     pub async fn get_refresh_token_by_jti(&self, jti: &str) -> Result<RefreshToken, StoreError> {
@@ -335,7 +207,9 @@ impl Store {
         Ok(result)
     }
 
-    pub async fn cleanup_expired_refresh_tokens(&self) -> Result<SqliteQueryResult, StoreError> {
+    /// Cleanup expired refresh tokens
+    /// TODO: add a way to use this (e.g. scheduled task)
+    pub async fn _cleanup_expired_refresh_tokens(&self) -> Result<SqliteQueryResult, StoreError> {
         let now = Utc::now().naive_utc();
         let result = sqlx::query!(
             r#"

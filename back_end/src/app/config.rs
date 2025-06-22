@@ -1,6 +1,6 @@
 use std::{fs, path::Path};
-use serde::Deserialize;
 use config::{Config, ConfigError, Environment, File};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
@@ -9,9 +9,6 @@ pub struct ServerConfig {
 
     #[serde(default)]
     pub port: u16,
-
-    #[serde(default)]
-    pub session_cookie_name: String,
 
     #[serde(default)]
     pub log_directives: String,
@@ -55,7 +52,6 @@ impl Default for ServerConfig {
         Self {
             host: "127.0.0.1".to_string(),
             port: 3000,
-            session_cookie_name: "axum_svelte_session".to_string(),
             log_directives: "svelte_axum_template=debug,tower_http=info".to_string(),
         }
     }

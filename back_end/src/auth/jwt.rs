@@ -1,17 +1,20 @@
-use axum::{http};
+use axum::http;
 use axum::extract::Request;
+use axum::response::IntoResponse;
+use axum::Json;
 use chrono::Utc;
 use jsonwebtoken as jwt;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use uuid::Uuid;
 use thiserror::Error;
 
-use crate::appconfig::JwtConfig;
+use crate::app::JwtConfig;
 
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Failed to encode JWT token")]
-    EncodingError(#[from] jsonwebtoken::errors::Error),
+    EncodingError(#[from] jwt::errors::Error),
 
     #[error("Failed to decode JWT token")]
     DecodingError,
@@ -22,6 +25,31 @@ pub enum JwtError {
     #[error("Invalid token")]
     InvalidToken,
 }
+
+impl IntoResponse for JwtError {
+    fn into_response(self) -> axum::response::Response {
+        tracing::error!(
+            error_type = %std::any::type_name::<Self>(),
+            error_subtype = %std::any::type_name_of_val(&self),
+            error_message = %self);
+
+        let (status, error_message) = match self {
+            Self::EncodingError(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::DecodingError => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
+            Self::TokenExpired => (http::StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
+            Self::InvalidToken => (http::StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
+        };
+
+        let body = Json(json!({
+            "result": "error",
+            "message": error_message
+        }));
+
+        (status, body).into_response()
+    }
+}
+
+// ...existing code...
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AccessTokenClaims {
@@ -137,7 +165,7 @@ where T: serde::de::DeserializeOwned
 /// Maps jsonwebtoken errors to our custom JwtError type
 fn map_jwt_error(err: jwt::errors::Error) -> JwtError {
     match err.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
+        jwt::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
         _ => JwtError::DecodingError,
     }
 }

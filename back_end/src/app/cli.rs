@@ -1,11 +1,16 @@
 // cli.rs - CLI utility for database migrations
 use std::env;
-use std::io::{self, Write};
+use std::io;
+use std::io::Write;
 use std::path::Path;
 use thiserror::Error;
 use clap::{Parser, Subcommand};
 
-use crate::db::{self, migrations::MigrationError}; // Import MigrationError directly
+use crate::app;
+use crate::auth;
+use crate::db;
+use crate::db::migrations::MigrationError;
+use crate::db::schema::NewUser;
 
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -60,7 +65,7 @@ enum MigrateSubCommands {
     },
 }
 
-pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
+pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -73,6 +78,7 @@ pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
     cli_args.extend(args.iter().skip(2).cloned());
 
     let cli = Cli::parse_from(cli_args);
+    let db_pool = &context.store.db_pool;
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
@@ -122,7 +128,7 @@ pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
                 return Err(CliError::Other("Password cannot be empty".to_string()));
             }
 
-            create_admin_user(db_pool, &username, &password, email.as_deref()).await
+            create_admin_user(&context.store, &username, &password, email.as_deref()).await
                 .map_err(|e| CliError::Other(e.to_string()))?;
 
             println!("Admin user '{}' created successfully!", username);
@@ -135,23 +141,17 @@ pub async fn run_migration_cli(db_pool: &db::DbPool) -> Result<(), CliError> {
 }
 
 async fn create_admin_user(
-    db_pool: &db::DbPool,
+    store: &db::Store,
     username: &str,
     password: &str,
     email: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::db::schema::NewUser;
-    use crate::store::Store;
-    use crate::routes::hash_password;
-
-    let store = Store::new(db_pool.clone());
-
     // Check if user already exists
     if store.get_user_by_username(username).await.is_ok() {
         return Err("User already exists".into());
     }
 
-    let password_hash = hash_password(password)?;
+    let password_hash = auth::hash_password(password)?;
     let new_user = NewUser {
         username: username.to_string(),
         password_hash: Some(password_hash),

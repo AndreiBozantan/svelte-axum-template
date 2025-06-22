@@ -1,83 +1,64 @@
-use axum::middleware;
-use axum::routing::get;
-use axum::routing::post;
-use axum::Router;
-use tower_http::trace::TraceLayer;
-use crate::appcontext::AppContext;
-use crate::store::Store;
-use crate::db::schema::{NewUser, NewTenant};
-use axum::body::Body;
-use axum::http::{Request, StatusCode, header};
-use axum_test::TestServer;
-use serde_json::{json, Value};
-use sqlx::SqlitePool;
-use tempfile::NamedTempFile;
-use tokio;
-
-use crate::{
-    assets,
-    middlewares, routes,
-    appcontext::AppContext,
-};
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use axum::http::header;
+    use axum::http::StatusCode;
+    use axum_test::TestServer;
+    use serde_json::json;
+    use serde_json::Value;
+    use tempfile::NamedTempFile;
+    use tokio;
 
-    async fn create_test_context() -> AppContext {
-        let temp_db = NamedTempFile::new().unwrap();
-        let database_url = format!("sqlite:{}", temp_db.path().to_str().unwrap());
+    use svelte_axum_template::*;
 
-        let config = AppConfig {
-            jwt: JwtConfig {
+    const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
+    const TEST_USERNAME: &str = "test_user";
+
+    async fn create_test_server(config: Option<app::Config>) -> TestServer {
+        let mut config = config.or(Some(app::Config {
+            jwt: app::JwtConfig {
                 secret: "test_secret_key_for_testing_only".to_string(),
                 access_token_expiry: 3600,
                 refresh_token_expiry: 86400,
             },
-            database: DatabaseConfig {
-                url: database_url.clone(),
-            },
             ..Default::default()
+        })).unwrap();
+
+        // Create a temporary SQLite database file and use it for testing
+        // TODO: try to remove the file after tests
+        let temp_db = NamedTempFile::new().unwrap();
+        config.database = app::DatabaseConfig {
+            url: format!("sqlite:{}", temp_db.path().to_str().unwrap()),
+            max_connections: 5,
         };
 
-        let pool = SqlitePool::connect(&database_url).await.unwrap();
-        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-
-        let store = Store::new(pool);
-
-        // Create test tenant
-        let tenant = NewTenant {
-            name: "Test Tenant".to_string(),
-            description: Some("Test tenant for auth tests".to_string()),
-        };
-        let tenant_id = store.create_tenant(tenant).await.unwrap();
+        let context = app::Context::new(config).await.unwrap();
+        sqlx::migrate!("./migrations").run(&context.store.db_pool).await.unwrap();
 
         // Create test user
-        let password_hash = crate::routes::auth::hash_password("testpass123").unwrap();
-        let user = NewUser {
-            username: "testuser".to_string(),
+        let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
+        let user = db::schema::NewUser {
+            username: TEST_USERNAME.to_string(),
             password_hash: Some(password_hash),
             email: Some("test@example.com".to_string()),
-            tenant_id: Some(tenant_id),
+            tenant_id: Some(1),
             sso_provider: None,
             sso_id: None,
         };
-        store.create_user(user).await.unwrap();
+        context.store.create_user(user).await.unwrap();
 
-        AppContext::new(config, store)
+        let router = routes::create_router(context);
+        TestServer::new(router).unwrap()
     }
 
     #[tokio::test]
     async fn test_login_success() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -86,20 +67,18 @@ mod tests {
         assert_eq!(body["result"], "ok");
         assert!(body["tokens"]["access_token"].is_string());
         assert!(body["tokens"]["refresh_token"].is_string());
-        assert_eq!(body["user"]["username"], "testuser");
+        assert_eq!(body["user"]["username"], TEST_USERNAME);
     }
 
     #[tokio::test]
     async fn test_login_invalid_credentials() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "wrongpassword"
+                "username": TEST_USERNAME,
+                "password": "wrong_password"
             }))
             .await;
 
@@ -110,9 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_nonexistent_user() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/login")
@@ -129,16 +106,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_refresh_token_success() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         // First login to get tokens
         let login_response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -157,14 +132,12 @@ mod tests {
         let refresh_body: Value = refresh_response.json();
         assert_eq!(refresh_body["result"], "ok");
         assert!(refresh_body["access_token"].is_string());
-        assert_eq!(refresh_body["user"]["username"], "testuser");
+        assert_eq!(refresh_body["user"]["username"], TEST_USERNAME);
     }
 
     #[tokio::test]
     async fn test_refresh_token_invalid() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/refresh")
@@ -180,16 +153,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_revoke_token_success() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         // Login to get tokens
         let login_response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -221,16 +192,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_logout_success() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         // Login to get tokens
         let login_response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -261,16 +230,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_protected_route_with_valid_token() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         // Login to get access token
         let login_response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -288,9 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_protected_route_without_token() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server.get("/api").await;
         response.assert_status(StatusCode::UNAUTHORIZED);
@@ -298,9 +263,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_protected_route_with_invalid_token() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .get("/api")
@@ -311,55 +274,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_token_expiry() {
-        let temp_db = NamedTempFile::new().unwrap();
-        let database_url = format!("sqlite:{}", temp_db.path().to_str().unwrap());
-
+    async fn test_access_token_expiry() {
         // Create config with very short token expiry
-        let config = AppConfig {
-            jwt: JwtConfig {
+        let config = app::Config {
+            jwt: app::JwtConfig {
                 secret: "test_secret_key_for_testing_only".to_string(),
                 access_token_expiry: 1, // 1 second
                 refresh_token_expiry: 86400,
             },
-            database: DatabaseConfig {
-                url: database_url.clone(),
-            },
             ..Default::default()
         };
 
-        let pool = SqlitePool::connect(&database_url).await.unwrap();
-        sqlx::migrate!("./migrations").run(&pool).await.unwrap();
-        let store = Store::new(pool);
-
-        // Create test data
-        let tenant = NewTenant {
-            name: "Test Tenant".to_string(),
-            description: Some("Test tenant".to_string()),
-        };
-        let tenant_id = store.create_tenant(tenant).await.unwrap();
-
-        let password_hash = crate::routes::auth::hash_password("testpass123").unwrap();
-        let user = NewUser {
-            username: "testuser".to_string(),
-            password_hash: Some(password_hash),
-            email: Some("test@example.com".to_string()),
-            tenant_id: Some(tenant_id),
-            sso_provider: None,
-            sso_id: None,
-        };
-        store.create_user(user).await.unwrap();
-
-        let context = AppContext::new(config, store);
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(Some(config)).await;
 
         // Login
         let login_response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser",
-                "password": "testpass123"
+                "username": TEST_USERNAME,
+                "password": TEST_PASSWORD
             }))
             .await;
 
@@ -380,9 +313,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_malformed_json_login() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/login")
@@ -394,14 +325,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_missing_fields_login() {
-        let context = create_test_context().await;
-        let app = backend(&context);
-        let server = TestServer::new(app).unwrap();
+        let server = create_test_server(None).await;
 
         let response = server
             .post("/auth/login")
             .json(&json!({
-                "username": "testuser"
+                "username": TEST_USERNAME
                 // missing password
             }))
             .await;

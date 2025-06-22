@@ -1,14 +1,17 @@
+mod store;
 pub mod schema;
 pub mod migrations;
+pub use store::Store;
+pub use store::StoreError;
 
 use std::path::Path;
 use std::str::FromStr;
 use thiserror::Error;
-
-use sqlx::{SqlitePool};
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-pub use crate::appconfig::DatabaseConfig;
+use crate::app::DatabaseConfig;
+
 pub type DbPool = SqlitePool;
 
 #[derive(Debug, Error)]
