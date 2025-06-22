@@ -5,6 +5,7 @@
 Cargo.lock
 target
 local.toml
+back_end/config/.jwt_secret
 
 # svelte files
 front_end/dist/
@@ -21,3 +22,4 @@ db.sqlite*
 
 # misc
 .env
+.DS_Store

@@ -1,10 +1,16 @@
 // cli.rs - CLI utility for database migrations
 use std::env;
+use std::io;
+use std::io::Write;
 use std::path::Path;
 use thiserror::Error;
 use clap::{Parser, Subcommand};
 
-use crate::db::{self, migrations::MigrationError}; // Import MigrationError directly
+use crate::app;
+use crate::auth;
+use crate::db;
+use crate::db::migrations::MigrationError;
+use crate::db::schema::NewUser;
 
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -48,9 +54,18 @@ enum MigrateSubCommands {
     Status,
     /// Run all pending migrations
     Run,
+    /// Create an admin user
+    CreateAdmin {
+        /// Username for the admin user
+        #[arg(short, long)]
+        username: String,
+        /// Email for the admin user (optional)
+        #[arg(short, long)]
+        email: Option<String>,
+    },
 }
 
-pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<(), CliError> {
+pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -63,6 +78,7 @@ pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<(), CliError> 
     cli_args.extend(args.iter().skip(2).cloned());
 
     let cli = Cli::parse_from(cli_args);
+    let db_pool = &context.store.db_pool;
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
@@ -102,8 +118,49 @@ pub async fn run_migration_cli(db_pool: &db::DbPoolRef) -> Result<(), CliError> 
                 .map_err(|e| CliError::MigrationRunFailed { source: e })?;
             println!("Migrations applied successfully.");
         },
+        MigrateSubCommands::CreateAdmin { username, email } => {
+            // Prompt for password securely
+            print!("Enter password for admin user '{}': ", username);
+            io::stdout().flush().unwrap();
+            let password = rpassword::read_password().map_err(|e| CliError::Other(e.to_string()))?;
+
+            if password.trim().is_empty() {
+                return Err(CliError::Other("Password cannot be empty".to_string()));
+            }
+
+            create_admin_user(&context.store, &username, &password, email.as_deref()).await
+                .map_err(|e| CliError::Other(e.to_string()))?;
+
+            println!("Admin user '{}' created successfully!", username);
+        },
+
     }
 
     // Exit the process since this is a CLI command
     std::process::exit(0);
+}
+
+async fn create_admin_user(
+    store: &db::Store,
+    username: &str,
+    password: &str,
+    email: Option<&str>
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Check if user already exists
+    if store.get_user_by_username(username).await.is_ok() {
+        return Err("User already exists".into());
+    }
+
+    let password_hash = auth::hash_password(password)?;
+    let new_user = NewUser {
+        username: username.to_string(),
+        password_hash: Some(password_hash),
+        email: email.map(|e| e.to_string()),
+        tenant_id: Some(1), // Default tenant
+        sso_provider: None,
+        sso_id: None,
+    };
+
+    store.create_user(new_user).await?;
+    Ok(())
 }

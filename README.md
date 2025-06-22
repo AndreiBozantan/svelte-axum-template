@@ -40,7 +40,7 @@ Optionally, you can execute `npm run clean` before the build, to remove all prev
 After running the clean command, you have to run `npm run dev:init` once, to reinitialize the project before running in dev mode.
 
 
-# Back end - Rust Axum
+# Backend - Rust Axum
 - located in `./back_end`
 - serves front end directory
 - middleware for checking authorization header
@@ -51,7 +51,32 @@ After running the clean command, you have to run `npm run dev:init` once, to rei
 
 Run `cargo run` from inside the `./back_end` folder to start the backend server.
 
-# Front end - Svelte
+## Backend Configuration
+The backend can be configured using TOML files in the `./back_end/config` directory:
+- `default.toml` - Default configuration
+- `development.toml` - Development-specific overrides
+- `production.toml` - Production configuration example
+
+### Database Migration Control
+By default, the application automatically runs database migrations on startup. This can be controlled via the `run_db_migrations_on_startup ` setting:
+
+```toml
+[database]
+url = "sqlite:db.sqlite"
+max_connections = 5
+run_db_migrations_on_startup  = true  # Set to false to disable automatic migrations
+```
+
+**For Development**: Keep `run_db_migrations_on_startup  = true` for convenience.
+
+**For Production**: Set `run_db_migrations_on_startup  = false` and run migrations manually:
+```bash
+./your-app migrate run
+```
+
+This provides better control over database schema changes in production environments.
+
+# Frontend - Svelte
 - Located in `./front_end`
 - navbar with login and logout
 - secure page that shows session information once logged in

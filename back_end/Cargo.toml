@@ -14,7 +14,6 @@ readme = "README.md"
 axum = { version = "0.8", features = ["json", "form", "multipart"] }
 tower = { version = "0.5" }
 tower-http = { version = "0.6", features = ["full"] }
-tower-sessions = { version = "0.14" }
 tokio = { version = "1.36", features = ["full"] }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -22,13 +21,20 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version =  "1.0" }
 rust-embed =  { version = "8.7" }
 mime_guess =  { version = "2.0" }
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-rustls", "macros", "migrate"] }
-anyhow =  { version = "1.0" }
+sqlx = { version = "0.8", features = ["sqlite", "chrono", "runtime-tokio-rustls", "macros", "migrate"] }
 thiserror =  { version = "1.0" }
-dotenv =  { version = "0.15" }
 clap = { version = "4.4", features = ["derive"] }
-chrono = { version = "0.4" }
+chrono = { version = "0.4", features = ["serde", "clock"] }
 config = { version = "0.15" }
+jsonwebtoken = { version = "9.0" }
+uuid = { version = "1.0", features = ["v4"] }
+argon2 = { version = "0.5", features = ["std"] }
+md5 = { version = "0.7" }
+rpassword = { version = "7.4" }
+rand = {version = "0.9" }
+hex = { version = "0.4" }
+axum-test = { version = "17.3" }
+sha2 = { version = "0.10" }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]

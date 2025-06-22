@@ -1,18 +1,18 @@
+mod store;
 pub mod schema;
 pub mod migrations;
+pub use store::Store;
+pub use store::StoreError;
 
 use std::path::Path;
-use std::sync::Arc;
 use std::str::FromStr;
 use thiserror::Error;
-
-use sqlx::{Pool, Sqlite};
+use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-pub use crate::appconfig::DatabaseConfig;
+use crate::app::DatabaseConfig;
 
-pub type DbPool = Pool<Sqlite>;
-pub type DbPoolRef = Arc<DbPool>;
+pub type DbPool = SqlitePool;
 
 #[derive(Debug, Error)]
 pub enum DbError {
@@ -26,7 +26,7 @@ pub enum DbError {
     MigrationError(#[from] migrations::MigrationError),
 }
 
-pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError> {
+pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPool, DbError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
             .create_if_missing(true)
             .foreign_keys(true)
@@ -39,12 +39,22 @@ pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPoolRef, DbError>
         .await
         .map_err(DbError::ConnectionError)?; // Updated to use the new variant
 
-    // Determine the migrations path
-    let migrations_path = Path::new("./back_end/migrations");
+    // Run migrations if run_db_migrations_on_startup is enabled
+    if !db_config.run_db_migrations_on_startup {
+        tracing::info!("Database migrations skipped (run_db_migrations_on_startup  = false)");
+    } else {
+        // if there is a backend directory in the current working directory, use that as the migrations path
+        let migrations_dir = match Path::new("backend").exists() {
+            true => "./backend/migrations",
+            false => "./migrations"
+        };
+        let migrations_path = Path::new(migrations_dir);
 
-    // Run migrations using our migrations module
-    migrations::run(&pool, migrations_path).await?;
+        // Run migrations using our migrations module
+        migrations::run(&pool, migrations_path).await?;
+        tracing::info!("Database migrations completed successfully");
+    }
 
     tracing::info!("Database initialized successfully");
-    Ok(Arc::new(pool))
+    Ok(pool)
 }
