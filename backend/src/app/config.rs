@@ -39,6 +39,26 @@ pub struct JwtConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct OAuthConfig {
+    #[serde(default)]
+    pub google_client_id: String,
+
+    #[serde(default)]
+    pub google_client_secret: String,
+
+    #[serde(default)]
+    pub google_redirect_uri: String,
+
+    // Future providers can be added here
+    // #[serde(default)]
+    // pub github_client_id: String,
+    // #[serde(default)]
+    // pub github_client_secret: String,
+    // #[serde(default)]
+    // pub github_redirect_uri: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     #[serde(default)]
     pub server: ServerConfig,
@@ -48,6 +68,9 @@ pub struct AppConfig {
 
     #[serde(default)]
     pub jwt: JwtConfig,
+
+    #[serde(default)]
+    pub oauth: OAuthConfig,
 }
 
 impl Default for ServerConfig {
@@ -80,12 +103,23 @@ impl Default for JwtConfig {
     }
 }
 
+impl Default for OAuthConfig {
+    fn default() -> Self {
+        Self {
+            google_client_id: "".to_string(),
+            google_client_secret: "".to_string(),
+            google_redirect_uri: "http://localhost:3000/auth/oauth/google/callback".to_string(),
+        }
+    }
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             server: ServerConfig::default(),
             database: DatabaseConfig::default(),
             jwt: JwtConfig::default(),
+            oauth: OAuthConfig::default(),
         }
     }
 }
@@ -93,25 +127,32 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
         let mut builder = Config::builder();
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+        let config_dir = match Path::new("backend").exists() {
+            true => "backend/config",
+            false => "config"
+        };
 
-        // TODO: move config to yml files
-        // TODO: check if the configs are loaded correctly in dev mode, when using `cargo run`
+        // print the current directory and config directory (tracing is not yet initialized)
+        println!("Loading application configuration from current directory: `{current_dir:?}` and config directory: `{config_dir}`");
 
         // Layer 1: Add default configuration from files
-        if Path::new("./config/default.toml").exists() {
-            builder = builder.add_source(File::with_name("./config/default.toml"));
+        let default_config_path = Path::new(config_dir).join("default.toml");
+        if default_config_path.exists() {
+            builder = builder.add_source(File::with_name(default_config_path.to_str().unwrap()));
         }
 
         // Layer 2: Add environment-specific config
         let env = std::env::var("RUN_ENV").unwrap_or_else(|_| "development".to_string());
-        let env_config = format!("./config/{env}.toml");
-        if Path::new(&env_config).exists() {
-            builder = builder.add_source(File::with_name(&env_config));
+        let env_config_path = Path::new(config_dir).join(format!("{env}.toml"));
+        if env_config_path.exists() {
+            builder = builder.add_source(File::with_name(&env_config_path.to_str().unwrap()));
         }
 
         // Layer 3: Add local config overrides
-        if Path::new("./config/local.toml").exists() {
-            builder = builder.add_source(File::with_name("./config/local.toml"));
+        let local_config_path = Path::new(config_dir).join("local.toml");
+        if local_config_path.exists() {
+            builder = builder.add_source(File::with_name(local_config_path.to_str().unwrap()));
         }
 
         // Layer 4: Override with environment variables
@@ -127,8 +168,13 @@ impl AppConfig {
         // handle JWT secret initialization
         config.jwt.secret = Self::ensure_jwt_secret()?;
 
-        // TODO: write config to file if it doesn't exist
-
+        // TODO: write config to file if it doesn't exist, so that it can be modified by users
+        // let config_file_path = Path::new(config_dir).join("config.toml");
+        // if !config_file_path.exists() {
+        //     fs::write(&config_file_path, toml::to_string(&config).unwrap())
+        //         .map_err(|e| ConfigError::Message(format!("Failed to write config file: {}", e)))?;
+        //     println!("Created default config file at {}", config_file_path.display());
+        // }
 
         Ok(config)
     }

@@ -13,6 +13,7 @@ use crate::app;
 use crate::auth;
 use crate::auth::jwt;
 use crate::auth::jwt::{JwtError, TokenResponse};
+use crate::auth::oauth::{OAuthService, OAuthError};
 use crate::db::StoreError;
 use crate::db::schema::NewRefreshToken;
 
@@ -192,4 +193,105 @@ pub async fn revoke_token(State(context): State<app::Context>, Json(request): Js
     // Revoke the token
     context.store.revoke_refresh_token(&refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
+}
+
+/// Handler for initiating Google OAuth flow
+pub async fn google_auth_init(
+    State(context): State<app::Context>,
+) -> Result<impl IntoResponse, OAuthError> {
+    let oauth_service = OAuthService::new(&context)?;
+    let (auth_url, csrf_token) = oauth_service.get_google_auth_url()?;
+
+    tracing::info!("Initiating Google OAuth flow with CSRF token: {}", csrf_token.secret());
+
+    // In production, you should store the CSRF token in a secure session store
+    // For now, we'll rely on the OAuth provider's state validation
+    Ok(axum::response::Redirect::to(auth_url.as_str()))
+}
+
+/// Handler for Google OAuth callback
+pub async fn google_auth_callback(
+    State(context): State<app::Context>,
+    axum::extract::Query(params): axum::extract::Query<crate::auth::oauth::AuthRequest>,
+) -> Result<impl IntoResponse, OAuthError> {
+    use oauth2::TokenResponse as OAuth2TokenResponse;
+
+    tracing::info!("Google OAuth callback received with state: {}", params.state);
+
+    let oauth_service = OAuthService::new(&context)?;
+
+    // Exchange authorization code for access token
+    let token_response = oauth_service.exchange_google_code(&params.code).await?;
+    let access_token = token_response.access_token().secret();
+
+    // Get user information from Google
+    let user_info = oauth_service.get_google_user_info(access_token).await?;
+
+    tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
+
+    // Check if user already exists
+    let existing_user = context.store
+        .get_user_by_sso_id("google", &user_info.id)
+        .await
+        .ok();
+
+    let user = if let Some(user) = existing_user {
+        tracing::info!("Existing SSO user found: {}", user.username);
+        user
+    } else {
+        // Create new user
+        let new_user = crate::db::schema::NewUser {
+            username: user_info.email.clone(), // Use email as username for SSO users
+            password_hash: None, // No password for SSO users
+            email: Some(user_info.email.clone()),
+            tenant_id: None, // You might want to assign a default tenant
+            sso_provider: Some("google".to_string()),
+            sso_id: Some(user_info.id.clone()),
+        };
+
+        let user = context.store.create_user(new_user).await?;
+
+        tracing::info!("Created new SSO user: {}", user.username);
+        user
+    };
+
+    // TODO: move duplicate code (login function) to a common function
+    // Generate JWT tokens for the user (same as regular login)
+    let access_token = jwt::generate_access_token(
+        &context.config.jwt,
+        user.id,
+        &user.username,
+        user.tenant_id)?;
+
+    let refresh_token = jwt::generate_refresh_token(
+        &context.config.jwt,
+        user.id)?;
+
+    // Store refresh token in database
+    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &refresh_token)
+        .map_err(|e| OAuthError::JwtError(e))?;
+    let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0)
+        .ok_or(OAuthError::JwtError(crate::auth::jwt::JwtError::InvalidToken))?;
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&refresh_token);
+    let token_hash = format!("{:x}", hasher.finalize());
+    let new_refresh_token = crate::db::schema::NewRefreshToken {
+        jti: refresh_claims.jti,
+        user_id: user.id,
+        token_hash: token_hash,
+        expires_at: expires_at.naive_utc(),
+    };
+    context.store.store_refresh_token(new_refresh_token).await?;
+
+    let jwt_token_response = jwt::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
+
+    // For OAuth flow, redirect to frontend with success status
+    // TODO: In production, consider a more secure approach like server-side session or secure cookies
+    let redirect_url = format!(
+        "http://localhost:5173/login?oauth_success=true&access_token={}&refresh_token={}",
+        jwt_token_response.access_token,
+        jwt_token_response.refresh_token
+    );
+
+    Ok(axum::response::Redirect::to(&redirect_url))
 }

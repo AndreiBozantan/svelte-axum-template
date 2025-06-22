@@ -44,11 +44,10 @@ pub async fn init_pool(db_config: &DatabaseConfig) -> Result<DbPool, DbError> {
         tracing::info!("Database migrations skipped (run_db_migrations_on_startup  = false)");
     } else {
         // if there is a backend directory in the current working directory, use that as the migrations path
-        let migrations_dir = match Path::new("backend").exists() {
-            true => "./backend/migrations",
-            false => "./migrations"
+        let migrations_path = match Path::new("backend").exists() {
+            true => Path::new("backend/migrations"),
+            false => Path::new("migrations")
         };
-        let migrations_path = Path::new(migrations_dir);
 
         // Run migrations using our migrations module
         migrations::run(&pool, migrations_path).await?;

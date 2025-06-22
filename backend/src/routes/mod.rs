@@ -32,6 +32,8 @@ pub fn create_router(context: app::Context) -> Router {
         .route("/auth/logout", get(auth::logout)) // deletes username in session and revokes tokens
         .route("/auth/refresh", post(auth::refresh_access_token)) // refresh access token
         .route("/auth/revoke", post(auth::revoke_token)) // revoke refresh token
+        .route("/auth/oauth/google", get(auth::google_auth_init)) // initiate Google OAuth
+        .route("/auth/oauth/google/callback", get(auth::google_auth_callback)) // Google OAuth callback
         .route("/health", get(health::health_check)) // Health check endpoint
         .with_state(context);
 

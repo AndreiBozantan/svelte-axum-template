@@ -18,6 +18,25 @@ export async function postLogin(username: string, password: string) {
     return await res.json();
 }
 
+// OAuth token storage and management
+export function storeTokens(accessToken: string, refreshToken: string) {
+    localStorage.setItem('access_token', accessToken);
+    localStorage.setItem('refresh_token', refreshToken);
+}
+
+export function getAccessToken(): string | null {
+    return localStorage.getItem('access_token');
+}
+
+export function getRefreshToken(): string | null {
+    return localStorage.getItem('refresh_token');
+}
+
+export function clearTokens() {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+}
+
 export async function getLogout() {
     const res = await fetch("/auth/logout", {credentials: 'same-origin'});
 
@@ -26,5 +45,6 @@ export async function getLogout() {
         // may want to return an error here
     } else {
         appState.clearUser();
+        clearTokens(); // Clear OAuth tokens as well
     }
 }

@@ -222,4 +222,32 @@ impl Store {
         .await?;
         Ok(result)
     }
+
+    pub async fn get_user_by_sso_id(&self, sso_provider: &str, sso_id: &str) -> Result<User, StoreError> {
+        let user = sqlx::query_as::<_, User>(
+            r#"
+            SELECT
+                id,
+                username,
+                password_hash,
+                email,
+                tenant_id,
+                sso_provider,
+                sso_id,
+                created_at,
+                updated_at
+            FROM users
+            WHERE sso_provider = ? AND sso_id = ?
+            "#
+        )
+        .bind(sso_provider)
+        .bind(sso_id)
+        .fetch_one(&self.db_pool)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => StoreError::UserNotFound,
+            _ => StoreError::Database(e),
+        })?;
+        return Ok(user);
+    }
 }
