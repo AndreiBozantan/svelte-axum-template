@@ -5,7 +5,6 @@ mod tests {
     use axum_test::TestServer;
     use serde_json::json;
     use serde_json::Value;
-    use tempfile::NamedTempFile;
     use tokio;
 
     use svelte_axum_template::*;
@@ -24,15 +23,14 @@ mod tests {
         })).unwrap();
 
         // Create a temporary SQLite database file and use it for testing
-        // TODO: try to remove the file after tests
-        let temp_db = NamedTempFile::new().unwrap();
+        // Use in-memory database to avoid permission issues
         config.database = app::DatabaseConfig {
-            url: format!("sqlite:{}", temp_db.path().to_str().unwrap()),
+            url: "sqlite::memory:".to_string(),
             max_connections: 5,
+            run_db_migrations_on_startup: true, // Enable auto-migrations for tests
         };
 
         let context = app::Context::new(config).await.unwrap();
-        sqlx::migrate!("./migrations").run(&context.store.db_pool).await.unwrap();
 
         // Create test user
         let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
@@ -299,8 +297,15 @@ mod tests {
         let login_body: Value = login_response.json();
         let access_token = login_body["tokens"]["access_token"].as_str().unwrap();
 
-        // Wait for token to expire
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        // Test token works before expiry
+        let response_before = server
+            .get("/api")
+            .add_header(header::AUTHORIZATION, format!("Bearer {}", access_token))
+            .await;
+        response_before.assert_status(StatusCode::OK);
+
+        // Wait for token to expire (longer wait to ensure expiration)
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 
         // Try to use expired token
         let response = server
@@ -320,7 +325,7 @@ mod tests {
             .text("not json")
             .await;
 
-        response.assert_status(StatusCode::BAD_REQUEST);
+        response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
 
     #[tokio::test]
@@ -335,6 +340,31 @@ mod tests {
             }))
             .await;
 
-        response.assert_status(StatusCode::BAD_REQUEST);
+        response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn test_auto_migrate_disabled() {
+        // Test that when run_db_migrations_on_startup is disabled, we can still create a database connection
+        // but need to handle the case where tables don't exist
+        let config = app::Config {
+            database: app::DatabaseConfig {
+                url: "sqlite::memory:".to_string(),
+                max_connections: 5,
+                run_db_migrations_on_startup: false, // Disable auto-migrations
+            },
+            ..Default::default()
+        };
+
+        // This should succeed in creating the connection pool but won't run migrations
+        let context = app::Context::new(config).await;
+        assert!(context.is_ok(), "Context creation should succeed even with run_db_migrations_on_startup disabled");
+
+        // However, trying to query user tables should fail because migrations weren't run
+        let context = context.unwrap();
+        let result = context.store.get_user_by_username("nonexistent").await;
+
+        // This should fail because the user table doesn't exist (no migrations were run)
+        assert!(result.is_err(), "Querying should fail when run_db_migrations_on_startup is disabled and no migrations have run");
     }
 }

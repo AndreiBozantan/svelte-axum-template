@@ -64,7 +64,7 @@ impl IntoResponse for AuthError {
             Self::JwtError(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::PasswordHashingError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::UserNotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            Self::UserNotFound => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::TokenInvalid => (StatusCode::UNAUTHORIZED, self.to_string()),
         };
 

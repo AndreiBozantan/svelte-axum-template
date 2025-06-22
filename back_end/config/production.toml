@@ -1,0 +1,17 @@
+[server]
+host = "0.0.0.0"
+port = 3000
+log_directives = "info,tower_http=info"
+
+[database]
+url = "sqlite:db.sqlite"
+max_connections = 10
+# Disable auto-migrations in production for manual control
+# Run migrations manually with: ./app migrate run
+run_db_migrations_on_startup = false
+
+[jwt]
+# JWT secret should be set via environment variable in production
+# secret = ""  # Set via SVELTE_AXUM_TEMPLATE__JWT__SECRET env var
+access_token_expiry = 900    # 15 minutes
+refresh_token_expiry = 604800  # 7 days

@@ -21,6 +21,9 @@ pub struct DatabaseConfig {
 
     #[serde(default)]
     pub max_connections: u32,
+
+    #[serde(default)]
+    pub run_db_migrations_on_startup: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -62,6 +65,7 @@ impl Default for DatabaseConfig {
         Self {
             url: "sqlite:db.sqlite".to_string(),
             max_connections: 5,
+            run_db_migrations_on_startup: true, // default to true for development
         }
     }
 }
@@ -89,6 +93,9 @@ impl Default for AppConfig {
 impl AppConfig {
     pub fn new() -> Result<Self, ConfigError> {
         let mut builder = Config::builder();
+
+        // TODO: move config to yml files
+        // TODO: check if the configs are loaded correctly in dev mode, when using `cargo run`
 
         // Layer 1: Add default configuration from files
         if Path::new("./config/default.toml").exists() {
@@ -119,6 +126,9 @@ impl AppConfig {
 
         // handle JWT secret initialization
         config.jwt.secret = Self::ensure_jwt_secret()?;
+
+        // TODO: write config to file if it doesn't exist
+
 
         Ok(config)
     }

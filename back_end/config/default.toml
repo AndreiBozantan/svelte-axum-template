@@ -6,3 +6,4 @@ log_directives = "debug"
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 5
+run_db_migrations_on_startup = true # Set to false in production for manual migration control

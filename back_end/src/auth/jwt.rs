@@ -154,7 +154,8 @@ fn decode_token<T>(token: &str, config: &JwtConfig, expected_token_type: &str, g
 where T: serde::de::DeserializeOwned
 {
     let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());
-    let validation = jwt::Validation::new(jwt::Algorithm::HS256);
+    let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
+    validation.leeway = 0; // Set leeway to 0 to ensure strict expiration checking
     let token = jwt::decode::<T>(token, &decoding_key, &validation).map_err(map_jwt_error)?;
     if expected_token_type != get_type(&token.claims) {
         return Err(JwtError::InvalidToken);

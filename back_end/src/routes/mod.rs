@@ -22,8 +22,8 @@ use crate::auth::jwt::JwtError;
 pub fn create_router(context: app::Context) -> Router {
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
-        .layer(middleware::from_fn_with_state(context.clone(), auth_middleware))
         .route("/api", get(api::handler))
+        .layer(middleware::from_fn_with_state(context.clone(), auth_middleware))
         .with_state(context.clone());
 
     // Create auth routes
