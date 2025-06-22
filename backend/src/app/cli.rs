@@ -113,7 +113,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
             }
         },
         MigrateSubCommands::Run => {
-            let migrations_path = Path::new("./back_end/migrations");
+            let migrations_path = Path::new("./backend/migrations");
             db::migrations::run(db_pool, migrations_path).await
                 .map_err(|e| CliError::MigrationRunFailed { source: e })?;
             println!("Migrations applied successfully.");

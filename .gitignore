@@ -5,10 +5,10 @@
 Cargo.lock
 target
 local.toml
-back_end/config/.jwt_secret
+backend/config/.jwt_secret
 
 # svelte files
-front_end/dist/
+frontend/dist/
 
 # npm files
 node_modules

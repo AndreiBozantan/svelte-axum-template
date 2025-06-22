@@ -33,6 +33,8 @@ pub enum MigrationError {
     FileSystemError(#[from] std::io::Error),
 }
 
+const MIGRATIONS_PATH: &str = "./backend/migrations";
+
 /// Runs all migrations from the filesystem migration path
 pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), MigrationError> {
     if !migrations_path.exists() {
@@ -58,14 +60,14 @@ pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), Migr
 
 /// Create a new migration file with the current timestamp
 pub fn create(name: &str) -> Result<String, MigrationError> {
-    let migrations_dir = Path::new("./back_end/migrations");
+    let migrations_dir = Path::new(MIGRATIONS_PATH);
 
     // Create migrations directory if it doesn't exist
     if !migrations_dir.exists() {
         fs::create_dir_all(migrations_dir)?;
     }
 
-    // Generate a timestamp in the format YYYYMMDDHHMMSS
+    // Generate a timestamp in the format YYYYMMDD_HHMMSS
     let seconds = SystemTime::now().duration_since(UNIX_EPOCH)
         .map_err(|e| MigrationError::SystemTimeFailed { source: e })?
         .as_secs();
@@ -74,7 +76,7 @@ pub fn create(name: &str) -> Result<String, MigrationError> {
     let now = Utc.timestamp_opt(seconds as i64, 0).single()
         .ok_or(MigrationError::TimestampError)?;
 
-    let timestamp = now.format("%Y%m%d%H%M%S").to_string();
+    let timestamp = now.format("%Y%m%d_%H%M%S").to_string();
     let filename = format!("{}_{}.sql", timestamp, name.replace(" ", "_").to_lowercase());
     let filepath = migrations_dir.join(&filename);
 
@@ -91,7 +93,7 @@ pub fn create(name: &str) -> Result<String, MigrationError> {
 
 /// List all available migrations
 pub fn list() -> Result<Vec<String>, MigrationError> {
-    let migrations_dir = Path::new("./back_end/migrations");
+    let migrations_dir = Path::new(MIGRATIONS_PATH);
 
     if !migrations_dir.exists() {
         return Ok(Vec::new());
