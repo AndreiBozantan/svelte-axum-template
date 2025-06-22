@@ -12,18 +12,21 @@ mod tests {
     const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
     const TEST_USERNAME: &str = "test_user";
 
-    async fn create_test_server(config: Option<app::Config>) -> TestServer {
-        let mut config = config.or(Some(app::Config {
+    fn default_config() -> app::Config {
+        app::Config {
             jwt: app::JwtConfig {
                 secret: "test_secret_key_for_testing_only".to_string(),
                 access_token_expiry: 3600,
                 refresh_token_expiry: 86400,
             },
             ..Default::default()
-        })).unwrap();
+        }
+    }
 
-        // Create a temporary SQLite database file and use it for testing
-        // Use in-memory database to avoid permission issues
+    async fn create_test_server(config: app::Config) -> TestServer {
+        let mut config = config.clone();
+
+        // use a temporary in-memory SQLite database file and use it for testing
         config.database = app::DatabaseConfig {
             url: "sqlite::memory:".to_string(),
             max_connections: 5,
@@ -50,7 +53,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_success() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/login")
@@ -70,7 +73,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_invalid_credentials() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/login")
@@ -87,7 +90,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_login_nonexistent_user() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/login")
@@ -104,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_refresh_token_success() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         // First login to get tokens
         let login_response = server
@@ -135,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_refresh_token_invalid() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/refresh")
@@ -151,7 +154,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_revoke_token_success() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         // Login to get tokens
         let login_response = server
@@ -190,7 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_logout_success() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         // Login to get tokens
         let login_response = server
@@ -228,7 +231,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_protected_route_with_valid_token() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         // Login to get access token
         let login_response = server
@@ -253,15 +256,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_protected_route_without_token() {
-        let server = create_test_server(None).await;
-
+        let server = create_test_server(default_config()).await;
         let response = server.get("/api").await;
         response.assert_status(StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]
     async fn test_protected_route_with_invalid_token() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .get("/api")
@@ -283,7 +285,7 @@ mod tests {
             ..Default::default()
         };
 
-        let server = create_test_server(Some(config)).await;
+        let server = create_test_server(config).await;
 
         // Login
         let login_response = server
@@ -318,7 +320,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_malformed_json_login() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/login")
@@ -330,7 +332,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_missing_fields_login() {
-        let server = create_test_server(None).await;
+        let server = create_test_server(default_config()).await;
 
         let response = server
             .post("/auth/login")

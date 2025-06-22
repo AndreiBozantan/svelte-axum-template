@@ -1,4 +1,4 @@
-    // Test PlaVn for Authentication Endpoints Integration Testing
+    // Test Plan for Authentication Endpoints Integration Testing
 
     /*
     TESTING STRATEGY:

@@ -7,6 +7,7 @@ use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::json;
 use thiserror::Error;
+use sha2::Digest;
 
 use crate::app;
 use crate::auth;
@@ -104,7 +105,9 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
     // store refresh token in database
     let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
-    let token_hash = format!("{:x}", md5::compute(&refresh_token)); // simple hash for storage
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&refresh_token);
+    let token_hash = format!("{:x}", hasher.finalize());
     let new_refresh_token = NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
@@ -150,7 +153,9 @@ pub async fn refresh_access_token(State(context): State<app::Context>, Json(requ
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Verify token hash
-    let token_hash = format!("{:x}", md5::compute(&request.refresh_token));
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(&request.refresh_token);
+    let token_hash = format!("{:x}", hasher.finalize());
     if stored_token.token_hash != token_hash {
         return Err(AuthError::TokenInvalid);
     }

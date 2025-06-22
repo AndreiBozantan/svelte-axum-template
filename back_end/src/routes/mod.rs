@@ -45,7 +45,7 @@ pub fn create_router(context: app::Context) -> Router {
 
 /// Middleware function to authenticate JWT tokens.
 /// If the token is valid, it allows the request to proceed.
-/// If the token is invalid or missing, it JwtError.
+/// If the token is invalid or missing, it returns a JwtError.
 async fn auth_middleware(
     State(context): State<app::Context>,
     req: Request<Body>,
