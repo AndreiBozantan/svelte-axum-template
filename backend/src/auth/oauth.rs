@@ -22,6 +22,7 @@ use crate::db::StoreError;
 // TODO: Improve the security by implementing server-side session handling
 // TODO: check if oauth without PKCE is acceptable for server-side OAuth flow
 // TODO: check if any sensitive info is exposed in the logs
+// TODO: upgrade to oauth2 v5
 
 #[derive(Debug, Error)]
 pub enum OAuthError {
