@@ -39,7 +39,7 @@ impl Store {
             User,
             r#"
             INSERT INTO users (username, password_hash, email, tenant_id, sso_provider, sso_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             RETURNING id, username, password_hash, email, tenant_id, sso_provider, sso_id, created_at, updated_at
             "#,
             new_user.username,
@@ -115,7 +115,7 @@ impl Store {
         sqlx::query!(
             r#"
             INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at)
-            VALUES (?, ?, ?, strftime('%s', 'now'), ?)
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
             "#,
             new_refresh_token.jti,
             new_refresh_token.user_id,
@@ -131,7 +131,7 @@ impl Store {
         sqlx::query!(
             r#"
             UPDATE refresh_tokens
-            SET revoked_at = strftime('%s', 'now')
+            SET revoked_at = CURRENT_TIMESTAMP
             WHERE jti = ?
             "#,
             jti

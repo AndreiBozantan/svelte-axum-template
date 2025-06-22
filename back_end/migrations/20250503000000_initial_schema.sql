@@ -43,4 +43,4 @@ CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expir
 
 -- Create a default tenant for existing users
 INSERT OR IGNORE INTO tenants (name, description, created_at, updated_at)
-VALUES ('Default', 'Default tenant for system users', strftime('%s', 'now'), strftime('%s', 'now'));
+VALUES ('Default', 'Default tenant for system users', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
