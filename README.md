@@ -41,7 +41,7 @@ After running the clean command, you have to run `npm run dev:init` once, to rei
 
 
 # Backend - Rust Axum
-- located in `./back_end`
+- located in `./backend`
 - serves front end directory
 - middleware for checking authorization header
 - middleware for checking session that user exists
@@ -49,10 +49,10 @@ After running the clean command, you have to run `npm run dev:init` once, to rei
 - /api route example using authorization header
 - /secure route example using sessions for authorization
 
-Run `cargo run` from inside the `./back_end` folder to start the backend server.
+Run `cargo run` from inside the `./backend` folder to start the backend server.
 
 ## Backend Configuration
-The backend can be configured using TOML files in the `./back_end/config` directory:
+The backend can be configured using TOML files in the `./backend/config` directory:
 - `default.toml` - Default configuration
 - `development.toml` - Development-specific overrides
 - `production.toml` - Production configuration example
@@ -77,12 +77,12 @@ run_db_migrations_on_startup  = true  # Set to false to disable automatic migrat
 This provides better control over database schema changes in production environments.
 
 # Frontend - Svelte
-- Located in `./front_end`
+- Located in `./frontend`
 - navbar with login and logout
 - secure page that shows session information once logged in
 - api fetch example, log in not required
 
-Run `npm run dev` from inside the `./front_end` directory to start serving the frontend.
+Run `npm run dev` from inside the `./frontend` directory to start serving the frontend.
 
 
 # Version History

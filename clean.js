@@ -5,8 +5,8 @@ const targets = [
     '.sqlx',
     'node_modules',
     'target',
-    path.join('front_end', 'dist'),
-    path.join('front_end', 'node_modules')
+    path.join('frontend', 'dist'),
+    path.join('frontend', 'node_modules')
 ];
 
 for (const target of targets) {

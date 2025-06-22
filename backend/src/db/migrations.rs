@@ -58,7 +58,7 @@ pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), Migr
 
 /// Create a new migration file with the current timestamp
 pub fn create(name: &str) -> Result<String, MigrationError> {
-    let migrations_dir = Path::new("./back_end/migrations");
+    let migrations_dir = Path::new("./backend/migrations");
 
     // Create migrations directory if it doesn't exist
     if !migrations_dir.exists() {
@@ -91,7 +91,7 @@ pub fn create(name: &str) -> Result<String, MigrationError> {
 
 /// List all available migrations
 pub fn list() -> Result<Vec<String>, MigrationError> {
-    let migrations_dir = Path::new("./back_end/migrations");
+    let migrations_dir = Path::new("./backend/migrations");
 
     if !migrations_dir.exists() {
         return Ok(Vec::new());

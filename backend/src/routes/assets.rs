@@ -10,7 +10,7 @@ use thiserror::Error;
 use chrono::{Utc, TimeZone};
 
 #[derive(RustEmbed)]
-#[folder = "../front_end/dist"]
+#[folder = "../frontend/dist"]
 pub struct Assets;
 
 #[derive(Debug, Error)]
