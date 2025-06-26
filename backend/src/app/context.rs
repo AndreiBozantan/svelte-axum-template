@@ -10,11 +10,11 @@ pub struct Context {
 }
 
 impl Context {
-    pub async fn new(config: app::Config) -> Result<Self, db::DbError> {
-        let db_pool = db::init_pool(&config.database).await?;
+    pub async fn new(config: app::Config) -> Result<Self, db::StoreError> {
+        let store = db::Store::new(&config.database).await?;
         Ok(Self {
-            store: Arc::new(db::Store::new(db_pool)),
             config: Arc::new(config),
+            store: Arc::new(store),
         })
     }
 }

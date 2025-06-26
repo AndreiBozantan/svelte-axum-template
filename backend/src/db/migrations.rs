@@ -3,8 +3,10 @@ use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH, SystemTimeError as StdSystemTimeError};
 use chrono::{Utc, Local, TimeZone};
-use sqlx::{Pool, Sqlite, Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
+use sqlx::{Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
 use thiserror::Error;
+
+use crate::db;
 
 #[derive(Debug, Error)]
 pub enum MigrationError {
@@ -36,12 +38,12 @@ pub enum MigrationError {
 const MIGRATIONS_PATH: &str = "./backend/migrations";
 
 /// Runs all migrations from the filesystem migration path
-pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), MigrationError> {
+pub async fn run(store: &db::Store, migrations_path: &Path) -> Result<(), MigrationError> {
     if !migrations_path.exists() {
         tracing::warn!("Migrations directory not found at {:?}, falling back to embedded migrations", migrations_path);
         // Run migrations from embedded
         sqlx::migrate!()
-            .run(pool)
+            .run(store.db())
             .await
             .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
     } else {
@@ -49,7 +51,7 @@ pub async fn run(pool: &Pool<Sqlite>, migrations_path: &Path) -> Result<(), Migr
         sqlx::migrate::Migrator::new(migrations_path)
             .await
             .map_err(|e| MigrationError::MigratorCreationFailed { source: e })?
-            .run(pool)
+            .run(store.db())
             .await
             .map_err(|e| MigrationError::MigrationRunFailed { source: e })?;
     }
@@ -118,10 +120,10 @@ pub fn list() -> Result<Vec<String>, MigrationError> {
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending(pool: &Pool<Sqlite>) -> Result<bool, MigrationError> {
+pub async fn check_pending(store: &db::Store) -> Result<bool, MigrationError> {
     // Get the list of applied migrations from the database
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
-        .fetch_all(pool)
+        .fetch_all(store.db())
         .await
         .map_err(|err| {
             match &err {

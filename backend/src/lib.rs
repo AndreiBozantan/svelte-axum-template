@@ -4,8 +4,17 @@
 #![allow(missing_docs)]
 
 // Re-export modules needed for tests
-pub mod db;
 pub mod routes;
+
+pub mod db {
+    pub mod store;
+    pub mod schema;
+    pub mod migrations;
+
+    pub use store::{Store, StoreError};
+
+    pub use migrations::MigrationError;
+}
 
 // Auth module and re-exports
 pub mod auth {

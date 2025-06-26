@@ -78,7 +78,6 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
     cli_args.extend(args.iter().skip(2).cloned());
 
     let cli = Cli::parse_from(cli_args);
-    let db_pool = &context.store.db_pool;
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
@@ -99,7 +98,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
             }
         },
         MigrateSubCommands::Status => {
-            match db::migrations::check_pending(db_pool).await {
+            match db::migrations::check_pending(&context.store).await {
                 Ok(true) => println!("There are pending migrations that need to be applied."),
                 Ok(false) => println!("Database is up to date. No pending migrations."),
                 Err(e) => {
@@ -114,7 +113,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
         },
         MigrateSubCommands::Run => {
             let migrations_path = Path::new("./backend/migrations");
-            db::migrations::run(db_pool, migrations_path).await
+            db::migrations::run(&context.store, migrations_path).await
                 .map_err(|e| CliError::MigrationRunFailed { source: e })?;
             println!("Migrations applied successfully.");
         },

@@ -1,16 +1,25 @@
+use std::path::Path;
+use std::str::FromStr;
 use chrono::Utc;
-use sqlx::sqlite::SqliteQueryResult;
 use thiserror::Error;
+use sqlx::sqlite::{SqliteQueryResult, SqliteConnectOptions, SqlitePoolOptions};
 
-use crate::db::DbPool;
-use crate::db::schema::{NewRefreshToken, NewUser, RefreshToken, Tenant, User };
+use crate::app;
+use crate::db;
+use crate::db::schema::{NewUser, NewRefreshToken, RefreshToken, Tenant, User};
 
 // TODO: split the store module in separate files for each table
 
 #[derive(Debug, Error)]
 pub enum StoreError {
+    #[error("Database connection error: {0}")]
+    Connection(sqlx::Error),
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
+
+    #[error("Database migration error: {0}")]
+    Migration(#[from] db::migrations::MigrationError),
 
     #[error("User not found")]
     UserNotFound,
@@ -24,14 +33,45 @@ pub enum StoreError {
 
 #[derive(Clone, Debug)]
 pub struct Store {
-    pub db_pool: DbPool,
+    db: sqlx::SqlitePool
 }
 
 impl Store {
-    pub fn new(db_pool: DbPool) -> Self {
-        Self {
-            db_pool,
+    pub fn db(&self) -> &sqlx::SqlitePool {
+        &self.db
+    }
+
+    pub async fn new(db_config: &app::DatabaseConfig) -> Result<Self, StoreError> {
+        let options = SqliteConnectOptions::from_str(&db_config.url)?
+                .create_if_missing(true)
+                .foreign_keys(true)
+                // Increase SQLite busy timeout to handle concurrent connections better
+                .busy_timeout(std::time::Duration::from_secs(30));
+
+        let pool = SqlitePoolOptions::new()
+            .max_connections(db_config.max_connections)
+            .connect_with(options)
+            .await
+            .map_err(|e| StoreError::Connection(e))?;
+        let store = Self { db: pool };
+
+        // Run migrations if run_db_migrations_on_startup is enabled
+        if !db_config.run_db_migrations_on_startup {
+            tracing::info!("Database migrations skipped (run_db_migrations_on_startup  = false)");
+        } else {
+            // if there is a backend directory in the current working directory, use that as the migrations path
+            let migrations_path = match Path::new("backend").exists() {
+                true => Path::new("backend/migrations"),
+                false => Path::new("migrations")
+            };
+
+            // Run migrations using our migrations module
+            db::migrations::run(&store, migrations_path).await?;
+            tracing::info!("Database migrations completed successfully");
         }
+
+        tracing::info!("Database initialized successfully");
+        Ok(store)
     }
 
     pub async fn create_user(&self, new_user: NewUser) -> Result<User, StoreError> {
@@ -48,7 +88,7 @@ impl Store {
             new_user.tenant_id,
             new_user.sso_provider,
             new_user.sso_id)
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await?;
 
         return Ok(user);
@@ -73,7 +113,7 @@ impl Store {
             "#,
             id
         )
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,
@@ -102,7 +142,7 @@ impl Store {
             "#,
             username
         )
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,
@@ -122,7 +162,7 @@ impl Store {
             new_refresh_token.token_hash,
             new_refresh_token.expires_at
         )
-        .execute(&self.db_pool)
+        .execute(&self.db)
         .await?;
         Ok(())
     }
@@ -136,7 +176,7 @@ impl Store {
             "#,
             jti
         )
-        .execute(&self.db_pool)
+        .execute(&self.db)
         .await?;
         Ok(())
     }
@@ -156,7 +196,7 @@ impl Store {
             "#,
             id
         )
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::TenantNotFound,
@@ -182,7 +222,7 @@ impl Store {
             "#,
             jti
         )
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::TokenNotFound,
@@ -202,7 +242,7 @@ impl Store {
             now,
             user_id
         )
-        .execute(&self.db_pool)
+        .execute(&self.db)
         .await?;
         Ok(result)
     }
@@ -218,7 +258,7 @@ impl Store {
             "#,
             now
         )
-        .execute(&self.db_pool)
+        .execute(&self.db)
         .await?;
         Ok(result)
     }
@@ -242,7 +282,7 @@ impl Store {
         )
         .bind(sso_provider)
         .bind(sso_id)
-        .fetch_one(&self.db_pool)
+        .fetch_one(&self.db)
         .await
         .map_err(|e| match e {
             sqlx::Error::RowNotFound => StoreError::UserNotFound,

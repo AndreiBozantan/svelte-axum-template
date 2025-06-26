@@ -18,7 +18,7 @@ pub enum AppError {
     Config(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    Database(#[from] db::DbError),
+    Database(#[from] db::StoreError),
 
     #[error("Migration error: {0}")]
     Migration(#[from] db::migrations::MigrationError),
