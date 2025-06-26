@@ -1,5 +1,5 @@
 use std::{fs, path::Path};
-use config::{Config, ConfigError, Environment, File};
+use config::{ConfigError, Environment, File};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -59,7 +59,7 @@ pub struct OAuthConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-pub struct AppConfig {
+pub struct Config {
     #[serde(default)]
     pub server: ServerConfig,
 
@@ -113,7 +113,7 @@ impl Default for OAuthConfig {
     }
 }
 
-impl Default for AppConfig {
+impl Default for Config {
     fn default() -> Self {
         Self {
             server: ServerConfig::default(),
@@ -124,9 +124,9 @@ impl Default for AppConfig {
     }
 }
 
-impl AppConfig {
+impl Config {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut builder = Config::builder();
+        let mut builder = config::Config::builder();
         let current_dir = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
         let config_dir = match Path::new("backend").exists() {
             true => "backend/config",
@@ -160,7 +160,7 @@ impl AppConfig {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let mut config: AppConfig = builder
+        let mut config: Config = builder
             .build()?
             .try_deserialize()
             .unwrap_or_default();

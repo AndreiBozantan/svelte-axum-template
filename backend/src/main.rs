@@ -7,10 +7,9 @@ use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use thiserror::Error;
 
-mod app;
-mod auth;
-mod db;
-mod routes;
+use svelte_axum_template::*;
+
+// Note: auth module is defined in lib.rs and used by other modules
 
 /// Application-level error type
 #[derive(Debug, Error)]
