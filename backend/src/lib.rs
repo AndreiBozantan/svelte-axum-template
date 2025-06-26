@@ -4,7 +4,13 @@
 #![allow(missing_docs)]
 
 // Re-export modules needed for tests
-pub mod routes;
+pub mod routes {
+    pub mod api;
+    pub mod auth;
+    pub mod assets;
+    pub mod health;
+
+}
 
 pub mod db {
     pub mod store;
@@ -28,13 +34,14 @@ pub mod auth {
 pub mod app {
     mod config;
     mod context;
+    mod router;
 
     pub mod cli;
 
     pub use context::Context;
-
     pub use config::Config;
     pub use config::DatabaseConfig;
     pub use config::ServerConfig;
     pub use config::JwtConfig;
+    pub use router::create_router;
 }

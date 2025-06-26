@@ -47,7 +47,7 @@ mod tests {
         };
         context.store.create_user(user).await.unwrap();
 
-        let router = routes::create_router(context);
+        let router = app::create_router(context);
         TestServer::new(router).unwrap()
     }
 

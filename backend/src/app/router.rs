@@ -1,8 +1,3 @@
-mod assets;
-mod auth;
-mod api;
-mod health;
-
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::Request;
@@ -14,6 +9,7 @@ use axum::routing::post;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
+use crate::routes;
 use crate::app;
 use crate::auth::jwt;
 use crate::auth::jwt::JwtError;
@@ -22,26 +18,26 @@ use crate::auth::jwt::JwtError;
 pub fn create_router(context: app::Context) -> Router {
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
-        .route("/api", get(api::handler))
+        .route("/api", get(routes::api::handler))
         .layer(middleware::from_fn_with_state(context.clone(), auth_middleware))
         .with_state(context.clone());
 
     // Create auth routes
     let auth_routes = Router::new()
-        .route("/auth/login", post(auth::login)) // sets username in session and returns JWT
-        .route("/auth/logout", get(auth::logout)) // deletes username in session and revokes tokens
-        .route("/auth/refresh", post(auth::refresh_access_token)) // refresh access token
-        .route("/auth/revoke", post(auth::revoke_token)) // revoke refresh token
-        .route("/auth/oauth/google", get(auth::google_auth_init)) // initiate Google OAuth
-        .route("/auth/oauth/google/callback", get(auth::google_auth_callback)) // Google OAuth callback
-        .route("/health", get(health::health_check)) // Health check endpoint
+        .route("/auth/login", post(routes::auth::login)) // sets username in session and returns JWT
+        .route("/auth/logout", get(routes::auth::logout)) // deletes username in session and revokes tokens
+        .route("/auth/refresh", post(routes::auth::refresh_access_token)) // refresh access token
+        .route("/auth/revoke", post(routes::auth::revoke_token)) // revoke refresh token
+        .route("/auth/oauth/google", get(routes::auth::google_auth_init)) // initiate Google OAuth
+        .route("/auth/oauth/google/callback", get(routes::auth::google_auth_callback)) // Google OAuth callback
+        .route("/health", get(routes::health::health_check)) // Health check endpoint
         .with_state(context);
 
     // Combine all routes
     Router::new()
         .merge(auth_routes)
         .merge(api_routes)
-        .fallback(assets::static_handler)
+        .fallback(routes::assets::static_handler)
         .layer(TraceLayer::new_for_http())
 }
 

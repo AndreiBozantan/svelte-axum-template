@@ -49,7 +49,7 @@ async fn run_app() -> Result<(), AppError> {
 
     // setup server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    let router = routes::create_router(context);
+    let router = app::create_router(context);
 
     tracing::info!("🚀 listening on http://{addr}");
     axum::serve(listener, router)
