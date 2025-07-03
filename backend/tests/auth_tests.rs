@@ -37,7 +37,7 @@ mod tests {
 
         // Create test user
         let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
-        let user = db::schema::NewUser {
+        let user = store::NewUser {
             username: TEST_USERNAME.to_string(),
             password_hash: Some(password_hash),
             email: Some("test@example.com".to_string()),
@@ -45,7 +45,7 @@ mod tests {
             sso_provider: None,
             sso_id: None,
         };
-        context.store.create_user(user).await.unwrap();
+        context.db.users.create(user).await.unwrap();
 
         let router = app::create_router(context);
         TestServer::new(router).unwrap()
@@ -364,7 +364,7 @@ mod tests {
 
         // However, trying to query user tables should fail because migrations weren't run
         let context = context.unwrap();
-        let result = context.store.get_user_by_username("nonexistent").await;
+        let result = context.db.users.get_by_name("nonexistent").await;
 
         // This should fail because the user table doesn't exist (no migrations were run)
         assert!(result.is_err(), "Querying should fail when run_db_migrations_on_startup is disabled and no migrations have run");

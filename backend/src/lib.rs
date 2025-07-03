@@ -3,45 +3,43 @@
 #![warn(clippy::nursery)]
 #![allow(missing_docs)]
 
-// Re-export modules needed for tests
+pub mod app {
+    mod config;
+    mod context;
+    mod router;
+    mod db;
+
+    pub mod cli;
+
+    pub use db::*;
+    pub use config::*;
+    pub use context::*;
+    pub use router::*;
+}
+
+pub mod auth {
+    mod password;
+    mod jwt;
+    mod oauth;
+
+    pub use password::*;
+    pub use jwt::*;
+    pub use oauth::*;
+}
+
 pub mod routes {
     pub mod api;
     pub mod auth;
     pub mod assets;
     pub mod health;
-
 }
 
-pub mod db {
-    pub mod store;
-    pub mod schema;
-    pub mod migrations;
+pub mod store {
+    mod refresh_tokens;
+    mod tenants;
+    mod users;
 
-    pub use store::{Store, StoreError};
-
-    pub use migrations::MigrationError;
-}
-
-// Auth module and re-exports
-pub mod auth {
-    pub mod jwt;
-    pub mod oauth;
-    pub mod password;
-
-    pub use password::{hash_password, verify_password};
-}
-
-pub mod app {
-    mod config;
-    mod context;
-    mod router;
-
-    pub mod cli;
-
-    pub use context::Context;
-    pub use config::Config;
-    pub use config::DatabaseConfig;
-    pub use config::ServerConfig;
-    pub use config::JwtConfig;
-    pub use router::create_router;
+    pub use users::*;
+    pub use tenants::*;
+    pub use refresh_tokens::*;
 }

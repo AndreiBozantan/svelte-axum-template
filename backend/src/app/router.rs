@@ -11,8 +11,7 @@ use tower_http::trace::TraceLayer;
 
 use crate::routes;
 use crate::app;
-use crate::auth::jwt;
-use crate::auth::jwt::JwtError;
+use crate::auth;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: app::Context) -> Router {
@@ -48,9 +47,9 @@ async fn auth_middleware(
     State(context): State<app::Context>,
     req: Request<Body>,
     next: Next,
-) -> Result<Response, JwtError> {
+) -> Result<Response, auth::JwtError> {
     // Decode and validate JWT token
-    let claims = jwt::decode_access_token_from_req(&context.config.jwt, &req)?;
+    let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
 
     tracing::info!(
         jti = claims.jti,

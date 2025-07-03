@@ -18,10 +18,10 @@ pub enum AppError {
     Config(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    Database(#[from] db::StoreError),
+    Database(#[from] app::DbError),
 
     #[error("Migration error: {0}")]
-    Migration(#[from] db::migrations::MigrationError),
+    Migration(#[from] app::DbMigrationError),
 
     #[error("CLI error: {0}")]
     CliError(#[from] app::cli::CliError),
@@ -45,7 +45,7 @@ async fn run_app() -> Result<(), AppError> {
 
     // initialize database and run CLI
     let context = app::Context::new(config).await?;
-    app::cli::run_migration_cli(&context).await?;
+    app::cli::run_migration_cli(&context.db).await?;
 
     // setup server
     let listener = tokio::net::TcpListener::bind(addr).await?;

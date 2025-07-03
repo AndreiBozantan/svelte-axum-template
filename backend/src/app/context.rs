@@ -1,20 +1,19 @@
 use std::sync::Arc;
 
-use crate::app;
-use crate::db;
+use crate::app::{self, db};
 
 #[derive(Clone)]
 pub struct Context {
-    pub store: Arc<db::Store>,
+    pub db: Arc<app::Database>,
     pub config: Arc<app::Config>,
 }
 
 impl Context {
-    pub async fn new(config: app::Config) -> Result<Self, db::StoreError> {
-        let store = db::Store::new(&config.database).await?;
+    pub async fn new(config: app::Config) -> Result<Self, db::DbError> {
+        let db = app::Database::new(&config.database).await?;
         Ok(Self {
             config: Arc::new(config),
-            store: Arc::new(store),
+            db: Arc::new(db),
         })
     }
 }

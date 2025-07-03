@@ -11,11 +11,7 @@ use sha2::Digest;
 
 use crate::app;
 use crate::auth;
-use crate::auth::jwt;
-use crate::auth::jwt::{JwtError, TokenResponse};
-use crate::auth::oauth::{OAuthService, OAuthError};
-use crate::db::StoreError;
-use crate::db::schema::NewRefreshToken;
+use crate::store;
 
 #[derive(Deserialize)]
 pub struct Login {
@@ -39,13 +35,13 @@ pub enum AuthError {
     InvalidCredentials,
 
     #[error("JWT error: {0}")]
-    JwtError(#[from] JwtError),
+    JwtError(#[from] auth::JwtError),
 
     #[error("Password error: {0}")]
     PasswordHashingError(#[from] argon2::password_hash::Error),
 
     #[error("Database error: {0}")]
-    DatabaseError(#[from] StoreError),
+    DatabaseOperationFailed(#[from] app::DbError),
 
     #[error("User not found")]
     UserNotFound,
@@ -65,7 +61,7 @@ impl IntoResponse for AuthError {
             Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::JwtError(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::PasswordHashingError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::UserNotFound => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::TokenInvalid => (StatusCode::UNAUTHORIZED, self.to_string()),
         };
@@ -84,7 +80,7 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
-    let user = context.store.get_user_by_username(&login.username).await
+    let user = context.db.users.get_by_name(&login.username).await
         .map_err(|_| AuthError::UserNotFound)?;
 
     if !auth::verify_password(&login.password, user.password_hash)? {
@@ -93,31 +89,31 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
     }
 
     // Generate JWT tokens with appropriate expiration
-    let access_token = jwt::generate_access_token(
+    let access_token = auth::generate_access_token(
         &context.config.jwt,
         user.id,
         &user.username,
         user.tenant_id)?;
 
-    let refresh_token = jwt::generate_refresh_token(
+    let refresh_token = auth::generate_refresh_token(
         &context.config.jwt,
         user.id)?;
 
     // store refresh token in database
-    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &refresh_token)?;
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
     let token_hash = format!("{:x}", hasher.finalize());
-    let new_refresh_token = NewRefreshToken {
+    let new_refresh_token = store::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    context.store.store_refresh_token(new_refresh_token).await?;
+    context.db.refresh_tokens.insert(new_refresh_token).await?;
 
-    let token_response = TokenResponse::new(access_token, refresh_token, &context.config.jwt);
+    let token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
     Ok(Json(json!({
         "result": "ok",
         "tokens": token_response,
@@ -131,26 +127,29 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
 
 /// Logout route
 pub async fn logout(State(context): State<app::Context>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
-    let claims = jwt::decode_access_token_from_req(&context.config.jwt, &req)?;
+    let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
     // revoke all the associated refresh tokens
     let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
-    if let Ok(db_user) = context.store.get_user_by_id(user_id).await {
-        let _ = context.store.revoke_all_user_refresh_tokens(db_user.id).await;
+    if let Ok(db_user) = context.db.users.get_by_id(user_id).await {
+        let _ = context.db.refresh_tokens.revoke_all_for_user(db_user.id).await;
     }
 
     Ok(Json(json!({"result": "ok"})))
 }
 
 /// Route to refresh access token using refresh token
-pub async fn refresh_access_token(State(context): State<app::Context>, Json(request): Json<RefreshTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn refresh_access_token(
+    State(context): State<app::Context>,
+    Json(request): Json<RefreshTokenRequest>
+) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
 
     // Decode and validate refresh token
-    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &request.refresh_token)
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;    // Check if refresh token exists in database and is not revoked
-    let stored_token = context.store.get_refresh_token_by_jti(&refresh_claims.jti).await
+    let stored_token = context.db.refresh_tokens.get_by_jti(&refresh_claims.jti).await
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Verify token hash
@@ -162,8 +161,8 @@ pub async fn refresh_access_token(State(context): State<app::Context>, Json(requ
     }
 
     // Generate new access token for the user
-    let user = context.store.get_user_by_id(stored_token.user_id).await?;
-    let new_access_token = jwt::generate_access_token(
+    let user = context.db.users.get_by_id(stored_token.user_id).await?;
+    let new_access_token = auth::generate_access_token(
         &context.config.jwt,
         user.id,
         &user.username,
@@ -187,19 +186,19 @@ pub async fn revoke_token(State(context): State<app::Context>, Json(request): Js
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
-    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &request.refresh_token)
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Revoke the token
-    context.store.revoke_refresh_token(&refresh_claims.jti).await?;
+    context.db.refresh_tokens.revoke(&refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
 }
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(
     State(context): State<app::Context>,
-) -> Result<impl IntoResponse, OAuthError> {
-    let oauth_service = OAuthService::new(&context)?;
+) -> Result<impl IntoResponse, auth::OAuthError> {
+    let oauth_service = auth::OAuthService::new(&context.config.oauth)?;
     let (auth_url, csrf_token) = oauth_service.get_google_auth_url()?;
 
     tracing::info!("Initiating Google OAuth flow with CSRF token: {}", csrf_token.secret());
@@ -212,13 +211,13 @@ pub async fn google_auth_init(
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
     State(context): State<app::Context>,
-    axum::extract::Query(params): axum::extract::Query<crate::auth::oauth::AuthRequest>,
-) -> Result<impl IntoResponse, OAuthError> {
+    axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
+) -> Result<impl IntoResponse, auth::OAuthError> {
     use oauth2::TokenResponse as OAuth2TokenResponse;
 
     tracing::info!("Google OAuth callback received with state: {}", params.state);
 
-    let oauth_service = OAuthService::new(&context)?;
+    let oauth_service = auth::OAuthService::new(&context.config.oauth)?;
 
     // Exchange authorization code for access token
     let token_response = oauth_service.exchange_google_code(&params.code).await?;
@@ -230,8 +229,8 @@ pub async fn google_auth_callback(
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists
-    let existing_user = context.store
-        .get_user_by_sso_id("google", &user_info.id)
+    let existing_user = context.db.users
+        .get_by_sso_id("google", &user_info.id)
         .await
         .ok();
 
@@ -240,7 +239,7 @@ pub async fn google_auth_callback(
         user
     } else {
         // Create new user
-        let new_user = crate::db::schema::NewUser {
+        let new_user = store::NewUser {
             username: user_info.email.clone(), // Use email as username for SSO users
             password_hash: None, // No password for SSO users
             email: Some(user_info.email.clone()),
@@ -249,7 +248,8 @@ pub async fn google_auth_callback(
             sso_id: Some(user_info.id.clone()),
         };
 
-        let user = context.store.create_user(new_user).await?;
+        let user = context.db.users.create(new_user).await
+            .map_err(|e| auth::OAuthError::InsertUserFailed(e))?;
 
         tracing::info!("Created new SSO user: {}", user.username);
         user
@@ -257,33 +257,34 @@ pub async fn google_auth_callback(
 
     // TODO: move duplicate code (login function) to a common function
     // Generate JWT tokens for the user (same as regular login)
-    let access_token = jwt::generate_access_token(
+    let access_token = auth::generate_access_token(
         &context.config.jwt,
         user.id,
         &user.username,
         user.tenant_id)?;
 
-    let refresh_token = jwt::generate_refresh_token(
+    let refresh_token = auth::generate_refresh_token(
         &context.config.jwt,
         user.id)?;
 
     // Store refresh token in database
-    let refresh_claims = jwt::decode_refresh_token(&context.config.jwt, &refresh_token)
-        .map_err(|e| OAuthError::JwtError(e))?;
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)
+        .map_err(|e| auth::OAuthError::JwtOperationFailed(e))?;
     let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0)
-        .ok_or(OAuthError::JwtError(crate::auth::jwt::JwtError::InvalidToken))?;
+        .ok_or(auth::OAuthError::JwtOperationFailed(auth::JwtError::InvalidToken))?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
     let token_hash = format!("{:x}", hasher.finalize());
-    let new_refresh_token = crate::db::schema::NewRefreshToken {
+    let new_refresh_token = store::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    context.store.store_refresh_token(new_refresh_token).await?;
+    context.db.refresh_tokens.insert(new_refresh_token).await
+        .map_err(|e| auth::OAuthError::InsertRefreshTokenFailed(e))?;
 
-    let jwt_token_response = jwt::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
+    let jwt_token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
 
     // For OAuth flow, redirect to frontend with success status
     // TODO: In production, consider a more secure approach like server-side session or secure cookies
