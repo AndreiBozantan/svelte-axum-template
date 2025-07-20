@@ -12,9 +12,9 @@ mod tests {
     const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
     const TEST_USERNAME: &str = "test_user";
 
-    fn default_config() -> app::Config {
-        app::Config {
-            jwt: app::JwtConfig {
+    fn default_config() -> core::Config {
+        core::Config {
+            jwt: core::JwtConfig {
                 secret: "test_secret_key_for_testing_only".to_string(),
                 access_token_expiry: 3600,
                 refresh_token_expiry: 86400,
@@ -23,17 +23,17 @@ mod tests {
         }
     }
 
-    async fn create_test_server(config: app::Config) -> TestServer {
+    async fn create_test_server(config: core::Config) -> TestServer {
         let mut config = config.clone();
 
         // use a temporary in-memory SQLite database file and use it for testing
-        config.database = app::DatabaseConfig {
+        config.database = core::DatabaseConfig {
             url: "sqlite::memory:".to_string(),
             max_connections: 5,
-            run_db_migrations_on_startup: true, // Enable auto-migrations for tests
         };
 
-        let context = app::Context::new(config).await.unwrap();
+        let db = core::create_db_pool(&config.database).await.unwrap();
+        app::run_migrations(&db).await.unwrap();
 
         // Create test user
         let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
@@ -45,7 +45,9 @@ mod tests {
             sso_provider: None,
             sso_id: None,
         };
-        context.db.users.create(user).await.unwrap();
+
+        let context = core::Context{db, config};
+        store::create_user(&context.db, user).await.unwrap();
 
         let router = app::create_router(context);
         TestServer::new(router).unwrap()
@@ -276,8 +278,8 @@ mod tests {
     #[tokio::test]
     async fn test_access_token_expiry() {
         // Create config with very short token expiry
-        let config = app::Config {
-            jwt: app::JwtConfig {
+        let config = core::Config {
+            jwt: core::JwtConfig {
                 secret: "test_secret_key_for_testing_only".to_string(),
                 access_token_expiry: 1, // 1 second
                 refresh_token_expiry: 86400,
@@ -343,30 +345,5 @@ mod tests {
             .await;
 
         response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-
-    #[tokio::test]
-    async fn test_auto_migrate_disabled() {
-        // Test that when run_db_migrations_on_startup is disabled, we can still create a database connection
-        // but need to handle the case where tables don't exist
-        let config = app::Config {
-            database: app::DatabaseConfig {
-                url: "sqlite::memory:".to_string(),
-                max_connections: 5,
-                run_db_migrations_on_startup: false, // Disable auto-migrations
-            },
-            ..Default::default()
-        };
-
-        // This should succeed in creating the connection pool but won't run migrations
-        let context = app::Context::new(config).await;
-        assert!(context.is_ok(), "Context creation should succeed even with run_db_migrations_on_startup disabled");
-
-        // However, trying to query user tables should fail because migrations weren't run
-        let context = context.unwrap();
-        let result = context.db.users.get_by_name("nonexistent").await;
-
-        // This should fail because the user table doesn't exist (no migrations were run)
-        assert!(result.is_err(), "Querying should fail when run_db_migrations_on_startup is disabled and no migrations have run");
     }
 }

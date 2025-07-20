@@ -5,8 +5,22 @@
 
 pub mod core {
     mod config;
+    mod context;
+    mod db;
 
     pub use config::*;
+    pub use context::*;
+    pub use db::*;
+}
+
+pub mod auth {
+    mod jwt;
+    mod oauth;
+    mod password;
+
+    pub use jwt::*;
+    pub use oauth::*;
+    pub use password::*;
 }
 
 pub mod store {
@@ -19,16 +33,6 @@ pub mod store {
     pub use refresh_tokens::*;
 }
 
-pub mod auth {
-    mod password;
-    mod jwt;
-    mod oauth;
-
-    pub use password::*;
-    pub use jwt::*;
-    pub use oauth::*;
-}
-
 pub mod routes {
     pub mod api;
     pub mod auth;
@@ -37,14 +41,11 @@ pub mod routes {
 }
 
 pub mod app {
-    mod db;
-    mod context;
+    mod cli;
+    mod migrations;
     mod router;
 
-    pub mod cli;
-
-    pub use db::*;
-    pub use context::*;
+    pub use cli::*;
+    pub use migrations::*;
     pub use router::*;
 }
-

@@ -9,8 +9,8 @@ use serde_json::json;
 use thiserror::Error;
 use sha2::Digest;
 
-use crate::app;
 use crate::auth;
+use crate::core;
 use crate::store;
 
 #[derive(Deserialize)]
@@ -41,7 +41,7 @@ pub enum AuthError {
     PasswordHashingError(#[from] argon2::password_hash::Error),
 
     #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] app::DbError),
+    DatabaseOperationFailed(#[from] core::DbError),
 
     #[error("User not found")]
     UserNotFound,
@@ -76,11 +76,11 @@ impl IntoResponse for AuthError {
 }
 
 /// Login route
-pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(State(context): State<core::Context>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
-    let user = context.db.users.get_by_name(&login.username).await
+    let user = store::get_user_by_name(&context.db, &login.username).await
         .map_err(|_| AuthError::UserNotFound)?;
 
     if !auth::verify_password(&login.password, user.password_hash)? {
@@ -111,7 +111,7 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    context.db.refresh_tokens.insert(new_refresh_token).await?;
+    store::create_refresh_token(&context.db, new_refresh_token).await?;
 
     let token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
     Ok(Json(json!({
@@ -126,14 +126,14 @@ pub async fn login(State(context): State<app::Context>, Json(login): Json<Login>
 }
 
 /// Logout route
-pub async fn logout(State(context): State<app::Context>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
+pub async fn logout(State(context): State<core::Context>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
     let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
     // revoke all the associated refresh tokens
     let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
-    if let Ok(db_user) = context.db.users.get_by_id(user_id).await {
-        let _ = context.db.refresh_tokens.revoke_all_for_user(db_user.id).await;
+    if let Ok(db_user) = store::get_user_by_id(&context.db, user_id).await {
+        let _ = store::revoke_all_refresh_tokens_for_user(&context.db, db_user.id).await;
     }
 
     Ok(Json(json!({"result": "ok"})))
@@ -141,7 +141,7 @@ pub async fn logout(State(context): State<app::Context>, req: Request<Body>) -> 
 
 /// Route to refresh access token using refresh token
 pub async fn refresh_access_token(
-    State(context): State<app::Context>,
+    State(context): State<core::Context>,
     Json(request): Json<RefreshTokenRequest>
 ) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
@@ -149,7 +149,7 @@ pub async fn refresh_access_token(
     // Decode and validate refresh token
     let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)
         .map_err(|_| AuthError::TokenInvalid)?;    // Check if refresh token exists in database and is not revoked
-    let stored_token = context.db.refresh_tokens.get_by_jti(&refresh_claims.jti).await
+    let stored_token = store::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Verify token hash
@@ -161,7 +161,7 @@ pub async fn refresh_access_token(
     }
 
     // Generate new access token for the user
-    let user = context.db.users.get_by_id(stored_token.user_id).await?;
+    let user = store::get_user_by_id(&context.db, stored_token.user_id).await?;
     let new_access_token = auth::generate_access_token(
         &context.config.jwt,
         user.id,
@@ -182,7 +182,7 @@ pub async fn refresh_access_token(
 }
 
 /// Route to revoke a refresh token
-pub async fn revoke_token(State(context): State<app::Context>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn revoke_token(State(context): State<core::Context>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
@@ -190,13 +190,13 @@ pub async fn revoke_token(State(context): State<app::Context>, Json(request): Js
         .map_err(|_| AuthError::TokenInvalid)?;
 
     // Revoke the token
-    context.db.refresh_tokens.revoke(&refresh_claims.jti).await?;
+    store::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
 }
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(
-    State(context): State<app::Context>,
+    State(context): State<core::Context>,
 ) -> Result<impl IntoResponse, auth::OAuthError> {
     let oauth_service = auth::OAuthService::new(&context.config.oauth)?;
     let (auth_url, csrf_token) = oauth_service.get_google_auth_url()?;
@@ -210,7 +210,7 @@ pub async fn google_auth_init(
 
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
-    State(context): State<app::Context>,
+    State(context): State<core::Context>,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, auth::OAuthError> {
     use oauth2::TokenResponse as OAuth2TokenResponse;
@@ -229,30 +229,32 @@ pub async fn google_auth_callback(
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists
-    let existing_user = context.db.users
-        .get_by_sso_id("google", &user_info.id)
-        .await
-        .ok();
+    let existing_user = store::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
 
-    let user = if let Some(user) = existing_user {
-        tracing::info!("Existing SSO user found: {}", user.username);
-        user
-    } else {
-        // Create new user
-        let new_user = store::NewUser {
-            username: user_info.email.clone(), // Use email as username for SSO users
-            password_hash: None, // No password for SSO users
-            email: Some(user_info.email.clone()),
-            tenant_id: None, // You might want to assign a default tenant
-            sso_provider: Some("google".to_string()),
-            sso_id: Some(user_info.id.clone()),
-        };
-
-        let user = context.db.users.create(new_user).await
-            .map_err(|e| auth::OAuthError::InsertUserFailed(e))?;
-
-        tracing::info!("Created new SSO user: {}", user.username);
-        user
+    let user = match existing_user {
+        Ok(user) => {
+            tracing::info!("Existing SSO user found: {}", user.username);
+            user
+        },
+        Err(core::DbError::UserNotFound) => {
+            tracing::info!("No existing user found, creating new user for: {}", user_info.email);
+            let new_user = store::NewUser {
+                username: user_info.email.clone(), // Use email as username for SSO users
+                password_hash: None, // No password for SSO users
+                email: Some(user_info.email.clone()),
+                tenant_id: None, // You might want to assign a default tenant
+                sso_provider: Some("google".to_string()),
+                sso_id: Some(user_info.id.clone()),
+            };
+            let user = store::create_user(&context.db, new_user).await
+                .map_err(|e| auth::OAuthError::InsertUserFailed(e))?;
+            tracing::info!("Created new SSO user: {}", user.username);
+            user
+        },
+        Err(e) => {
+            tracing::error!("Failed to retrieve or create user: {}", e);
+            return Err(auth::OAuthError::GetUserFailed(e));
+        }
     };
 
     // TODO: move duplicate code (login function) to a common function
@@ -281,7 +283,7 @@ pub async fn google_auth_callback(
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    context.db.refresh_tokens.insert(new_refresh_token).await
+    store::create_refresh_token(&context.db, new_refresh_token).await
         .map_err(|e| auth::OAuthError::InsertRefreshTokenFailed(e))?;
 
     let jwt_token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);

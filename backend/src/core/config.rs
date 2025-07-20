@@ -21,9 +21,6 @@ pub struct DatabaseConfig {
 
     #[serde(default)]
     pub max_connections: u32,
-
-    #[serde(default)]
-    pub run_db_migrations_on_startup: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -88,7 +85,6 @@ impl Default for DatabaseConfig {
         Self {
             url: "sqlite:db.sqlite".to_string(),
             max_connections: 5,
-            run_db_migrations_on_startup: true, // default to true for development
         }
     }
 }
