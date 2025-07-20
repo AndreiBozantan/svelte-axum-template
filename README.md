@@ -105,3 +105,37 @@ Run `npm run dev` from inside the `./frontend` directory to start serving the fr
 ## Version 0.5
 - embedding static files into the binary using `cargo-embed-file` see [pr#1](https://github.com/AndreiBozantan/svelte-axum-template/pull/1)
 - updated to `axum` 0.8.4
+
+# OAuth2 SSO Setup (Google)
+
+This template includes Google OAuth2 SSO integration. To set it up:
+
+## 1. Create Google OAuth2 Credentials
+
+1. Go to the [Google Cloud Console](https://console.developers.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google+ API (for user info)
+4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
+5. Choose "Web application"
+6. Set the authorized redirect URI to: `http://localhost:3000/auth/oauth/google/callback`
+
+## 2. Configure the Backend
+
+⚠️ **IMPORTANT SECURITY NOTE**: Never commit OAuth secrets to git!
+
+Create `local.toml` (git-ignored) based on `default.toml` in the `./backend/config` directory and add your Google OAuth credentials.
+
+## 3. Using OAuth2 Login
+
+1. Start the application with `npm run dev`
+2. Navigate to the login page
+3. Click "Sign in with Google"
+4. Complete the Google OAuth flow
+5. You'll be redirected back and automatically logged in
+
+OAuth2 users are stored in the same `users` table with:
+- `sso_provider`: "google"
+- `sso_id`: Google user ID
+- `password_hash`: NULL (since OAuth users don't have passwords)
+
+The OAuth flow generates the same JWT tokens as regular login, so all existing authentication middleware works seamlessly.

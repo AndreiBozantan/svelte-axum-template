@@ -7,10 +7,9 @@ use std::net::SocketAddr;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use thiserror::Error;
 
-mod app;
-mod auth;
-mod db;
-mod routes;
+use svelte_axum_template::*;
+
+// Note: auth module is defined in lib.rs and used by other modules
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -19,10 +18,10 @@ pub enum AppError {
     Config(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    Database(#[from] db::DbError),
+    Database(#[from] app::DbError),
 
     #[error("Migration error: {0}")]
-    Migration(#[from] db::migrations::MigrationError),
+    Migration(#[from] app::DbMigrationError),
 
     #[error("CLI error: {0}")]
     CliError(#[from] app::cli::CliError),
@@ -46,11 +45,11 @@ async fn run_app() -> Result<(), AppError> {
 
     // initialize database and run CLI
     let context = app::Context::new(config).await?;
-    app::cli::run_migration_cli(&context).await?;
+    app::cli::run_migration_cli(&context.db).await?;
 
     // setup server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    let router = routes::create_router(context);
+    let router = app::create_router(context);
 
     tracing::info!("🚀 listening on http://{addr}");
     axum::serve(listener, router)

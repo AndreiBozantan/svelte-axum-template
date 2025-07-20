@@ -2,17 +2,14 @@
 use std::env;
 use std::io;
 use std::io::Write;
-use std::path::Path;
-use thiserror::Error;
 use clap::{Parser, Subcommand};
 
-use crate::app;
 use crate::auth;
-use crate::db;
-use crate::db::migrations::MigrationError;
-use crate::db::schema::NewUser;
+use crate::app;
+use crate::app::db::DbMigrationError as MigrationError;
+use crate::store::NewUser;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]
     MigrationCreateFailed { #[source] source: MigrationError },
@@ -65,7 +62,7 @@ enum MigrateSubCommands {
     },
 }
 
-pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
+pub async fn run_migration_cli(db: &app::Database) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -78,16 +75,15 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
     cli_args.extend(args.iter().skip(2).cloned());
 
     let cli = Cli::parse_from(cli_args);
-    let db_pool = &context.store.db_pool;
 
     match cli.migrate_sub_command {
         MigrateSubCommands::Create { name } => {
-            let filename = db::migrations::create(&name)
+            let filename = db.create_migration(&name)
                 .map_err(|e| CliError::MigrationCreateFailed { source: e })?;
             println!("Created new migration file: {filename}");
         },
         MigrateSubCommands::List => {
-            let migrations = db::migrations::list()
+            let migrations = db.list_migrations()
                 .map_err(|e| CliError::MigrationListFailed { source: e })?;
             if migrations.is_empty() {
                 println!("No migrations found.");
@@ -99,7 +95,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
             }
         },
         MigrateSubCommands::Status => {
-            match db::migrations::check_pending(db_pool).await {
+            match db.check_pending_migrations().await {
                 Ok(true) => println!("There are pending migrations that need to be applied."),
                 Ok(false) => println!("Database is up to date. No pending migrations."),
                 Err(e) => {
@@ -113,8 +109,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
             }
         },
         MigrateSubCommands::Run => {
-            let migrations_path = Path::new("./backend/migrations");
-            db::migrations::run(db_pool, migrations_path).await
+            db.run_migrations().await
                 .map_err(|e| CliError::MigrationRunFailed { source: e })?;
             println!("Migrations applied successfully.");
         },
@@ -128,7 +123,7 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
                 return Err(CliError::Other("Password cannot be empty".to_string()));
             }
 
-            create_admin_user(&context.store, &username, &password, email.as_deref()).await
+            create_admin_user(&db, &username, &password, email.as_deref()).await
                 .map_err(|e| CliError::Other(e.to_string()))?;
 
             println!("Admin user '{}' created successfully!", username);
@@ -141,13 +136,13 @@ pub async fn run_migration_cli(context: &app::Context) -> Result<(), CliError> {
 }
 
 async fn create_admin_user(
-    store: &db::Store,
+    db: &app::Database,
     username: &str,
     password: &str,
     email: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Check if user already exists
-    if store.get_user_by_username(username).await.is_ok() {
+    if db.users.get_by_name(username).await.is_ok() {
         return Err("User already exists".into());
     }
 
@@ -161,6 +156,8 @@ async fn create_admin_user(
         sso_id: None,
     };
 
-    store.create_user(new_user).await?;
+    db.users.create(new_user).await
+        .map_err(|_| "Failed to create admin user")?;
+
     Ok(())
 }
