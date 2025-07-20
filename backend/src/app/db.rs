@@ -10,6 +10,7 @@ use sqlx::{Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
 use thiserror::Error;
 
 use crate::app;
+use crate::core;
 use crate::store;
 
 pub type DbPoolType = sqlx::SqlitePool;
@@ -79,7 +80,7 @@ fn migrations_path() -> &'static Path {
 
 
 impl Database {
-    pub async fn new(db_config: &app::DatabaseConfig) -> Result<Self, DbError> {
+    pub async fn new(db_config: &core::DatabaseConfig) -> Result<Self, DbError> {
         let options = SqliteConnectOptions::from_str(&db_config.url)
             .map_err(DbError::ConnectionFailed)?
             .create_if_missing(true)

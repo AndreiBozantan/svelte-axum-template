@@ -3,18 +3,20 @@
 #![warn(clippy::nursery)]
 #![allow(missing_docs)]
 
-pub mod app {
+pub mod core {
     mod config;
-    mod context;
-    mod router;
-    mod db;
 
-    pub mod cli;
-
-    pub use db::*;
     pub use config::*;
-    pub use context::*;
-    pub use router::*;
+}
+
+pub mod store {
+    mod users;
+    mod tenants;
+    mod refresh_tokens;
+
+    pub use users::*;
+    pub use tenants::*;
+    pub use refresh_tokens::*;
 }
 
 pub mod auth {
@@ -34,12 +36,15 @@ pub mod routes {
     pub mod health;
 }
 
-pub mod store {
-    mod refresh_tokens;
-    mod tenants;
-    mod users;
+pub mod app {
+    mod db;
+    mod context;
+    mod router;
 
-    pub use users::*;
-    pub use tenants::*;
-    pub use refresh_tokens::*;
+    pub mod cli;
+
+    pub use db::*;
+    pub use context::*;
+    pub use router::*;
 }
+

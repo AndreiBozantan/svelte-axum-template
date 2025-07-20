@@ -9,7 +9,7 @@ use serde_json::json;
 use uuid::Uuid;
 use thiserror::Error;
 
-use crate::app::JwtConfig;
+use crate::core::JwtConfig;
 
 #[derive(Debug, Error)]
 pub enum JwtError {

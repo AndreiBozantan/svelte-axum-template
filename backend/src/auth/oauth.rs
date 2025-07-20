@@ -13,7 +13,8 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
-use crate::app::{DbError, OAuthConfig};
+use crate::app::DbError;
+use crate::core::OAuthConfig;
 use crate::auth;
 
 // 🔒 Security Notes
