@@ -13,7 +13,8 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 
-use crate::app::{DbError, OAuthConfig};
+use crate::core::DbError;
+use crate::core::OAuthConfig;
 use crate::auth;
 
 // 🔒 Security Notes
@@ -33,7 +34,7 @@ pub enum OAuthError {
     HttpRequestFailed(#[from] reqwest::Error),
 
     #[error("JWT error: {0}")]
-    JwtOperationFailed(#[from] auth::jwt::JwtError),
+    JwtOperationFailed(#[from] auth::JwtError),
 
     #[error("Failed to parse redirect URI: {0}")]
     InvalidRedirectUri(#[from] url::ParseError),
@@ -41,13 +42,16 @@ pub enum OAuthError {
     #[error("OAuth provider configuration error: {0}")]
     InvalidConfig(String),
 
-    #[error("User info retrieval failed: {0}")]
-    UserInfoRetrievalFailed(reqwest::Error),
+    #[error("User info retrieval API call failed: {0}")]
+    UserInfoRetrievalApiCallFailed(reqwest::Error),
 
-    #[error("Insert user failed: {0}")]
+    #[error("Get user from DB failed: {0}")]
+    GetUserFailed(DbError),
+
+    #[error("Insert user to DB failed: {0}")]
     InsertUserFailed(DbError),
 
-    #[error("Insert Refresh token failed: {0}")]
+    #[error("Insert refresh token to DB failed: {0}")]
     InsertRefreshTokenFailed(DbError),
 }
 
@@ -55,7 +59,7 @@ impl IntoResponse for OAuthError {
     fn into_response(self) -> axum::response::Response {
         let (status, error_message) = match self {
             OAuthError::InvalidConfig(_) => (StatusCode::INTERNAL_SERVER_ERROR, "OAuth configuration error"),
-            OAuthError::UserInfoRetrievalFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to retrieve user information"),
+            OAuthError::UserInfoRetrievalApiCallFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Failed to retrieve user information"),
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "OAuth authentication failed"),
         };
 
@@ -156,7 +160,7 @@ impl OAuthService {
             .bearer_auth(access_token)
             .send()
             .await
-            .map_err(|e| OAuthError::UserInfoRetrievalFailed(e))?
+            .map_err(|e| OAuthError::UserInfoRetrievalApiCallFailed(e))?
             .json()
             .await?;
         Ok(user_info)

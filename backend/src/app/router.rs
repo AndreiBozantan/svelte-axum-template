@@ -9,12 +9,12 @@ use axum::routing::post;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
-use crate::routes;
-use crate::app;
 use crate::auth;
+use crate::core;
+use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
-pub fn create_router(context: app::Context) -> Router {
+pub fn create_router(context: core::Context) -> Router {
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
@@ -44,7 +44,7 @@ pub fn create_router(context: app::Context) -> Router {
 /// If the token is valid, it allows the request to proceed.
 /// If the token is invalid or missing, it returns a JwtError.
 async fn auth_middleware(
-    State(context): State<app::Context>,
+    State(context): State<core::Context>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, auth::JwtError> {

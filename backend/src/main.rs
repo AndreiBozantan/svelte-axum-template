@@ -4,8 +4,8 @@
 #![allow(missing_docs)]
 
 use std::net::SocketAddr;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use thiserror::Error;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use svelte_axum_template::*;
 
@@ -18,13 +18,13 @@ pub enum AppError {
     Config(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    Database(#[from] app::DbError),
+    Database(#[from] core::DbError),
 
     #[error("Migration error: {0}")]
     Migration(#[from] app::DbMigrationError),
 
     #[error("CLI error: {0}")]
-    CliError(#[from] app::cli::CliError),
+    CliError(#[from] app::CliError),
 
     #[error("Network address parsing error: {0}")]
     AddrParse(#[from] std::net::AddrParseError),
@@ -34,7 +34,7 @@ pub enum AppError {
 }
 
 async fn run_app() -> Result<(), AppError> {
-    let config = app::Config::new()?;
+    let config = core::Config::new()?;
     let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port).parse()?;
 
     // start tracing - level set by either RUST_LOG env variable or defaults to debug
@@ -44,8 +44,9 @@ async fn run_app() -> Result<(), AppError> {
         .init();
 
     // initialize database and run CLI
-    let context = app::Context::new(config).await?;
-    app::cli::run_migration_cli(&context.db).await?;
+    let db = core::create_db_pool(&config.database).await?;
+    let context = core::Context{db, config};
+    app::run_migration_cli(&context.db).await?;
 
     // setup server
     let listener = tokio::net::TcpListener::bind(addr).await?;
