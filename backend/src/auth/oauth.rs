@@ -145,12 +145,13 @@ impl OAuthService {
             .request_async(async_http_client)
             .await;
 
-        if token_result.is_err() {
-            tracing::error!("Failed to exchange Google authorization code: {:?}", token_result.as_ref().err());
-            return Err(OAuthError::OAuth2RequestFailed(token_result.err().unwrap()));
+        match token_result {
+            Ok(token) => Ok(token),
+            Err(err) => {
+                tracing::error!("Failed to exchange Google authorization code: {:?}", err);
+                Err(OAuthError::OAuth2RequestFailed(err))
+            }
         }
-
-        Ok(token_result.unwrap())
     }
 
     pub async fn get_google_user_info(&self, access_token: &str) -> Result<GoogleUserInfo, OAuthError> {
