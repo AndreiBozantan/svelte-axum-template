@@ -26,7 +26,7 @@ pub async fn get_tenant_by_id(db: &DbPoolType, id: i64) -> Result<Tenant, DbErro
         SELECT
             id as "id!",
             name as "name!",
-            description as "description!",
+            description,
             created_at as "created_at!",
             updated_at as "updated_at!"
         FROM tenants
