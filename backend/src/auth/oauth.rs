@@ -88,18 +88,32 @@ pub struct AuthRequest {
     pub state: String,
 }
 
-fn create_google_client(config: &OAuthConfig) -> Result<oauth2::Client<oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>, oauth2::StandardTokenResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>, oauth2::StandardTokenIntrospectionResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>, oauth2::StandardRevocableToken, oauth2::StandardErrorResponse<oauth2::RevocationErrorResponseType>, oauth2::EndpointSet, oauth2::EndpointNotSet, oauth2::EndpointNotSet, oauth2::EndpointNotSet, oauth2::EndpointSet>, OAuthError> {
-    if config.google_client_id.is_empty() || config.google_client_secret.is_empty() {
-        return Err(OAuthError::InvalidConfig("Google OAuth not configured".to_string()));
-    }
-    let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-        .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google auth URL: {}", e)))?;
-    let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-        .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google token URL: {}", e)))?;
-    let redirect_url = RedirectUrl::new(config.google_redirect_uri.to_string())
-        .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google redirect URI: {}", e)))?;
-    let client = BasicClient::new(ClientId::new(config.google_client_id.to_string()))
-        .set_client_secret(ClientSecret::new(config.google_client_secret.to_string()))
+// Type alias to simplify the function signature
+type GoogleOAuth2Client = oauth2::Client<
+    oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>,
+    oauth2::StandardTokenResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>,
+    oauth2::StandardTokenIntrospectionResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>,
+    oauth2::StandardRevocableToken,
+    oauth2::StandardErrorResponse<oauth2::RevocationErrorResponseType>,
+    oauth2::EndpointSet,    // HasAuthUrl
+    oauth2::EndpointNotSet, // HasDeviceAuthUrl
+    oauth2::EndpointNotSet, // HasIntrospectionUrl
+    oauth2::EndpointNotSet, // HasRevocationUrl
+    oauth2::EndpointSet,    // HasTokenUrl
+>;
+
+fn validate_google_config(config: &OAuthConfig) -> Result<(), OAuthError> {
+    let valid = !config.google_client_id.is_empty() && !config.google_client_secret.is_empty();
+    valid.then_some(()).ok_or(OAuthError::InvalidConfig("Google OAuth not configured".to_string()))
+}
+
+fn create_google_client(config: &OAuthConfig) -> Result<GoogleOAuth2Client, OAuthError> {
+    validate_google_config(config)?;
+    let redirect_url = RedirectUrl::new(config.google_redirect_uri.clone())?;
+    let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap();
+    let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string()).unwrap();
+    let client = BasicClient::new(ClientId::new(config.google_client_id.clone()))
+        .set_client_secret(ClientSecret::new(config.google_client_secret.clone()))
         .set_auth_uri(auth_url)
         .set_token_uri(token_url)
         .set_redirect_uri(redirect_url);
