@@ -198,11 +198,7 @@ pub async fn revoke_token(State(context): State<core::Context>, Json(request): J
 pub async fn google_auth_init(
     State(context): State<core::Context>,
 ) -> Result<impl IntoResponse, auth::OAuthError> {
-    let oauth_service = auth::OAuthService::new(&context.config.oauth)?;
-    let (auth_url, csrf_token) = oauth_service.get_google_auth_url()?;
-
-    tracing::info!("Initiating Google OAuth flow with CSRF token: {}", csrf_token.secret());
-
+    let (auth_url, _csrf_token) = auth::get_google_auth_url(&context.config.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
     Ok(axum::response::Redirect::to(auth_url.as_str()))
@@ -213,24 +209,12 @@ pub async fn google_auth_callback(
     State(context): State<core::Context>,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, auth::OAuthError> {
-    use oauth2::TokenResponse as OAuth2TokenResponse;
-
     tracing::info!("Google OAuth callback received with state: {}", params.state);
-
-    let oauth_service = auth::OAuthService::new(&context.config.oauth)?;
-
-    // Exchange authorization code for access token
-    let token_response = oauth_service.exchange_google_code(&params.code).await?;
-    let access_token = token_response.access_token().secret();
-
-    // Get user information from Google
-    let user_info = oauth_service.get_google_user_info(access_token).await?;
-
+    let user_info = auth::get_google_user_info(&context.config.oauth, &params.code).await?;
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists
     let existing_user = store::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
-
     let user = match existing_user {
         Ok(user) => {
             tracing::info!("Existing SSO user found: {}", user.username);
