@@ -98,33 +98,23 @@ pub struct OAuthService {
 
 impl OAuthService {
     pub fn new(config: &OAuthConfig) -> Result<Self, OAuthError> {
-        let google_client = if !config.google_client_id.is_empty()
-            && !config.google_client_secret.is_empty() {
-
-            let client_id = ClientId::new(config.google_client_id.clone());
-            let client_secret = ClientSecret::new(config.google_client_secret.clone());
-            let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-                .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google auth URL: {}", e)))?;
-            let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-                .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google token URL: {}", e)))?;
-            let redirect_url = RedirectUrl::new(config.google_redirect_uri.clone())?;
-
-            Some(BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
-                .set_redirect_uri(redirect_url))
-        } else {
-            None
-        };
-
-        Ok(Self {
-            google_client,
-            http_client: Client::new(),
-        })
+        if config.google_client_id.is_empty() || config.google_client_secret.is_empty() {
+            return Ok(Self {google_client: None, http_client: Client::new()});
+        }
+        let client_id = ClientId::new(config.google_client_id.clone());
+        let client_secret = ClientSecret::new(config.google_client_secret.clone());
+        let auth_url = AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
+            .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google auth URL: {}", e)))?;
+        let token_url = TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
+            .map_err(|e| OAuthError::InvalidConfig(format!("Invalid Google token URL: {}", e)))?;
+        let google_client = BasicClient::new(client_id, Some(client_secret), auth_url, Some(token_url))
+            .set_redirect_uri(RedirectUrl::new(config.google_redirect_uri.clone())?);
+        Ok(Self {google_client: Some(google_client), http_client: Client::new()})
     }
 
     pub fn get_google_auth_url(&self) -> Result<(Url, CsrfToken), OAuthError> {
         let client = self.google_client.as_ref()
             .ok_or_else(|| OAuthError::InvalidConfig("Google OAuth not configured".to_string()))?;
-
         // For server-side OAuth flow, we don't need PKCE
         let (auth_url, csrf_token) = client
             .authorize_url(CsrfToken::new_random)
@@ -132,26 +122,17 @@ impl OAuthService {
             .add_scope(Scope::new("email".to_string()))
             .add_scope(Scope::new("profile".to_string()))
             .url();
-
         Ok((auth_url, csrf_token))
     }
 
     pub async fn exchange_google_code(&self, code: &str) -> Result<oauth2::StandardTokenResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>, OAuthError> {
         let client = self.google_client.as_ref()
             .ok_or_else(|| OAuthError::InvalidConfig("Google OAuth not configured".to_string()))?;
-
-        let token_result = client
+        client
             .exchange_code(AuthorizationCode::new(code.to_string()))
             .request_async(async_http_client)
-            .await;
-
-        match token_result {
-            Ok(token) => Ok(token),
-            Err(err) => {
-                tracing::error!("Failed to exchange Google authorization code: {:?}", err);
-                Err(OAuthError::OAuth2RequestFailed(err))
-            }
-        }
+            .await
+            .map_err(OAuthError::OAuth2RequestFailed)
     }
 
     pub async fn get_google_user_info(&self, access_token: &str) -> Result<GoogleUserInfo, OAuthError> {
