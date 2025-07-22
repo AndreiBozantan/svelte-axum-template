@@ -49,7 +49,7 @@ impl IntoResponse for JwtError {
     }
 }
 
-// Common claims shared by both token types
+/// Common claims shared by both token types
 #[derive(Debug, Deserialize, Serialize)]
 struct CommonClaims {
     pub sub: String,        // Subject (user ID)

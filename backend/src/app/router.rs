@@ -14,7 +14,7 @@ use crate::core;
 use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
-pub fn create_router(context: core::Context) -> Router {
+pub fn create_router(context: core::ArcContext) -> Router {
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
@@ -44,7 +44,7 @@ pub fn create_router(context: core::Context) -> Router {
 /// If the token is valid, it allows the request to proceed.
 /// If the token is invalid or missing, it returns a JwtError.
 async fn auth_middleware(
-    State(context): State<core::Context>,
+    State(context): State<core::ArcContext>,
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, auth::JwtError> {

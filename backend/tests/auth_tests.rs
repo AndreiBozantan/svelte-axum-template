@@ -46,10 +46,10 @@ mod tests {
             sso_id: None,
         };
 
-        let context = core::Context{db, config};
+        let context = core::Context::new(db, config);
         store::create_user(&context.db, user).await.unwrap();
 
-        let router = app::create_router(context);
+        let router = app::create_router(context.into());
         TestServer::new(router).unwrap()
     }
 
