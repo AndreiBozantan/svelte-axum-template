@@ -8,7 +8,7 @@ pub enum DbError {
     #[error("Database operation failed: {0}")]
     OperationFailed(sqlx::Error),
 
-    #[error("Row not found")]
+    #[error("Row not found: {0}")]
     RowNotFound(sqlx::Error),
 }
 
