@@ -32,7 +32,7 @@ mod tests {
             max_connections: 5,
         };
 
-        let db = core::create_db_pool(&config.database).await.unwrap();
+        let db = app::create_db_context(&config.database).await.unwrap();
         app::run_migrations(&db).await.unwrap();
 
         // Create test user

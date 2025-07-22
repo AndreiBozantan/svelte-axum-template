@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::core::{DbError, DbPoolType};
+use crate::core::{DbError, DbContext};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -27,7 +27,7 @@ pub struct NewUser {
     pub sso_id: Option<String>,
 }
 
-pub async fn create_user(db: &DbPoolType, new_user: NewUser) -> Result<User, DbError> {
+pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -47,7 +47,7 @@ pub async fn create_user(db: &DbPoolType, new_user: NewUser) -> Result<User, DbE
     Ok(user)
 }
 
-pub async fn get_user_by_id(db: &DbPoolType, id: i64) -> Result<User, DbError> {
+pub async fn get_user_by_id(db: &DbContext, id: i64) -> Result<User, DbError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -67,15 +67,11 @@ pub async fn get_user_by_id(db: &DbPoolType, id: i64) -> Result<User, DbError> {
         id
     )
     .fetch_one(db)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::UserNotFound,
-        _ => DbError::OperationFailed(e),
-    })?;
+    .await?;
     Ok(user)
 }
 
-pub async fn get_user_by_name(db: &DbPoolType, username: &str) -> Result<User, DbError> {
+pub async fn get_user_by_name(db: &DbContext, username: &str) -> Result<User, DbError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -95,15 +91,11 @@ pub async fn get_user_by_name(db: &DbPoolType, username: &str) -> Result<User, D
         username
     )
     .fetch_one(db)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::UserNotFound,
-        _ => DbError::OperationFailed(e),
-    })?;
+    .await?;
     Ok(user)
 }
 
-pub async fn get_user_by_sso_id(db: &DbPoolType, sso_provider: &str, sso_id: &str) -> Result<User, DbError> {
+pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str) -> Result<User, DbError> {
     let user = sqlx::query_as::<_, User>(
         r#"
         SELECT
@@ -123,10 +115,6 @@ pub async fn get_user_by_sso_id(db: &DbPoolType, sso_provider: &str, sso_id: &st
     .bind(sso_provider)
     .bind(sso_id)
     .fetch_one(db)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::UserNotFound,
-        _ => DbError::OperationFailed(e),
-    })?;
+    .await?;
     Ok(user)
 }
