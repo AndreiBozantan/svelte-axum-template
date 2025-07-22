@@ -14,16 +14,19 @@ use crate::core::JwtConfig;
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Failed to encode JWT token")]
-    EncodingError(#[from] jwt::errors::Error),
+    EncodingError(jwt::errors::Error),
 
     #[error("Failed to decode JWT token")]
-    DecodingError,
+    DecodingError(jwt::errors::Error),
 
     #[error("Token has expired")]
     TokenExpired,
 
     #[error("Invalid token")]
     InvalidToken,
+
+    #[error("Invalid authorization header")]
+    InvalidAuthorizationHeader,
 }
 
 impl IntoResponse for JwtError {
@@ -35,9 +38,10 @@ impl IntoResponse for JwtError {
 
         let (status, error_message) = match self {
             Self::EncodingError(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DecodingError => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
+            Self::DecodingError(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
             Self::TokenExpired => (http::StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
             Self::InvalidToken => (http::StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
+            Self::InvalidAuthorizationHeader => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authorization header".to_string()),
         };
 
         let body = Json(json!({
@@ -86,6 +90,18 @@ pub struct TokenResponse {
     pub refresh_token: String,
     pub access_token_expires_in: i64, // Seconds until access token expires
     pub refresh_token_expires_in: i64, // Seconds until refresh token expires
+}
+
+trait ClaimsWithTokenType {
+    fn token_type(&self) -> &str;
+}
+
+impl ClaimsWithTokenType for AccessTokenClaims {
+    fn token_type(&self) -> &str { &self.token_type }
+}
+
+impl ClaimsWithTokenType for RefreshTokenClaims {
+    fn token_type(&self) -> &str { &self.token_type }
 }
 
 impl TokenResponse {
@@ -137,12 +153,12 @@ pub fn decode_access_token_from_req(config: &JwtConfig, req: &Request) -> Result
         .headers()
         .get(http::header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok())
-        .ok_or(JwtError::DecodingError)?;
+        .ok_or(JwtError::InvalidAuthorizationHeader)?;
 
     // Extract Bearer token
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or(JwtError::DecodingError)?;
+        .ok_or(JwtError::InvalidAuthorizationHeader)?;
 
     // Decode the access token
     decode_access_token(config, token)
@@ -159,26 +175,26 @@ pub fn decode_refresh_token(config: &JwtConfig, token: &str) -> Result<RefreshTo
 }
 
 fn decode_token<T>(token: &str, config: &JwtConfig, expected_token_type: &str) -> Result<T, JwtError>
-where T: serde::de::DeserializeOwned
+where T: serde::de::DeserializeOwned + ClaimsWithTokenType
 {
     let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());
     let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
     validation.leeway = 0; // Set leeway to 0 to ensure strict expiration checking
-
-    let common_token_data = jwt::decode::<CommonClaims>(token, &decoding_key, &validation).map_err(map_jwt_error)?;
-    if common_token_data.claims.token_type != expected_token_type {
-        return Err(JwtError::InvalidToken);
-    }
-
-    let token = jwt::decode::<T>(token, &decoding_key, &validation).map_err(map_jwt_error)?;
+    let token = jwt::decode::<T>(token, &decoding_key, &validation)?;
+    let valid = token.claims.token_type() == expected_token_type;
+    valid.then_some(()).ok_or(JwtError::InvalidToken)?;
     Ok(token.claims)
 }
 
 /// Maps jsonwebtoken errors to our custom JwtError type
-fn map_jwt_error(err: jwt::errors::Error) -> JwtError {
-    match err.kind() {
-        jwt::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
-        _ => JwtError::DecodingError,
+impl From<jwt::errors::Error> for JwtError {
+    fn from(e: jwt::errors::Error) -> Self {
+        match e.kind() {
+            jwt::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
+            jwt::errors::ErrorKind::InvalidToken => JwtError::InvalidToken,
+            jwt::errors::ErrorKind::Json(_) => JwtError::InvalidToken,
+            _ => JwtError::DecodingError(e),
+        }
     }
 }
 
@@ -274,7 +290,7 @@ mod tests {
 
         let result = decode_access_token(&wrong_config, &token);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError));
+        assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
     }
 
     #[test]
@@ -284,7 +300,7 @@ mod tests {
 
         let result = decode_access_token(&config, invalid_token);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError));
+        assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
     }
 
     #[test]
@@ -294,7 +310,7 @@ mod tests {
 
         let result = decode_access_token(&config, malformed_token);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError));
+        assert!(matches!(result.unwrap_err(), JwtError::InvalidToken));
     }
 
     #[test]
@@ -371,7 +387,7 @@ mod tests {
 
         let result = decode_access_token_from_req(&config, &req);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError));
+        assert!(matches!(result.unwrap_err(), JwtError::InvalidAuthorizationHeader));
     }
 
     #[test]
@@ -387,7 +403,7 @@ mod tests {
 
         let result = decode_access_token_from_req(&config, &req);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError));
+        assert!(matches!(result.unwrap_err(), JwtError::InvalidAuthorizationHeader));
     }
 
     #[test]
