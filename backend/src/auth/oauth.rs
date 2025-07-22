@@ -1,5 +1,6 @@
 use oauth2;
-use serde;
+use serde::Deserialize;
+use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
@@ -30,7 +31,7 @@ pub enum OAuthError {
     UserInfoRetrievalApiCallFailed(reqwest::Error),
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleUserInfo {
     pub id: String,
     pub email: String,
@@ -42,7 +43,7 @@ pub struct GoogleUserInfo {
     pub locale: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct AuthRequest {
     pub code: String,
     pub state: String,
