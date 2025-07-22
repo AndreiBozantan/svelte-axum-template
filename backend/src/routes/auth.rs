@@ -34,20 +34,33 @@ pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
 
-    #[error("JWT error: {0}")]
-    JwtError(#[from] auth::JwtError),
+    #[error("JWT operation failed: {0}")]
+    JwtOperationFailed(#[from] auth::JwtError),
 
-    #[error("Password error: {0}")]
-    PasswordHashingError(#[from] argon2::password_hash::Error),
+    #[error("Password hashing failed: {0}")]
+    PasswordHashingFailed(#[from] argon2::password_hash::Error),
 
-    #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] core::DbError),
+    #[error("Token expired or invalid")]
+    TokenInvalid,
 
     #[error("User not found")]
     UserNotFound,
 
-    #[error("Token expired or invalid")]
-    TokenInvalid,
+    #[error("Database operation failed: {0}")]
+    DatabaseOperationFailed(core::DbError),
+
+    #[error("OAuth operation failed: {0}")]
+    OAuthOperationFailed(#[from] auth::OAuthError),
+}
+
+impl From<core::DbError> for AuthError {
+    fn from(db_error: core::DbError) -> Self {
+        match db_error {
+            core::DbError::UserNotFound => AuthError::InvalidCredentials,
+            core::DbError::TokenNotFound => AuthError::InvalidCredentials,
+            other => AuthError::DatabaseOperationFailed(other),
+        }
+    }
 }
 
 impl IntoResponse for AuthError {
@@ -58,12 +71,13 @@ impl IntoResponse for AuthError {
             error_message = %self);
 
         let (status, error_message) = match self {
-            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::JwtError(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::PasswordHashingError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::PasswordHashingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
+            Self::JwtOperationFailed(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::UserNotFound => (StatusCode::UNAUTHORIZED, self.to_string()),
             Self::TokenInvalid => (StatusCode::UNAUTHORIZED, self.to_string()),
+            Self::OAuthOperationFailed(e) => (StatusCode::UNAUTHORIZED, e.to_string()),
         };
 
         let body = Json(json!({
@@ -76,13 +90,11 @@ impl IntoResponse for AuthError {
 }
 
 /// Login route
-pub async fn login(State(context): State<core::Context>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
-    let user = store::get_user_by_name(&context.db, &login.username).await
-        .map_err(|_| AuthError::UserNotFound)?;
-
+    let user = store::get_user_by_name(&context.db, &login.username).await?;
     if !auth::verify_password(&login.password, user.password_hash)? {
         tracing::warn!("Invalid password for user: {}", login.username);
         return Err(AuthError::InvalidCredentials);
@@ -126,7 +138,7 @@ pub async fn login(State(context): State<core::Context>, Json(login): Json<Login
 }
 
 /// Logout route
-pub async fn logout(State(context): State<core::Context>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
+pub async fn logout(State(context): State<core::ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
     let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
@@ -141,16 +153,14 @@ pub async fn logout(State(context): State<core::Context>, req: Request<Body>) ->
 
 /// Route to refresh access token using refresh token
 pub async fn refresh_access_token(
-    State(context): State<core::Context>,
+    State(context): State<core::ArcContext>,
     Json(request): Json<RefreshTokenRequest>
 ) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
 
-    // Decode and validate refresh token
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)
-        .map_err(|_| AuthError::TokenInvalid)?;    // Check if refresh token exists in database and is not revoked
-    let stored_token = store::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await
-        .map_err(|_| AuthError::TokenInvalid)?;
+    // Decode refresh token and check if it exists in database and is not revoked
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
+    let stored_token = store::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
 
     // Verify token hash
     let mut hasher = sha2::Sha256::new();
@@ -182,12 +192,11 @@ pub async fn refresh_access_token(
 }
 
 /// Route to revoke a refresh token
-pub async fn revoke_token(State(context): State<core::Context>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn revoke_token(State(context): State<core::ArcContext>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)
-        .map_err(|_| AuthError::TokenInvalid)?;
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
 
     // Revoke the token
     store::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
@@ -196,8 +205,8 @@ pub async fn revoke_token(State(context): State<core::Context>, Json(request): J
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(
-    State(context): State<core::Context>,
-) -> Result<impl IntoResponse, auth::OAuthError> {
+    State(context): State<core::ArcContext>,
+) -> Result<impl IntoResponse, AuthError> {
     let (auth_url, _csrf_token) = auth::get_google_auth_url(&context.config.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
@@ -206,9 +215,9 @@ pub async fn google_auth_init(
 
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
-    State(context): State<core::Context>,
+    State(context): State<core::ArcContext>,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
-) -> Result<impl IntoResponse, auth::OAuthError> {
+) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Google OAuth callback received with state: {}", params.state);
     let user_info = auth::get_google_user_info(&context.config.oauth, &params.code).await?;
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
@@ -230,14 +239,13 @@ pub async fn google_auth_callback(
                 sso_provider: Some("google".to_string()),
                 sso_id: Some(user_info.id.clone()),
             };
-            let user = store::create_user(&context.db, new_user).await
-                .map_err(|e| auth::OAuthError::InsertUserFailed(e))?;
+            let user = store::create_user(&context.db, new_user).await?;
             tracing::info!("Created new SSO user: {}", user.username);
             user
         },
         Err(e) => {
             tracing::error!("Failed to retrieve or create user: {}", e);
-            return Err(auth::OAuthError::GetUserFailed(e));
+            return Err(AuthError::DatabaseOperationFailed(e));
         }
     };
 
@@ -254,10 +262,8 @@ pub async fn google_auth_callback(
         user.id)?;
 
     // Store refresh token in database
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)
-        .map_err(|e| auth::OAuthError::JwtOperationFailed(e))?;
-    let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0)
-        .ok_or(auth::OAuthError::JwtOperationFailed(auth::JwtError::InvalidToken))?;
+    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)?;
+    let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(auth::JwtError::InvalidToken)?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
     let token_hash = format!("{:x}", hasher.finalize());
@@ -267,8 +273,7 @@ pub async fn google_auth_callback(
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    store::create_refresh_token(&context.db, new_refresh_token).await
-        .map_err(|e| auth::OAuthError::InsertRefreshTokenFailed(e))?;
+    store::create_refresh_token(&context.db, new_refresh_token).await?;
 
     let jwt_token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
 

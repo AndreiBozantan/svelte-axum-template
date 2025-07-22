@@ -45,12 +45,12 @@ async fn run_app() -> Result<(), AppError> {
 
     // initialize database and run CLI
     let db = core::create_db_pool(&config.database).await?;
-    let context = core::Context{db, config};
-    app::run_migration_cli(&context.db).await?;
+    app::run_migration_cli(&db).await?;
 
     // setup server
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    let router = app::create_router(context);
+    let context = core::Context::new(db, config);
+    let router = app::create_router(context.into());
 
     tracing::info!("🚀 listening on http://{addr}");
     axum::serve(listener, router)

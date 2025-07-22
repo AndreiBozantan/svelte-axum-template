@@ -4,7 +4,7 @@ use crate::core;
 use crate::store;
 
 #[allow(clippy::unused_async)]
-pub async fn health_check(State(context): State<core::Context>) -> Result<impl IntoResponse, axum::response::Response> {
+pub async fn health_check(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, axum::response::Response> {
     // read the tenant from db
     store::get_tenant_by_id(&context.db, 1).await.map_err(|e| {
         tracing::error!("Health check failed to read default tenant from database: {}", e);
