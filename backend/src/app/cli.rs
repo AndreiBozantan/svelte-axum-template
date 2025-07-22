@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use crate::app;
 use crate::auth;
 use crate::core;
-use crate::store;
+use crate::db;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
@@ -143,12 +143,12 @@ async fn create_admin_user(
     email: Option<&str>
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Check if user already exists
-    if store::get_user_by_name(&db, username).await.is_ok() {
+    if db::get_user_by_name(&db, username).await.is_ok() {
         return Err("User already exists".into());
     }
 
     let password_hash = auth::hash_password(password)?;
-    let new_user = store::NewUser {
+    let new_user = db::NewUser {
         username: username.to_string(),
         password_hash: Some(password_hash),
         email: email.map(|e| e.to_string()),
@@ -157,7 +157,7 @@ async fn create_admin_user(
         sso_id: None,
     };
 
-    store::create_user(&db, new_user).await
+    db::create_user(&db, new_user).await
         .map_err(|_| "Failed to create admin user")?;
 
     Ok(())
