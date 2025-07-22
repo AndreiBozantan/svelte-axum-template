@@ -49,7 +49,7 @@ async fn auth_middleware(
     next: Next,
 ) -> Result<Response, auth::JwtError> {
     // Decode and validate JWT token
-    let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
+    let claims = auth::decode_access_token_from_req(&context.jwt, &req)?;
 
     tracing::info!(
         jti = claims.jti,

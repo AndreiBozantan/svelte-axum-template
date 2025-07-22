@@ -11,7 +11,7 @@ use serde_json::json;
 use uuid::Uuid;
 use thiserror::Error;
 
-use crate::core::JwtConfig;
+use crate::core;
 
 #[derive(Debug, Error)]
 pub enum JwtError {
@@ -107,12 +107,12 @@ impl ClaimsWithTokenType for RefreshTokenClaims {
 }
 
 impl TokenResponse {
-    pub fn new(access_token: String, refresh_token: String, config: &JwtConfig) -> Self {
+    pub fn new(ctx: &core::JwtContext, access_token: String, refresh_token: String) -> Self {
         Self {
             access_token,
             refresh_token,
-            access_token_expires_in: config.access_token_expiry,
-            refresh_token_expires_in: config.refresh_token_expiry,
+            access_token_expires_in: ctx.access_token_expiry,
+            refresh_token_expires_in: ctx.refresh_token_expiry,
         }
     }
 }
@@ -122,36 +122,34 @@ const REFRESH_TOKEN_TYPE: &str = "refresh";
 const ACCESS_TOKEN_TYPE: &str = "access";
 
 /// Generate a new access token
-pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
+pub fn generate_access_token(ctx: &core::JwtContext, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
-    let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
     let claims = AccessTokenClaims {
         sub: user_id.to_string(),
         username: user_name.to_string(),
         tenant_id,
-        exp: now + config.access_token_expiry,
+        exp: now + ctx.access_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
         token_type: ACCESS_TOKEN_TYPE.to_string(),
     };
-    jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&JWT_HEADER, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
 }
 
 /// Generate a new refresh token
-pub fn generate_refresh_token(config: &JwtConfig, user_id: i64) -> Result<String, JwtError> {
+pub fn generate_refresh_token(ctx: &core::JwtContext, user_id: i64) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
-    let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
     let claims = RefreshTokenClaims {
         sub: user_id.to_string(),
-        exp: now + config.refresh_token_expiry,
+        exp: now + ctx.refresh_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
         token_type: REFRESH_TOKEN_TYPE.to_string(),
     };
-    jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&JWT_HEADER, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
 }
 
-pub fn decode_access_token_from_req(config: &JwtConfig, req: &Request) -> Result<AccessTokenClaims, JwtError> {
+pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Result<AccessTokenClaims, JwtError> {
     // Extract the Authorization header
     let auth_header = req
         .headers()
@@ -165,26 +163,23 @@ pub fn decode_access_token_from_req(config: &JwtConfig, req: &Request) -> Result
         .ok_or(JwtError::InvalidAuthorizationHeader)?;
 
     // Decode the access token
-    decode_access_token(config, token)
+    decode_access_token(ctx, token)
 }
 
 /// Validate and decode an access token
-pub fn decode_access_token(config: &JwtConfig, token: &str) -> Result<AccessTokenClaims, JwtError> {
-    decode_token::<AccessTokenClaims>(token, config, ACCESS_TOKEN_TYPE)
+pub fn decode_access_token(ctx: &core::JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
+    decode_token::<AccessTokenClaims>(ctx, token, ACCESS_TOKEN_TYPE)
 }
 
 /// Validate and decode a refresh token
-pub fn decode_refresh_token(config: &JwtConfig, token: &str) -> Result<RefreshTokenClaims, JwtError> {
-    decode_token::<RefreshTokenClaims>(token, config, REFRESH_TOKEN_TYPE)
+pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
+    decode_token::<RefreshTokenClaims>(ctx, token, REFRESH_TOKEN_TYPE)
 }
 
-fn decode_token<T>(token: &str, config: &JwtConfig, expected_token_type: &str) -> Result<T, JwtError>
+fn decode_token<T>(ctx: &core::JwtContext, token: &str, expected_token_type: &str) -> Result<T, JwtError>
 where T: serde::de::DeserializeOwned + ClaimsWithTokenType
 {
-    let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());
-    let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
-    validation.leeway = 0; // Set leeway to 0 to ensure strict expiration checking
-    let token = jwt::decode::<T>(token, &decoding_key, &validation)?;
+    let token = jwt::decode::<T>(token, &ctx.decoding_key, &ctx.validation)?;
     let valid = token.claims.token_type() == expected_token_type;
     valid.then_some(()).ok_or(JwtError::InvalidToken)?;
     Ok(token.claims)
@@ -208,30 +203,23 @@ mod tests {
     use axum::body::Body;
     use axum::http::{HeaderValue, Request};
 
-    fn create_test_config() -> JwtConfig {
-        JwtConfig {
+    fn create_test_context() -> core::JwtContext {
+        let config = core::JwtConfig {
             secret: "test_secret_key_for_jwt_testing".to_string(),
             access_token_expiry: 3600, // 1 hour
             refresh_token_expiry: 86400, // 24 hours
-        }
-    }
-
-    fn create_short_expiry_config() -> JwtConfig {
-        JwtConfig {
-            secret: "test_secret_key_for_jwt_testing".to_string(),
-            access_token_expiry: 1, // 1 second
-            refresh_token_expiry: 2, // 2 seconds
-        }
+        };
+        core::JwtContext::new(&config)
     }
 
     #[test]
     fn test_generate_access_token_success() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
         let tenant_id = Some(456);
 
-        let token = generate_access_token(&config, user_id, username, tenant_id).unwrap();
+        let token = generate_access_token(&ctx, user_id, username, tenant_id).unwrap();
 
         // Token should be non-empty and contain JWT structure (header.payload.signature)
         let parts: Vec<&str> = token.split('.').collect();
@@ -240,10 +228,10 @@ mod tests {
 
     #[test]
     fn test_generate_refresh_token_success() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
 
-        let token = generate_refresh_token(&config, user_id).unwrap();
+        let token = generate_refresh_token(&ctx, user_id).unwrap();
 
         // Token should be non-empty and contain JWT structure
         let parts: Vec<&str> = token.split('.').collect();
@@ -252,13 +240,13 @@ mod tests {
 
     #[test]
     fn test_decode_access_token_success() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
         let tenant_id = Some(456);
 
-        let token = generate_access_token(&config, user_id, username, tenant_id).unwrap();
-        let claims = decode_access_token(&config, &token).unwrap();
+        let token = generate_access_token(&ctx, user_id, username, tenant_id).unwrap();
+        let claims = decode_access_token(&ctx, &token).unwrap();
 
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.username, username);
@@ -270,11 +258,11 @@ mod tests {
 
     #[test]
     fn test_decode_refresh_token_success() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
 
-        let token = generate_refresh_token(&config, user_id).unwrap();
-        let claims = decode_refresh_token(&config, &token).unwrap();
+        let token = generate_refresh_token(&ctx, user_id).unwrap();
+        let claims = decode_refresh_token(&ctx, &token).unwrap();
 
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.token_type, REFRESH_TOKEN_TYPE);
@@ -284,94 +272,100 @@ mod tests {
 
     #[test]
     fn test_decode_access_token_wrong_secret() {
-        let config = create_test_config();
-        let mut wrong_config = config.clone();
-        wrong_config.secret = "wrong_secret".to_string();
-
+        let wrong_config = core::JwtConfig {
+            secret: "wrong_secret".to_string(),
+            access_token_expiry: 3600, // 1 hour
+            refresh_token_expiry: 86400, // 24 hours
+        };
+        let wrong_ctx = core::JwtContext::new(&wrong_config);
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
-        let token = generate_access_token(&config, user_id, username, None).unwrap();
-
-        let result = decode_access_token(&wrong_config, &token);
+        let token = generate_access_token(&ctx, user_id, username, None).unwrap();
+        let result = decode_access_token(&wrong_ctx, &token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
     }
 
     #[test]
     fn test_decode_invalid_token() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let invalid_token = "invalid.token.format";
 
-        let result = decode_access_token(&config, invalid_token);
+        let result = decode_access_token(&ctx, invalid_token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
     }
 
     #[test]
     fn test_decode_malformed_token() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let malformed_token = "not_a_jwt_token";
 
-        let result = decode_access_token(&config, malformed_token);
+        let result = decode_access_token(&ctx, malformed_token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::InvalidToken));
     }
 
     #[test]
     fn test_token_expiry() {
-        let config = create_short_expiry_config();
+        let config = core::JwtConfig {
+            secret: "test_secret_key_for_jwt_testing".to_string(),
+            access_token_expiry: 1, // 1 second
+            refresh_token_expiry: 2, // 2 seconds
+        };
+        let ctx =  core::JwtContext::new(&config);
         let user_id = 123;
         let username = "test_user";
-
-        let token = generate_access_token(&config, user_id, username, None).unwrap();
+        let token = generate_access_token(&ctx, user_id, username, None).unwrap();
 
         // Should work immediately
-        let claims = decode_access_token(&config, &token).unwrap();
+        let claims = decode_access_token(&ctx, &token).unwrap();
         assert_eq!(claims.sub, user_id.to_string());
 
         // Wait for token to expire
         std::thread::sleep(std::time::Duration::from_secs(2));
 
         // Should now fail with expiry error
-        let result = decode_access_token(&config, &token);
+        let result = decode_access_token(&ctx, &token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::TokenExpired));
     }
 
     #[test]
     fn test_access_token_used_as_refresh_token() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
 
-        let access_token = generate_access_token(&config, user_id, username, None).unwrap();
+        let access_token = generate_access_token(&ctx, user_id, username, None).unwrap();
 
         // Try to decode access token as refresh token - should fail
-        let result = decode_refresh_token(&config, &access_token);
+        let result = decode_refresh_token(&ctx, &access_token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::InvalidToken));
     }
 
     #[test]
     fn test_refresh_token_used_as_access_token() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
 
-        let refresh_token = generate_refresh_token(&config, user_id).unwrap();
+        let refresh_token = generate_refresh_token(&ctx, user_id).unwrap();
 
         // Try to decode refresh token as access token - should fail
-        let result = decode_access_token(&config, &refresh_token);
+        let result = decode_access_token(&ctx, &refresh_token);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::InvalidToken));
     }
 
     #[test]
     fn test_decode_access_token_from_req_success() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
 
-        let token = generate_access_token(&config, user_id, username, None).unwrap();
+        let token = generate_access_token(&ctx, user_id, username, None).unwrap();
 
         let mut req = Request::new(Body::empty());
         req.headers_mut().insert(
@@ -379,24 +373,24 @@ mod tests {
             HeaderValue::from_str(&format!("Bearer {}", token)).unwrap()
         );
 
-        let claims = decode_access_token_from_req(&config, &req).unwrap();
+        let claims = decode_access_token_from_req(&ctx, &req).unwrap();
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.username, username);
     }
 
     #[test]
     fn test_decode_access_token_from_req_missing_header() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let req = Request::new(Body::empty());
 
-        let result = decode_access_token_from_req(&config, &req);
+        let result = decode_access_token_from_req(&ctx, &req);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::InvalidAuthorizationHeader));
     }
 
     #[test]
     fn test_decode_access_token_from_req_wrong_format() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let mut req = Request::new(Body::empty());
 
         // Missing "Bearer " prefix
@@ -405,36 +399,36 @@ mod tests {
             HeaderValue::from_str("some_token").unwrap()
         );
 
-        let result = decode_access_token_from_req(&config, &req);
+        let result = decode_access_token_from_req(&ctx, &req);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), JwtError::InvalidAuthorizationHeader));
     }
 
     #[test]
     fn test_token_response_creation() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let access_token = "access_token_string".to_string();
         let refresh_token = "refresh_token_string".to_string();
 
-        let response = TokenResponse::new(access_token.clone(), refresh_token.clone(), &config);
+        let response = TokenResponse::new(&ctx, access_token.clone(), refresh_token.clone());
 
         assert_eq!(response.access_token, access_token);
         assert_eq!(response.refresh_token, refresh_token);
-        assert_eq!(response.access_token_expires_in, config.access_token_expiry);
-        assert_eq!(response.refresh_token_expires_in, config.refresh_token_expiry);
+        assert_eq!(response.access_token_expires_in, ctx.access_token_expiry);
+        assert_eq!(response.refresh_token_expires_in, ctx.refresh_token_expiry);
     }
 
     #[test]
     fn test_different_tokens_have_different_jtis() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
 
-        let token1 = generate_access_token(&config, user_id, username, None).unwrap();
-        let token2 = generate_access_token(&config, user_id, username, None).unwrap();
+        let token1 = generate_access_token(&ctx, user_id, username, None).unwrap();
+        let token2 = generate_access_token(&ctx, user_id, username, None).unwrap();
 
-        let claims1 = decode_access_token(&config, &token1).unwrap();
-        let claims2 = decode_access_token(&config, &token2).unwrap();
+        let claims1 = decode_access_token(&ctx, &token1).unwrap();
+        let claims2 = decode_access_token(&ctx, &token2).unwrap();
 
         // JTIs should be different for different tokens
         assert_ne!(claims1.jti, claims2.jti);
@@ -442,19 +436,19 @@ mod tests {
 
     #[test]
     fn test_access_token_contains_correct_tenant_info() {
-        let config = create_test_config();
+        let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
 
         // Test with tenant
         let tenant_id = Some(456);
-        let token_with_tenant = generate_access_token(&config, user_id, username, tenant_id).unwrap();
-        let claims_with_tenant = decode_access_token(&config, &token_with_tenant).unwrap();
+        let token_with_tenant = generate_access_token(&ctx, user_id, username, tenant_id).unwrap();
+        let claims_with_tenant = decode_access_token(&ctx, &token_with_tenant).unwrap();
         assert_eq!(claims_with_tenant.tenant_id, tenant_id);
 
         // Test without tenant
-        let token_without_tenant = generate_access_token(&config, user_id, username, None).unwrap();
-        let claims_without_tenant = decode_access_token(&config, &token_without_tenant).unwrap();
+        let token_without_tenant = generate_access_token(&ctx, user_id, username, None).unwrap();
+        let claims_without_tenant = decode_access_token(&ctx, &token_without_tenant).unwrap();
         assert_eq!(claims_without_tenant.tenant_id, None);
     }
 }
