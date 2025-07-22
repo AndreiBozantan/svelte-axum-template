@@ -37,7 +37,7 @@ mod tests {
 
         // Create test user
         let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
-        let user = store::NewUser {
+        let user = db::NewUser {
             username: TEST_USERNAME.to_string(),
             password_hash: Some(password_hash),
             email: Some("test@example.com".to_string()),
@@ -47,7 +47,7 @@ mod tests {
         };
 
         let context = core::Context::new(db, config);
-        store::create_user(&context.db, user).await.unwrap();
+        db::create_user(&context.db, user).await.unwrap();
 
         let router = app::create_router(context.into());
         TestServer::new(router).unwrap()

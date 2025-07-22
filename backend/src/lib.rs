@@ -6,11 +6,11 @@
 pub mod core {
     mod config;
     mod context;
-    mod db;
+    mod dbpool;
 
     pub use config::*;
     pub use context::*;
-    pub use db::*;
+    pub use dbpool::*;
 }
 
 pub mod auth {
@@ -23,7 +23,7 @@ pub mod auth {
     pub use password::*;
 }
 
-pub mod store {
+pub mod db {
     mod users;
     mod tenants;
     mod refresh_tokens;

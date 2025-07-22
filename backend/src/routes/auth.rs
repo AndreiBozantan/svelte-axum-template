@@ -11,7 +11,7 @@ use sha2::Digest;
 
 use crate::auth;
 use crate::core;
-use crate::store;
+use crate::db;
 
 #[derive(Deserialize)]
 pub struct Login {
@@ -94,7 +94,7 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
-    let user = store::get_user_by_name(&context.db, &login.username).await?;
+    let user = db::get_user_by_name(&context.db, &login.username).await?;
     if !auth::verify_password(&login.password, user.password_hash)? {
         tracing::warn!("Invalid password for user: {}", login.username);
         return Err(AuthError::InvalidCredentials);
@@ -117,13 +117,13 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
     let token_hash = format!("{:x}", hasher.finalize());
-    let new_refresh_token = store::NewRefreshToken {
+    let new_refresh_token = db::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    store::create_refresh_token(&context.db, new_refresh_token).await?;
+    db::create_refresh_token(&context.db, new_refresh_token).await?;
 
     let token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
     Ok(Json(json!({
@@ -144,8 +144,8 @@ pub async fn logout(State(context): State<core::ArcContext>, req: Request<Body>)
 
     // revoke all the associated refresh tokens
     let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
-    if let Ok(db_user) = store::get_user_by_id(&context.db, user_id).await {
-        let _ = store::revoke_all_refresh_tokens_for_user(&context.db, db_user.id).await;
+    if let Ok(db_user) = db::get_user_by_id(&context.db, user_id).await {
+        let _ = db::revoke_all_refresh_tokens_for_user(&context.db, db_user.id).await;
     }
 
     Ok(Json(json!({"result": "ok"})))
@@ -160,7 +160,7 @@ pub async fn refresh_access_token(
 
     // Decode refresh token and check if it exists in database and is not revoked
     let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
-    let stored_token = store::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
+    let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
 
     // Verify token hash
     let mut hasher = sha2::Sha256::new();
@@ -171,7 +171,7 @@ pub async fn refresh_access_token(
     }
 
     // Generate new access token for the user
-    let user = store::get_user_by_id(&context.db, stored_token.user_id).await?;
+    let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
     let new_access_token = auth::generate_access_token(
         &context.config.jwt,
         user.id,
@@ -199,7 +199,7 @@ pub async fn revoke_token(State(context): State<core::ArcContext>, Json(request)
     let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
 
     // Revoke the token
-    store::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
+    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
     Ok(Json(json!({"result": "ok"})))
 }
 
@@ -223,7 +223,7 @@ pub async fn google_auth_callback(
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists
-    let existing_user = store::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
+    let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
     let user = match existing_user {
         Ok(user) => {
             tracing::info!("Existing SSO user found: {}", user.username);
@@ -231,7 +231,7 @@ pub async fn google_auth_callback(
         },
         Err(core::DbError::UserNotFound) => {
             tracing::info!("No existing user found, creating new user for: {}", user_info.email);
-            let new_user = store::NewUser {
+            let new_user = db::NewUser {
                 username: user_info.email.clone(), // Use email as username for SSO users
                 password_hash: None, // No password for SSO users
                 email: Some(user_info.email.clone()),
@@ -239,7 +239,7 @@ pub async fn google_auth_callback(
                 sso_provider: Some("google".to_string()),
                 sso_id: Some(user_info.id.clone()),
             };
-            let user = store::create_user(&context.db, new_user).await?;
+            let user = db::create_user(&context.db, new_user).await?;
             tracing::info!("Created new SSO user: {}", user.username);
             user
         },
@@ -267,13 +267,13 @@ pub async fn google_auth_callback(
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
     let token_hash = format!("{:x}", hasher.finalize());
-    let new_refresh_token = store::NewRefreshToken {
+    let new_refresh_token = db::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
         token_hash: token_hash,
         expires_at: expires_at.naive_utc(),
     };
-    store::create_refresh_token(&context.db, new_refresh_token).await?;
+    db::create_refresh_token(&context.db, new_refresh_token).await?;
 
     let jwt_token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
 
