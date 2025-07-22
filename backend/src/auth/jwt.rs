@@ -149,16 +149,16 @@ pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Re
 
 /// Validate and decode an access token
 pub fn decode_access_token(ctx: &core::JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
-    let token = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token.claims.token_type == TokenType::Access;
-    valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
+    let token_data = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
+    let valid = token_data.claims.token_type == TokenType::Access;
+    valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Validate and decode a refresh token
 pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
-    let token = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token.claims.token_type == TokenType::Refresh;
-    valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
+    let token_data = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
+    let valid = token_data.claims.token_type == TokenType::Refresh;
+    valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Maps jsonwebtoken errors to our custom JwtError type
