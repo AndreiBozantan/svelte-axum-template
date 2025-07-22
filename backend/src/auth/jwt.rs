@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use axum::http;
 use axum::extract::Request;
 use axum::response::IntoResponse;
@@ -115,10 +117,11 @@ impl TokenResponse {
     }
 }
 
+static JWT_HEADER: LazyLock<jwt::Header> = LazyLock::new(|| jwt::Header::new(jwt::Algorithm::HS256));
+
 /// Generate a new access token
 pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
-    let header = jwt::Header::new(jwt::Algorithm::HS256);
     let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
     let claims = AccessTokenClaims {
         sub: user_id.to_string(),
@@ -129,13 +132,12 @@ pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, 
         jti: Uuid::new_v4().to_string(),
         token_type: "access".to_string(),
     };
-    jwt::encode(&header, &claims, &encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
 
 /// Generate a new refresh token
 pub fn generate_refresh_token(config: &JwtConfig, user_id: i64) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
-    let header = jwt::Header::new(jwt::Algorithm::HS256);
     let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
     let claims = RefreshTokenClaims {
         sub: user_id.to_string(),
@@ -144,7 +146,7 @@ pub fn generate_refresh_token(config: &JwtConfig, user_id: i64) -> Result<String
         jti: Uuid::new_v4().to_string(),
         token_type: "refresh".to_string(),
     };
-    jwt::encode(&header, &claims, &encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
 
 pub fn decode_access_token_from_req(config: &JwtConfig, req: &Request) -> Result<AccessTokenClaims, JwtError> {
