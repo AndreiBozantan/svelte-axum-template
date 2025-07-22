@@ -94,18 +94,6 @@ pub struct TokenResponse {
     pub refresh_token_expires_in: i64, // Seconds until refresh token expires
 }
 
-trait ClaimsWithTokenType {
-    fn token_type(&self) -> &str;
-}
-
-impl ClaimsWithTokenType for AccessTokenClaims {
-    fn token_type(&self) -> &str { &self.token_type }
-}
-
-impl ClaimsWithTokenType for RefreshTokenClaims {
-    fn token_type(&self) -> &str { &self.token_type }
-}
-
 impl TokenResponse {
     pub fn new(ctx: &core::JwtContext, access_token: String, refresh_token: String) -> Self {
         Self {
@@ -168,21 +156,16 @@ pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Re
 
 /// Validate and decode an access token
 pub fn decode_access_token(ctx: &core::JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
-    decode_token::<AccessTokenClaims>(ctx, token, ACCESS_TOKEN_TYPE)
+    let token = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
+    let valid = token.claims.token_type == ACCESS_TOKEN_TYPE;
+    valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Validate and decode a refresh token
 pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
-    decode_token::<RefreshTokenClaims>(ctx, token, REFRESH_TOKEN_TYPE)
-}
-
-fn decode_token<T>(ctx: &core::JwtContext, token: &str, expected_token_type: &str) -> Result<T, JwtError>
-where T: serde::de::DeserializeOwned + ClaimsWithTokenType
-{
-    let token = jwt::decode::<T>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token.claims.token_type() == expected_token_type;
-    valid.then_some(()).ok_or(JwtError::InvalidToken)?;
-    Ok(token.claims)
+    let token = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
+    let valid = token.claims.token_type == REFRESH_TOKEN_TYPE;
+    valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Maps jsonwebtoken errors to our custom JwtError type
