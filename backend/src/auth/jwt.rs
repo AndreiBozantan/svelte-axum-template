@@ -53,14 +53,11 @@ impl IntoResponse for JwtError {
     }
 }
 
-/// Common claims shared by both token types
-#[derive(Debug, Deserialize, Serialize)]
-struct CommonClaims {
-    pub sub: String,        // Subject (user ID)
-    pub exp: i64,          // Expiration time
-    pub iat: i64,          // Issued at
-    pub jti: String,       // JWT ID (unique identifier)
-    pub token_type: String, // "access" or "refresh"
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum TokenType {
+    Access,
+    Refresh,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -71,7 +68,7 @@ pub struct AccessTokenClaims {
     pub exp: i64,          // Expiration time
     pub iat: i64,          // Issued at
     pub jti: String,       // JWT ID (unique identifier)
-    pub token_type: String, // "access"
+    pub token_type: TokenType, // "access"
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -80,7 +77,7 @@ pub struct RefreshTokenClaims {
     pub exp: i64,          // Expiration time
     pub iat: i64,          // Issued at
     pub jti: String,       // JWT ID (unique identifier)
-    pub token_type: String, // "refresh"
+    pub token_type: TokenType, // "refresh"
 }
 
 /// Response structure for token endpoints
@@ -103,9 +100,6 @@ impl TokenResponse {
     }
 }
 
-const REFRESH_TOKEN_TYPE: &str = "refresh";
-const ACCESS_TOKEN_TYPE: &str = "access";
-
 /// Generate a new access token
 pub fn generate_access_token(ctx: &core::JwtContext, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
@@ -117,7 +111,7 @@ pub fn generate_access_token(ctx: &core::JwtContext, user_id: i64, user_name: &s
         exp: now + ctx.access_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
-        token_type: ACCESS_TOKEN_TYPE.to_string(),
+        token_type: TokenType::Access,
     };
     jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
 }
@@ -131,7 +125,7 @@ pub fn generate_refresh_token(ctx: &core::JwtContext, user_id: i64) -> Result<St
         exp: now + ctx.refresh_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
-        token_type: REFRESH_TOKEN_TYPE.to_string(),
+        token_type: TokenType::Refresh,
     };
     jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
 }
@@ -156,14 +150,14 @@ pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Re
 /// Validate and decode an access token
 pub fn decode_access_token(ctx: &core::JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
     let token = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token.claims.token_type == ACCESS_TOKEN_TYPE;
+    let valid = token.claims.token_type == TokenType::Access;
     valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Validate and decode a refresh token
 pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
     let token = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token.claims.token_type == REFRESH_TOKEN_TYPE;
+    let valid = token.claims.token_type == TokenType::Refresh;
     valid.then_some(token.claims).ok_or(JwtError::InvalidToken)
 }
 
@@ -233,7 +227,7 @@ mod tests {
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.username, username);
         assert_eq!(claims.tenant_id, tenant_id);
-        assert_eq!(claims.token_type, ACCESS_TOKEN_TYPE);
+        assert_eq!(claims.token_type, TokenType::Access);
         assert!(claims.exp > claims.iat);
         assert!(!claims.jti.is_empty());
     }
@@ -247,7 +241,7 @@ mod tests {
         let claims = decode_refresh_token(&ctx, &token).unwrap();
 
         assert_eq!(claims.sub, user_id.to_string());
-        assert_eq!(claims.token_type, REFRESH_TOKEN_TYPE);
+        assert_eq!(claims.token_type, TokenType::Refresh);
         assert!(claims.exp > claims.iat);
         assert!(!claims.jti.is_empty());
     }
