@@ -4,7 +4,7 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
-use crate::core::OAuthConfig;
+use crate::core;
 
 // 🔒 Security Notes
 // OAuth tokens are temporarily passed via URL parameters (acceptable for localhost testing)
@@ -63,12 +63,12 @@ type GoogleOAuth2Client = oauth2::Client<
     oauth2::EndpointSet,    // HasTokenUrl
 >;
 
-fn validate_google_config(config: &OAuthConfig) -> Result<(), OAuthError> {
+fn validate_google_config(config: &core::OAuthConfig) -> Result<(), OAuthError> {
     let valid = !config.google_client_id.is_empty() && !config.google_client_secret.is_empty();
     valid.then_some(()).ok_or(OAuthError::InvalidConfig("Google OAuth not configured".to_string()))
 }
 
-fn create_google_client(config: &OAuthConfig) -> Result<GoogleOAuth2Client, OAuthError> {
+fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client, OAuthError> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
     let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap();
@@ -81,7 +81,7 @@ fn create_google_client(config: &OAuthConfig) -> Result<GoogleOAuth2Client, OAut
     Ok(client)
 }
 
-pub fn get_google_auth_url(config: &OAuthConfig) -> Result<(Url, oauth2::CsrfToken), OAuthError> {
+pub fn get_google_auth_url(config: &core::OAuthConfig) -> Result<(Url, oauth2::CsrfToken), OAuthError> {
     let client = create_google_client(config)?;
     // For server-side OAuth flow, we don't need PKCE
     let (auth_url, csrf_token) = client
@@ -93,18 +93,15 @@ pub fn get_google_auth_url(config: &OAuthConfig) -> Result<(Url, oauth2::CsrfTok
     Ok((auth_url, csrf_token))
 }
 
-pub async fn get_google_user_info(config: &OAuthConfig, code: &str) -> Result<GoogleUserInfo, OAuthError> {
-    let client = create_google_client(config)?;
-    let http_client = oauth2::reqwest::Client::builder() // Create HTTP client for OAuth2 requests with SSRF protection
-        .redirect(oauth2::reqwest::redirect::Policy::none())
-        .build()?;
+pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Result<GoogleUserInfo, OAuthError> {
+    let client = create_google_client(&context.config.oauth)?;
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-        .request_async(&http_client)
+        .request_async(&context.http_client)
         .await?;
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
     let user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo";
-    let user_info = http_client
+    let user_info = context.http_client
         .get(user_info_url)
         .bearer_auth(access_token)
         .send()
