@@ -118,6 +118,8 @@ impl TokenResponse {
 }
 
 static JWT_HEADER: LazyLock<jwt::Header> = LazyLock::new(|| jwt::Header::new(jwt::Algorithm::HS256));
+const REFRESH_TOKEN_TYPE: &str = "refresh";
+const ACCESS_TOKEN_TYPE: &str = "access";
 
 /// Generate a new access token
 pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
@@ -130,7 +132,7 @@ pub fn generate_access_token(config: &JwtConfig, user_id: i64, user_name: &str, 
         exp: now + config.access_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
-        token_type: "access".to_string(),
+        token_type: ACCESS_TOKEN_TYPE.to_string(),
     };
     jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
@@ -144,7 +146,7 @@ pub fn generate_refresh_token(config: &JwtConfig, user_id: i64) -> Result<String
         exp: now + config.refresh_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
-        token_type: "refresh".to_string(),
+        token_type: REFRESH_TOKEN_TYPE.to_string(),
     };
     jwt::encode(&JWT_HEADER, &claims, &encoding_key).map_err(JwtError::EncodingError)
 }
@@ -168,12 +170,12 @@ pub fn decode_access_token_from_req(config: &JwtConfig, req: &Request) -> Result
 
 /// Validate and decode an access token
 pub fn decode_access_token(config: &JwtConfig, token: &str) -> Result<AccessTokenClaims, JwtError> {
-    decode_token::<AccessTokenClaims>(token, config, "access")
+    decode_token::<AccessTokenClaims>(token, config, ACCESS_TOKEN_TYPE)
 }
 
 /// Validate and decode a refresh token
 pub fn decode_refresh_token(config: &JwtConfig, token: &str) -> Result<RefreshTokenClaims, JwtError> {
-    decode_token::<RefreshTokenClaims>(token, config, "refresh")
+    decode_token::<RefreshTokenClaims>(token, config, REFRESH_TOKEN_TYPE)
 }
 
 fn decode_token<T>(token: &str, config: &JwtConfig, expected_token_type: &str) -> Result<T, JwtError>
@@ -261,7 +263,7 @@ mod tests {
         assert_eq!(claims.sub, user_id.to_string());
         assert_eq!(claims.username, username);
         assert_eq!(claims.tenant_id, tenant_id);
-        assert_eq!(claims.token_type, "access");
+        assert_eq!(claims.token_type, ACCESS_TOKEN_TYPE);
         assert!(claims.exp > claims.iat);
         assert!(!claims.jti.is_empty());
     }
@@ -275,7 +277,7 @@ mod tests {
         let claims = decode_refresh_token(&config, &token).unwrap();
 
         assert_eq!(claims.sub, user_id.to_string());
-        assert_eq!(claims.token_type, "refresh");
+        assert_eq!(claims.token_type, REFRESH_TOKEN_TYPE);
         assert!(claims.exp > claims.iat);
         assert!(!claims.jti.is_empty());
     }
