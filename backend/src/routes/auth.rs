@@ -101,18 +101,11 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
     }
 
     // Generate JWT tokens with appropriate expiration
-    let access_token = auth::generate_access_token(
-        &context.config.jwt,
-        user.id,
-        &user.username,
-        user.tenant_id)?;
-
-    let refresh_token = auth::generate_refresh_token(
-        &context.config.jwt,
-        user.id)?;
+    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
+    let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
 
     // store refresh token in database
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)?;
+    let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
@@ -125,7 +118,7 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
+    let token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
     Ok(Json(json!({
         "result": "ok",
         "tokens": token_response,
@@ -139,7 +132,7 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
 
 /// Logout route
 pub async fn logout(State(context): State<core::ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
-    let claims = auth::decode_access_token_from_req(&context.config.jwt, &req)?;
+    let claims = auth::decode_access_token_from_req(&context.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
     // revoke all the associated refresh tokens
@@ -159,7 +152,7 @@ pub async fn refresh_access_token(
     tracing::info!("Refreshing access token");
 
     // Decode refresh token and check if it exists in database and is not revoked
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
+    let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
 
     // Verify token hash
@@ -172,12 +165,7 @@ pub async fn refresh_access_token(
 
     // Generate new access token for the user
     let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
-    let new_access_token = auth::generate_access_token(
-        &context.config.jwt,
-        user.id,
-        &user.username,
-        user.tenant_id,
-    )?;
+    let new_access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
 
     Ok(Json(json!({
         "result": "ok",
@@ -196,7 +184,7 @@ pub async fn revoke_token(State(context): State<core::ArcContext>, Json(request)
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &request.refresh_token)?;
+    let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
 
     // Revoke the token
     db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
@@ -252,17 +240,17 @@ pub async fn google_auth_callback(
     // TODO: move duplicate code (login function) to a common function
     // Generate JWT tokens for the user (same as regular login)
     let access_token = auth::generate_access_token(
-        &context.config.jwt,
+        &context.jwt,
         user.id,
         &user.username,
         user.tenant_id)?;
 
     let refresh_token = auth::generate_refresh_token(
-        &context.config.jwt,
+        &context.jwt,
         user.id)?;
 
     // Store refresh token in database
-    let refresh_claims = auth::decode_refresh_token(&context.config.jwt, &refresh_token)?;
+    let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
     let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(auth::JwtError::InvalidToken)?;
     let mut hasher = sha2::Sha256::new();
     hasher.update(&refresh_token);
@@ -275,7 +263,7 @@ pub async fn google_auth_callback(
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let jwt_token_response = auth::TokenResponse::new(access_token, refresh_token, &context.config.jwt);
+    let jwt_token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
 
     // For OAuth flow, redirect to frontend with success status
     // TODO: In production, consider a more secure approach like server-side session or secure cookies
