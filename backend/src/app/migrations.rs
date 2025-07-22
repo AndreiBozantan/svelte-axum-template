@@ -1,17 +1,17 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH, SystemTimeError as StdSystemTimeError};
+use std::time::{UNIX_EPOCH, SystemTime, SystemTimeError as StdSystemTimeError};
 
 use chrono::{Utc, Local, TimeZone};
 use sqlx::{Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
 use thiserror::Error;
 
 use crate::app;
-use crate::core::DbPoolType;
+use crate::core::DbContext;
 
 #[derive(Debug, Error)]
-pub enum DbMigrationError {
+pub enum MigrationError {
     #[error("Failed to run embedded migrations")]
     EmbeddedMigrationFailed { #[source] source: SqlxMigrateError },
 
@@ -45,7 +45,7 @@ fn migrations_path() -> &'static Path {
 }
 
 /// Runs all migrations from the filesystem migration path
-pub async fn run_migrations(db: &DbPoolType) -> Result<(), DbMigrationError> {
+pub async fn run_migrations(db: &DbContext) -> Result<(), MigrationError> {
     let migrations_path = migrations_path();
     if !migrations_path.exists() {
         tracing::warn!("Migrations directory not found at {:?}, falling back to embedded migrations", migrations_path);
@@ -53,30 +53,30 @@ pub async fn run_migrations(db: &DbPoolType) -> Result<(), DbMigrationError> {
         sqlx::migrate!()
             .run(db)
             .await
-            .map_err(|e| DbMigrationError::EmbeddedMigrationFailed { source: e })?;
+            .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
     } else {
         // Run migrations from the filesystem
         sqlx::migrate::Migrator::new(migrations_path)
             .await
-            .map_err(|e| DbMigrationError::MigratorCreationFailed { source: e })?
+            .map_err(|e| MigrationError::MigratorCreationFailed { source: e })?
             .run(db)
             .await
-            .map_err(|e| DbMigrationError::MigrationRunFailed { source: e })?;
+            .map_err(|e| MigrationError::MigrationRunFailed { source: e })?;
     }
     tracing::info!("Database migrations completed successfully");
     Ok(())
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &DbPoolType) -> Result<bool, DbMigrationError> {
+pub async fn check_pending_migrations(db: &DbContext) -> Result<bool, MigrationError> {
     // Get the list of applied migrations from the database
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)
         .await
         .map_err(|err| {
             match &err {
-                sqlx::Error::Database(db_err) if db_err.message().contains("no such table") => DbMigrationError::NoMigrationsApplied,
-                _ => DbMigrationError::FetchAppliedMigrationsFailed { source: err },
+                sqlx::Error::Database(db_err) if db_err.message().contains("no such table") => MigrationError::NoMigrationsApplied,
+                _ => MigrationError::FetchAppliedMigrationsFailed { source: err },
             }
         })?;
 
@@ -92,7 +92,7 @@ pub async fn check_pending_migrations(db: &DbPoolType) -> Result<bool, DbMigrati
 }
 
 /// Create a new migration file with the current timestamp
-pub fn create_migration(name: &str) -> Result<String, DbMigrationError> {
+pub fn create_migration(name: &str) -> Result<String, MigrationError> {
     let migrations_dir = Path::new(migrations_path());
 
     // Create migrations directory if it doesn't exist
@@ -102,12 +102,12 @@ pub fn create_migration(name: &str) -> Result<String, DbMigrationError> {
 
     // Generate a timestamp in the format YYYYMMDD_HHMMSS
     let seconds = SystemTime::now().duration_since(UNIX_EPOCH)
-        .map_err(|e| DbMigrationError::SystemTimeFailed { source: e })?
+        .map_err(|e| MigrationError::SystemTimeFailed { source: e })?
         .as_secs();
 
     // Properly convert seconds to DateTime<Utc>
     let now = Utc.timestamp_opt(seconds as i64, 0).single()
-        .ok_or(DbMigrationError::TimestampConversionFailed)?;
+        .ok_or(MigrationError::TimestampConversionFailed)?;
 
     let timestamp = now.format("%Y%m%d_%H%M%S").to_string();
     let filename = format!("{}_{}.sql", timestamp, name.replace(" ", "_").to_lowercase());
@@ -125,7 +125,7 @@ pub fn create_migration(name: &str) -> Result<String, DbMigrationError> {
 }
 
 /// List all available migrations
-pub fn list_migrations() -> Result<Vec<String>, DbMigrationError> {
+pub fn list_migrations() -> Result<Vec<String>, MigrationError> {
     let migrations_dir = Path::new(migrations_path());
 
     if !migrations_dir.exists() {

@@ -11,18 +11,18 @@ use crate::db;
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]
-    MigrationCreateFailed { #[source] source: app::DbMigrationError },
+    MigrationCreateFailed { #[source] source: app::MigrationError },
 
     #[error("Listing migrations failed")]
-    MigrationListFailed { #[source] source: app::DbMigrationError },
+    MigrationListFailed { #[source] source: app::MigrationError },
 
     // For the Status command, only actual errors from check_pending should be wrapped.
     // NoMigrationsApplied is handled as informational output.
     #[error("Checking migration status failed")]
-    MigrationStatusCheckFailed { #[source] source: app::DbMigrationError },
+    MigrationStatusCheckFailed { #[source] source: app::MigrationError },
 
     #[error("Running migrations failed")]
-    MigrationRunFailed { #[source] source: app::DbMigrationError },
+    MigrationRunFailed { #[source] source: app::MigrationError },
 
     // The Other(String) variant is kept as a fallback, though ideally all errors should be specific.
     #[error("An unexpected CLI error occurred: {0}")]
@@ -63,7 +63,7 @@ enum MigrateSubCommands {
     },
 }
 
-pub async fn run_migration_cli(db: &core::DbPoolType) -> Result<(), CliError> {
+pub async fn run_migration_cli(db: &core::DbContext) -> Result<(), CliError> {
     let args: Vec<String> = env::args().collect();
 
     // Only run if this is explicitly called with the right arguments
@@ -100,7 +100,7 @@ pub async fn run_migration_cli(db: &core::DbPoolType) -> Result<(), CliError> {
                 Ok(true) => println!("There are pending migrations that need to be applied."),
                 Ok(false) => println!("Database is up to date. No pending migrations."),
                 Err(e) => {
-                    if let app::DbMigrationError::NoMigrationsApplied = e {
+                    if let app::MigrationError::NoMigrationsApplied = e {
                         println!("No migrations have been applied yet.");
                     } else {
                         // Propagate other MigrationErrors
@@ -137,7 +137,7 @@ pub async fn run_migration_cli(db: &core::DbPoolType) -> Result<(), CliError> {
 }
 
 async fn create_admin_user(
-    db: &core::DbPoolType,
+    db: &core::DbContext,
     username: &str,
     password: &str,
     email: Option<&str>

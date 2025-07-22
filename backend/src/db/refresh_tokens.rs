@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::sqlite::SqliteQueryResult;
 
-use crate::core::{DbError, DbPoolType};
+use crate::core::{DbError, DbContext};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct RefreshToken {
@@ -25,7 +25,7 @@ pub struct NewRefreshToken {
     pub expires_at: NaiveDateTime,
 }
 
-pub async fn create_refresh_token(db: &DbPoolType, new_refresh_token: NewRefreshToken) -> Result<(), DbError> {
+pub async fn create_refresh_token(db: &DbContext, new_refresh_token: NewRefreshToken) -> Result<(), DbError> {
     sqlx::query!(
         r#"
         INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at)
@@ -41,7 +41,7 @@ pub async fn create_refresh_token(db: &DbPoolType, new_refresh_token: NewRefresh
     Ok(())
 }
 
-pub async fn revoke_refresh_token(db: &DbPoolType, jti: &str) -> Result<(), DbError> {
+pub async fn revoke_refresh_token(db: &DbContext, jti: &str) -> Result<(), DbError> {
     sqlx::query!(
         r#"
         UPDATE refresh_tokens
@@ -55,7 +55,7 @@ pub async fn revoke_refresh_token(db: &DbPoolType, jti: &str) -> Result<(), DbEr
     Ok(())
 }
 
-pub async fn get_refresh_token_by_jti(db: &DbPoolType, jti: &str) -> Result<RefreshToken, DbError> {
+pub async fn get_refresh_token_by_jti(db: &DbContext, jti: &str) -> Result<RefreshToken, DbError> {
     let token = sqlx::query_as!(
         RefreshToken,
         r#"
@@ -73,15 +73,11 @@ pub async fn get_refresh_token_by_jti(db: &DbPoolType, jti: &str) -> Result<Refr
         jti
     )
     .fetch_one(db)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::TokenNotFound,
-        _ => DbError::OperationFailed(e),
-    })?;
+    .await?;
     Ok(token)
 }
 
-pub async fn revoke_all_refresh_tokens_for_user(db: &DbPoolType, user_id: i64) -> Result<SqliteQueryResult, DbError> {
+pub async fn revoke_all_refresh_tokens_for_user(db: &DbContext, user_id: i64) -> Result<SqliteQueryResult, DbError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"
@@ -99,7 +95,7 @@ pub async fn revoke_all_refresh_tokens_for_user(db: &DbPoolType, user_id: i64) -
 
 /// Cleanup expired refresh tokens
 /// TODO: add a way to use this (e.g. scheduled task)
-async fn _cleanup_expired(db: &DbPoolType) -> Result<SqliteQueryResult, DbError> {
+async fn _cleanup_expired(db: &DbContext) -> Result<SqliteQueryResult, DbError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"

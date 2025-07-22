@@ -1,17 +1,10 @@
 use jsonwebtoken as jwt;
 use crate::core::config::Config;
 use crate::core::config::JwtConfig;
-use crate::core::dbpool::DbPoolType;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
-#[derive(Clone)]
-pub struct Context {
-    pub db: DbPoolType,
-    pub jwt: JwtContext,
-    pub config: Config,
-    pub http_client: reqwest::Client,
-}
+pub type DbContext = sqlx::SqlitePool;
 
 #[derive(Clone)]
 pub struct JwtContext {
@@ -22,8 +15,16 @@ pub struct JwtContext {
     pub refresh_token_expiry: i64,
 }
 
+#[derive(Clone)]
+pub struct Context {
+    pub db: DbContext,
+    pub jwt: JwtContext,
+    pub config: Config,
+    pub http_client: reqwest::Client,
+}
+
 impl Context {
-    pub fn new(db: DbPoolType, config: Config) -> Self {
+    pub fn new(db: DbContext, config: Config) -> Self {
         let jwt = JwtContext::new(&config.jwt);
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())

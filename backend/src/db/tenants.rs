@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::core::{DbError, DbPoolType};
+use crate::core::{DbError, DbContext};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Tenant {
@@ -19,7 +19,7 @@ pub struct NewTenant {
     pub description: Option<String>,
 }
 
-pub async fn get_tenant_by_id(db: &DbPoolType, id: i64) -> Result<Tenant, DbError> {
+pub async fn get_tenant_by_id(db: &DbContext, id: i64) -> Result<Tenant, DbError> {
     let tenant = sqlx::query_as!(
         Tenant,
         r#"
@@ -35,10 +35,6 @@ pub async fn get_tenant_by_id(db: &DbPoolType, id: i64) -> Result<Tenant, DbErro
         id
     )
     .fetch_one(db)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::TenantNotFound,
-        _ => DbError::OperationFailed(e),
-    })?;
+    .await?;
     Ok(tenant)
 }

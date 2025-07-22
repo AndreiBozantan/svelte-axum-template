@@ -56,8 +56,7 @@ pub enum AuthError {
 impl From<core::DbError> for AuthError {
     fn from(db_error: core::DbError) -> Self {
         match db_error {
-            core::DbError::UserNotFound => AuthError::InvalidCredentials,
-            core::DbError::TokenNotFound => AuthError::InvalidCredentials,
+            core::DbError::RowNotFound(_) => AuthError::InvalidCredentials,
             other => AuthError::DatabaseOperationFailed(other),
         }
     }
@@ -217,7 +216,7 @@ pub async fn google_auth_callback(
             tracing::info!("Existing SSO user found: {}", user.username);
             user
         },
-        Err(core::DbError::UserNotFound) => {
+        Err(core::DbError::RowNotFound(_)) => {
             tracing::info!("No existing user found, creating new user for: {}", user_info.email);
             let new_user = db::NewUser {
                 username: user_info.email.clone(), // Use email as username for SSO users

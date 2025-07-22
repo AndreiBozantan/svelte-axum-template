@@ -6,11 +6,11 @@
 pub mod core {
     mod config;
     mod context;
-    mod dbpool;
+    mod dberror;
 
     pub use config::*;
     pub use context::*;
-    pub use dbpool::*;
+    pub use dberror::*;
 }
 
 pub mod auth {
@@ -41,10 +41,12 @@ pub mod routes {
 }
 
 pub mod app {
+    mod app;
     mod cli;
     mod migrations;
     mod router;
 
+    pub use app::*;
     pub use cli::*;
     pub use migrations::*;
     pub use router::*;
