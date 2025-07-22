@@ -219,7 +219,7 @@ pub async fn google_auth_callback(
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Google OAuth callback received with state: {}", params.state);
-    let user_info = auth::get_google_user_info(&context.config.oauth, &params.code).await?;
+    let user_info = auth::get_google_user_info(&context, &params.code).await?;
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists
