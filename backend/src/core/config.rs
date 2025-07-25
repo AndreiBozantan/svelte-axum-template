@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{env, fs, path::Path};
 use config::{ConfigError, Environment, File};
 use serde::Deserialize;
 
@@ -26,7 +26,7 @@ pub struct DatabaseConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct JwtConfig {
     #[serde(default)]
-    pub secret: String,
+    pub secret: String, // TODO: should this be removed from here?
 
     #[serde(default)]
     pub access_token_expiry: i64,  // In seconds (e.g., 15 minutes = 900)
@@ -70,12 +70,24 @@ pub struct Config {
     pub oauth: OAuthConfig,
 }
 
+pub struct ConfigMetadata {
+    pub app_run_env: String,
+    pub config_dir: String,
+    pub server_address: String,
+    pub log_directives: String,
+}
+
+pub struct ConfigWithMetadata {
+    pub data: Config,
+    pub metadata: ConfigMetadata,
+}
+
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
             port: 3000,
-            log_directives: "svelte_axum_template=debug,tower_http=info".to_string(),
+            log_directives: "info,tower_http=info,axum=info".to_string(),
         }
     }
 }
@@ -120,17 +132,11 @@ impl Default for Config {
     }
 }
 
-impl Config {
+impl ConfigWithMetadata {
     pub fn new() -> Result<Self, ConfigError> {
         let mut builder = config::Config::builder();
-        let current_dir = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
-        let config_dir = match Path::new("backend").exists() {
-            true => "backend/config",
-            false => "config"
-        };
-
-        // print the current directory and config directory (tracing is not yet initialized)
-        println!("Loading application configuration from current directory: `{current_dir:?}` and config directory: `{config_dir}`");
+        let config_dir = Path::new("backend").exists().then_some("backend/config").unwrap_or("config");
+        let app_run_env = env::var("APP_RUN_ENV").unwrap_or("production".to_string());
 
         // Layer 1: Add default configuration from files
         let default_config_path = Path::new(config_dir).join("default.toml");
@@ -139,8 +145,7 @@ impl Config {
         }
 
         // Layer 2: Add environment-specific config
-        let env = std::env::var("RUN_ENV").unwrap_or_else(|_| "development".to_string());
-        let env_config_path = Path::new(config_dir).join(format!("{env}.toml"));
+        let env_config_path = Path::new(config_dir).join(format!("{app_run_env}.toml"));
         if env_config_path.exists() {
             builder = builder.add_source(File::with_name(&env_config_path.to_str().unwrap()));
         }
@@ -162,17 +167,29 @@ impl Config {
             .unwrap_or_default();
 
         // handle JWT secret initialization
+        // TODO: probably this should be moved to JwtContext
         config.jwt.secret = Self::ensure_jwt_secret()?;
 
+        let metadata = ConfigMetadata {
+            app_run_env: app_run_env.clone(),
+            config_dir: config_dir.to_string(),
+            server_address: format!("{}:{}", config.server.host, config.server.port),
+            log_directives: config.server.log_directives.clone(),
+        };
+
         // TODO: write config to file if it doesn't exist, so that it can be modified by users
-        // let config_file_path = Path::new(config_dir).join("config.toml");
-        // if !config_file_path.exists() {
-        //     fs::write(&config_file_path, toml::to_string(&config).unwrap())
+        // if !env_config_path.exists() {
+        //     fs::write(&env_config_path, toml::to_string(&config).unwrap())
         //         .map_err(|e| ConfigError::Message(format!("Failed to write config file: {}", e)))?;
-        //     println!("Created default config file at {}", config_file_path.display());
+        //     println!("Created default config file at {env_config_path:?}");
         // }
 
-        Ok(config)
+        let result = ConfigWithMetadata {
+            data: config,
+            metadata,
+        };
+
+        Ok(result)
     }
 
     fn ensure_jwt_secret() -> Result<String, ConfigError> {
@@ -219,7 +236,7 @@ impl Config {
                 .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {}", e)))?;
         }
 
-        println!("Generated new JWT secret and saved to {}", secret_file_path);
+        tracing::info!("Generated new JWT secret and saved to {}", secret_file_path);
         Ok(new_secret)
     }
 
