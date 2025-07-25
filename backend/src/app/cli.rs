@@ -155,8 +155,9 @@ async fn migrate_action_create_admin(
     let password = rpassword::read_password()
         .map_err(|e| CliError::Other(e.to_string()))?;
 
-    password.trim().is_empty().then(|| Option::<i32>::None)
-        .ok_or(CliError::Other("Password cannot be empty".to_string()))?;
+    password.trim().is_empty()
+        .then(|| CliError::Other("Password cannot be empty".to_string()))
+        .map_or(Ok(()), Err)?;
 
     // Check if user already exists; if found, return an error
     match db::get_user_by_name(&db, username).await {
