@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+// TODO: consider moving to the db module
+
 #[derive(Debug, Error)]
 pub enum DbError {
     #[error("Database connection error: {0}")]

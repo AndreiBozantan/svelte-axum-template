@@ -13,22 +13,22 @@ use crate::core::DbContext;
 #[derive(Debug, Error)]
 pub enum MigrationError {
     #[error("Failed to run embedded migrations")]
-    EmbeddedMigrationFailed { #[source] source: SqlxMigrateError },
+    EmbeddedMigrationFailed { source: SqlxMigrateError },
 
     #[error("Failed to create migrator")]
-    MigratorCreationFailed { #[source] source: SqlxMigrateError },
+    MigratorCreationFailed { source: SqlxMigrateError },
 
     #[error("Failed to run migrations")]
-    MigrationRunFailed { #[source] source: SqlxMigrateError },
+    MigrationRunFailed { source: SqlxMigrateError },
 
     #[error("Error getting system time")]
-    SystemTimeFailed { #[source] source: StdSystemTimeError },
+    SystemTimeFailed { source: StdSystemTimeError },
 
     #[error("Failed to create timestamp")]
     TimestampConversionFailed,
 
     #[error("Failed to fetch applied migrations")]
-    FetchAppliedMigrationsFailed { #[source] source: SqlxError },
+    FetchAppliedMigrationsFailed { source: SqlxError },
 
     #[error("No migrations applied yet")]
     NoMigrationsApplied,

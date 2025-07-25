@@ -1,9 +1,9 @@
 use jsonwebtoken as jwt;
-use crate::core::config::Config;
-use crate::core::config::JwtConfig;
+use crate::core::config::*;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
+// TODO: consider moving to db module
 pub type DbContext = sqlx::SqlitePool;
 
 #[derive(Clone)]

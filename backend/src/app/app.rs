@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::str::FromStr;
 use std::net::SocketAddr;
 use thiserror::Error;
@@ -11,7 +12,7 @@ use crate::app;
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("Configuration error: {0}")]
-    ConfigOperationFailed(#[from] config::ConfigError),
+    ConfigLoadingFailed(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
     DatabaseOperationFailed(#[from] core::DbError),
@@ -42,31 +43,57 @@ pub async fn create_db_context(db_config: &core::DatabaseConfig) -> Result<core:
     Ok(pool)
 }
 
-pub async fn run_app() -> Result<(), AppError> {
-    // start tracing - level set by either RUST_LOG env variable or defaults to debug
-    let config = core::Config::new()?;
+pub async fn run() -> () {
+    if let Err(e) = run_app().await {
+        eprintln!("❌ {e}");
+        eprintln!("");
+
+        let mut source = e.source();
+        while let Some(err) = source {
+            eprintln!("Caused by: {}", err);
+            source = err.source();
+        }
+
+        let backtrace = std::backtrace::Backtrace::capture();
+        eprintln!("{}", backtrace);
+
+        std::process::exit(1);
+    }
+}
+
+async fn run_app() -> Result<(), AppError> {
+    // TODO: use dot-env to load environment variables
+    // dotenvy::dotenv().ok();
+
+    let config = core::ConfigWithMetadata::new()?;
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.server.log_directives))
+        .with(tracing_subscriber::EnvFilter::new(&config.data.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     // initialize database and run CLI
-    let db = create_db_context(&config.database).await?;
-    app::run_migration_cli(&db).await?;
+    let db = create_db_context(&config.data.database).await?;
+    let context = core::Context::new(db, config.data).into();
+    app::run_cli(&context).await?;
 
-    // setup server
-    let addr: SocketAddr = format!("{h}:{p}", h = config.server.host, p = config.server.port).parse()?;
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    let context = core::Context::new(db, config);
+    let address = config.metadata.server_address.parse::<SocketAddr>()?;
+    let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context.into());
+    tracing::info!("🚀 starting server");
+    tracing::info!("   app_env: {}", config.metadata.app_run_env);
+    tracing::info!("   cfg_dir: {}", config.metadata.config_dir);
+    tracing::info!("   logging: {}", config.metadata.log_directives);
+    tracing::info!("   address: http://{}", config.metadata.server_address);
 
-    tracing::info!("🚀 listening on http://{addr}");
+    tracing::debug!("test debug log");
+
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
     Ok(())
 }
+
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.
 /// We use this in our `Server` method `with_graceful_shutdown`.
