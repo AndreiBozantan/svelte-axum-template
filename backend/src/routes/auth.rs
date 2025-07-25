@@ -1,13 +1,13 @@
+use axum::Json;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
-use axum::Json;
 use axum::response::IntoResponse;
 use chrono::DateTime;
 use serde::Deserialize;
 use serde_json::json;
-use thiserror::Error;
 use sha2::Digest;
+use thiserror::Error;
 
 use crate::auth;
 use crate::core;
@@ -89,7 +89,10 @@ impl IntoResponse for AuthError {
 }
 
 /// Login route
-pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Login>) -> Result<impl IntoResponse, AuthError> {
+pub async fn login(
+    State(context): State<core::ArcContext>,
+    Json(login): Json<Login>,
+) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Logging in user: {}", login.username);
 
     // Get user from database
@@ -130,7 +133,10 @@ pub async fn login(State(context): State<core::ArcContext>, Json(login): Json<Lo
 }
 
 /// Logout route
-pub async fn logout(State(context): State<core::ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
+pub async fn logout(
+    State(context): State<core::ArcContext>,
+    req: Request<Body>,
+) -> Result<impl IntoResponse, AuthError> {
     let claims = auth::decode_access_token_from_req(&context.jwt, &req)?;
     tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
 
@@ -146,7 +152,7 @@ pub async fn logout(State(context): State<core::ArcContext>, req: Request<Body>)
 /// Route to refresh access token using refresh token
 pub async fn refresh_access_token(
     State(context): State<core::ArcContext>,
-    Json(request): Json<RefreshTokenRequest>
+    Json(request): Json<RefreshTokenRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Refreshing access token");
 
@@ -179,7 +185,10 @@ pub async fn refresh_access_token(
 }
 
 /// Route to revoke a refresh token
-pub async fn revoke_token(State(context): State<core::ArcContext>, Json(request): Json<RevokeTokenRequest>) -> Result<impl IntoResponse, AuthError> {
+pub async fn revoke_token(
+    State(context): State<core::ArcContext>,
+    Json(request): Json<RevokeTokenRequest>,
+) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Revoking refresh token");
 
     // Decode refresh token to get JTI
@@ -215,12 +224,12 @@ pub async fn google_auth_callback(
         Ok(user) => {
             tracing::info!("Existing SSO user found: {}", user.username);
             user
-        },
+        }
         Err(core::DbError::RowNotFound(_)) => {
             tracing::info!("No existing user found, creating new user for: {}", user_info.email);
             let new_user = db::NewUser {
                 username: user_info.email.clone(), // Use email as username for SSO users
-                password_hash: None, // No password for SSO users
+                password_hash: None,               // No password for SSO users
                 email: Some(user_info.email.clone()),
                 tenant_id: None, // You might want to assign a default tenant
                 sso_provider: Some("google".to_string()),
@@ -229,7 +238,7 @@ pub async fn google_auth_callback(
             let user = db::create_user(&context.db, new_user).await?;
             tracing::info!("Created new SSO user: {}", user.username);
             user
-        },
+        }
         Err(e) => {
             tracing::error!("Failed to retrieve or create user: {}", e);
             return Err(AuthError::DatabaseOperationFailed(e));
@@ -238,15 +247,9 @@ pub async fn google_auth_callback(
 
     // TODO: move duplicate code (login function) to a common function
     // Generate JWT tokens for the user (same as regular login)
-    let access_token = auth::generate_access_token(
-        &context.jwt,
-        user.id,
-        &user.username,
-        user.tenant_id)?;
+    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
 
-    let refresh_token = auth::generate_refresh_token(
-        &context.jwt,
-        user.id)?;
+    let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
 
     // Store refresh token in database
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
@@ -268,8 +271,7 @@ pub async fn google_auth_callback(
     // TODO: In production, consider a more secure approach like server-side session or secure cookies
     let redirect_url = format!(
         "http://localhost:5173/login?oauth_success=true&access_token={}&refresh_token={}",
-        jwt_token_response.access_token,
-        jwt_token_response.refresh_token
+        jwt_token_response.access_token, jwt_token_response.refresh_token
     );
 
     Ok(axum::response::Redirect::to(&redirect_url))

@@ -1,6 +1,6 @@
-use std::{env, fs, path::Path};
 use config::{ConfigError, Environment, File};
 use serde::Deserialize;
+use std::{env, fs, path::Path};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ServerConfig {
@@ -29,7 +29,7 @@ pub struct JwtConfig {
     pub secret: String, // TODO: should this be removed from here?
 
     #[serde(default)]
-    pub access_token_expiry: i64,  // In seconds (e.g., 15 minutes = 900)
+    pub access_token_expiry: i64, // In seconds (e.g., 15 minutes = 900)
 
     #[serde(default)]
     pub refresh_token_expiry: i64, // In seconds (e.g., 7 days = 604800)
@@ -161,10 +161,7 @@ impl ConfigWithMetadata {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let mut config: Config = builder
-            .build()?
-            .try_deserialize()
-            .unwrap_or_default();
+        let mut config: Config = builder.build()?.try_deserialize().unwrap_or_default();
 
         // handle JWT secret initialization
         // TODO: probably this should be moved to JwtContext
@@ -184,12 +181,7 @@ impl ConfigWithMetadata {
         //     println!("Created default config file at {env_config_path:?}");
         // }
 
-        let result = ConfigWithMetadata {
-            data: config,
-            metadata,
-        };
-
-        Ok(result)
+        Ok(ConfigWithMetadata { data: config, metadata })
     }
 
     fn ensure_jwt_secret() -> Result<String, ConfigError> {
@@ -214,15 +206,13 @@ impl ConfigWithMetadata {
 
         // Create config directory if it doesn't exist
         if let Some(parent) = Path::new(secret_file_path).parent() {
-            fs::create_dir_all(parent).map_err(|e| {
-                ConfigError::Message(format!("Failed to create config directory: {}", e))
-            })?;
+            fs::create_dir_all(parent)
+                .map_err(|e| ConfigError::Message(format!("Failed to create config directory: {}", e)))?;
         }
 
         // Write the secret to file with restricted permissions
-        fs::write(secret_file_path, &new_secret).map_err(|e| {
-            ConfigError::Message(format!("Failed to write JWT secret to file: {}", e))
-        })?;
+        fs::write(secret_file_path, &new_secret)
+            .map_err(|e| ConfigError::Message(format!("Failed to write JWT secret to file: {}", e)))?;
 
         // Set file permissions to be readable only by owner (Unix-like systems)
         #[cfg(unix)]

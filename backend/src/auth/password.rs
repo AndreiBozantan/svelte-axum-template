@@ -1,14 +1,12 @@
 use argon2::Argon2;
-use argon2::password_hash::{Error, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use argon2::password_hash::rand_core::OsRng;
+use argon2::password_hash::{Error, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 
 /// Hash a password using Argon2
 pub fn hash_password(password: &str) -> Result<String, Error> {
     let salt = SaltString::generate(OsRng);
-    let password_hash = Argon2::default()
-        .hash_password(password.as_bytes(), &salt)?
-        .to_string();
-    Ok(password_hash)
+    let password_hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    Ok(password_hash.to_string())
 }
 
 /// Verify a password against a hash

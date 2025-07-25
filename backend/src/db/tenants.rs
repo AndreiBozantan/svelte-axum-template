@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::core::{DbError, DbContext};
+use crate::core::{DbContext, DbError};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Tenant {

@@ -1,12 +1,12 @@
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::error::Error;
-use std::str::FromStr;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use thiserror::Error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-use crate::core;
 use crate::app;
+use crate::core;
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -93,7 +93,6 @@ async fn run_app() -> Result<(), AppError> {
 
     Ok(())
 }
-
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.
 /// We use this in our `Server` method `with_graceful_shutdown`.

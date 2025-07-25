@@ -24,19 +24,19 @@ pub mod auth {
 }
 
 pub mod db {
-    mod users;
-    mod tenants;
     mod refresh_tokens;
+    mod tenants;
+    mod users;
 
-    pub use users::*;
-    pub use tenants::*;
     pub use refresh_tokens::*;
+    pub use tenants::*;
+    pub use users::*;
 }
 
 pub mod routes {
     pub mod api;
-    pub mod auth;
     pub mod assets;
+    pub mod auth;
     pub mod health;
 }
 
