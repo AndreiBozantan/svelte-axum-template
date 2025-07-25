@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::sqlite::SqliteQueryResult;
 
-use crate::core::{DbError, DbContext};
+use crate::core::{DbContext, DbError};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct RefreshToken {

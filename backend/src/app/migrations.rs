@@ -1,9 +1,9 @@
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
-use std::time::{UNIX_EPOCH, SystemTime, SystemTimeError as StdSystemTimeError};
+use std::time::{SystemTime, SystemTimeError as StdSystemTimeError, UNIX_EPOCH};
 
-use chrono::{Utc, Local, TimeZone};
+use chrono::{Local, TimeZone, Utc};
 use sqlx::{Error as SqlxError, migrate::MigrateError as SqlxMigrateError};
 use thiserror::Error;
 
@@ -40,7 +40,7 @@ pub enum MigrationError {
 fn migrations_path() -> &'static Path {
     match Path::new("backend").exists() {
         true => Path::new("backend/migrations"),
-        false => Path::new("migrations")
+        false => Path::new("migrations"),
     }
 }
 
@@ -48,7 +48,7 @@ fn migrations_path() -> &'static Path {
 pub async fn run_migrations(db: &DbContext) -> Result<(), MigrationError> {
     let migrations_path = migrations_path();
     if !migrations_path.exists() {
-        tracing::warn!("Migrations directory not found at {:?}, falling back to embedded migrations", migrations_path);
+        tracing::warn!("Migrations directory not found at {migrations_path:?}, falling back to embedded migrations");
         // Run migrations from embedded
         sqlx::migrate!()
             .run(db)
@@ -73,18 +73,17 @@ pub async fn check_pending_migrations(db: &DbContext) -> Result<bool, MigrationE
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)
         .await
-        .map_err(|err| {
-            match &err {
-                sqlx::Error::Database(db_err) if db_err.message().contains("no such table") => MigrationError::NoMigrationsApplied,
-                _ => MigrationError::FetchAppliedMigrationsFailed { source: err },
-            }
+        .map_err(|err| match &err {
+            sqlx::Error::Database(e) if e.message().contains("no such table") => MigrationError::NoMigrationsApplied,
+            _ => MigrationError::FetchAppliedMigrationsFailed { source: err },
         })?;
 
     // Get the list of available migrations
     let available_migrations = app::list_migrations()?;
 
     // Check if there are any migrations that haven't been applied
-    let applied_names: Vec<String> = applied_migrations.into_iter()
+    let applied_names: Vec<String> = applied_migrations
+        .into_iter()
         .map(|row| row.version.unwrap_or_default().to_string())
         .collect();
 

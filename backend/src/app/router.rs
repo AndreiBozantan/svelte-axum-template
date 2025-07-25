@@ -1,12 +1,12 @@
+use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::Request;
+use axum::middleware;
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::middleware;
 use axum::routing::get;
 use axum::routing::post;
-use axum::Router;
 use tower_http::trace::TraceLayer;
 
 use crate::auth;
@@ -56,7 +56,8 @@ async fn auth_middleware(
         username = claims.username,
         userid = claims.sub,
         exp = claims.exp,
-        "JWT validated");
+        "JWT validated"
+    );
 
     // Token is valid, proceed with the request
     Ok(next.run(req).await)

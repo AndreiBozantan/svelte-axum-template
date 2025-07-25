@@ -1,5 +1,5 @@
-use jsonwebtoken as jwt;
 use crate::core::config::{Config, JwtConfig};
+use jsonwebtoken as jwt;
 
 pub type ArcContext = std::sync::Arc<Context>;
 

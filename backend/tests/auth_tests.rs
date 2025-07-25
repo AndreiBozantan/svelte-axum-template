@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use axum::http::header;
     use axum::http::StatusCode;
+    use axum::http::header;
     use axum_test::TestServer;
-    use serde_json::json;
     use serde_json::Value;
+    use serde_json::json;
     use tokio;
 
     use svelte_axum_template::*;
@@ -324,10 +324,7 @@ mod tests {
     async fn test_malformed_json_login() {
         let server = create_test_server(default_config()).await;
 
-        let response = server
-            .post("/auth/login")
-            .text("not json")
-            .await;
+        let response = server.post("/auth/login").text("not json").await;
 
         response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }

@@ -1,13 +1,13 @@
-use axum::http;
-use axum::extract::Request;
-use axum::response::IntoResponse;
 use axum::Json;
+use axum::extract::Request;
+use axum::http;
+use axum::response::IntoResponse;
 use chrono::Utc;
 use jsonwebtoken as jwt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uuid::Uuid;
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::core;
 
@@ -62,21 +62,21 @@ pub enum TokenType {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AccessTokenClaims {
-    pub sub: String,        // Subject (user ID)
-    pub username: String,   // Username for convenience
+    pub sub: String,            // Subject (user ID)
+    pub username: String,       // Username for convenience
     pub tenant_id: Option<i64>, // Tenant ID if applicable
-    pub exp: i64,          // Expiration time
-    pub iat: i64,          // Issued at
-    pub jti: String,       // JWT ID (unique identifier)
-    pub token_type: TokenType, // "access"
+    pub exp: i64,               // Expiration time
+    pub iat: i64,               // Issued at
+    pub jti: String,            // JWT ID (unique identifier)
+    pub token_type: TokenType,  // "access"
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RefreshTokenClaims {
-    pub sub: String,        // Subject (user ID)
-    pub exp: i64,          // Expiration time
-    pub iat: i64,          // Issued at
-    pub jti: String,       // JWT ID (unique identifier)
+    pub sub: String,           // Subject (user ID)
+    pub exp: i64,              // Expiration time
+    pub iat: i64,              // Issued at
+    pub jti: String,           // JWT ID (unique identifier)
     pub token_type: TokenType, // "refresh"
 }
 
@@ -85,7 +85,7 @@ pub struct RefreshTokenClaims {
 pub struct TokenResponse {
     pub access_token: String,
     pub refresh_token: String,
-    pub access_token_expires_in: i64, // Seconds until access token expires
+    pub access_token_expires_in: i64,  // Seconds until access token expires
     pub refresh_token_expires_in: i64, // Seconds until refresh token expires
 }
 
@@ -101,7 +101,12 @@ impl TokenResponse {
 }
 
 /// Generate a new access token
-pub fn generate_access_token(ctx: &core::JwtContext, user_id: i64, user_name: &str, tenant_id: Option<i64>) -> Result<String, JwtError> {
+pub fn generate_access_token(
+    ctx: &core::JwtContext,
+    user_id: i64,
+    user_name: &str,
+    tenant_id: Option<i64>,
+) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
     let header = jwt::Header::new(jwt::Algorithm::HS256);
     let claims = AccessTokenClaims {
@@ -182,7 +187,7 @@ mod tests {
     fn create_test_context() -> core::JwtContext {
         let config = core::JwtConfig {
             secret: "test_secret_key_for_jwt_testing".to_string(),
-            access_token_expiry: 3600, // 1 hour
+            access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
         };
         core::JwtContext::new(&config)
@@ -250,7 +255,7 @@ mod tests {
     fn test_decode_access_token_wrong_secret() {
         let wrong_config = core::JwtConfig {
             secret: "wrong_secret".to_string(),
-            access_token_expiry: 3600, // 1 hour
+            access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
         };
         let wrong_ctx = core::JwtContext::new(&wrong_config);
@@ -287,10 +292,10 @@ mod tests {
     fn test_token_expiry() {
         let config = core::JwtConfig {
             secret: "test_secret_key_for_jwt_testing".to_string(),
-            access_token_expiry: 1, // 1 second
+            access_token_expiry: 1,  // 1 second
             refresh_token_expiry: 2, // 2 seconds
         };
-        let ctx =  core::JwtContext::new(&config);
+        let ctx = core::JwtContext::new(&config);
         let user_id = 123;
         let username = "test_user";
         let token = generate_access_token(&ctx, user_id, username, None).unwrap();
@@ -346,7 +351,7 @@ mod tests {
         let mut req = Request::new(Body::empty());
         req.headers_mut().insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap()
+            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
         );
 
         let claims = decode_access_token_from_req(&ctx, &req).unwrap();
@@ -372,7 +377,7 @@ mod tests {
         // Missing "Bearer " prefix
         req.headers_mut().insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_str("some_token").unwrap()
+            HeaderValue::from_str("some_token").unwrap(),
         );
 
         let result = decode_access_token_from_req(&ctx, &req);

@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-use crate::core::{DbError, DbContext};
+use crate::core::{DbContext, DbError};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
@@ -40,7 +40,8 @@ pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbEr
         new_user.email,
         new_user.tenant_id,
         new_user.sso_provider,
-        new_user.sso_id)
+        new_user.sso_id
+    )
     .fetch_one(db)
     .await
     .map_err(|e| DbError::OperationFailed(e))?;
@@ -110,7 +111,7 @@ pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str
             updated_at
         FROM users
         WHERE sso_provider = ? AND sso_id = ?
-        "#
+        "#,
     )
     .bind(sso_provider)
     .bind(sso_id)
