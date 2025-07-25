@@ -95,7 +95,7 @@ async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Re
         MigrateAction::List => migrate_action_list()?,
         MigrateAction::Status => migrate_action_status(db).await?,
         MigrateAction::Run => migrate_action_run(db).await?,
-        MigrateAction::CreateAdmin { username, email } => migrate_action_create_admin(username, email, db).await?
+        MigrateAction::CreateAdmin { username, email } => migrate_action_create_admin(username, email, db).await?,
     }
     std::process::exit(0); // Exit the process since this is a CLI command
 }
