@@ -1,5 +1,6 @@
 use std::io;
 use std::io::Write;
+
 use clap::{Parser, Subcommand};
 
 use crate::app;
@@ -57,7 +58,7 @@ enum CliCommand {
 #[derive(Subcommand)]
 enum MigrateAction {
     /// Create a new migration file
-    Create { name: String, },
+    Create { name: String },
 
     /// List all available migrations
     List,
@@ -82,25 +83,25 @@ enum MigrateAction {
 
 pub async fn run_cli(ctx: &core::Context) -> Result<(), CliError> {
     let cli = Cli::parse();
-    match &cli.command {
+    match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate{action}) => exec_migrate_command(&action, &ctx.db).await,
+        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &ctx.db).await,
     }
 }
 
-async fn exec_migrate_command(action: &MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
-    match &action {
+async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
+    match action {
         MigrateAction::Create { name } => migrate_action_create(name)?,
         MigrateAction::List => migrate_action_list()?,
         MigrateAction::Status => migrate_action_status(db).await?,
         MigrateAction::Run => migrate_action_run(db).await?,
-        MigrateAction::CreateAdmin { username, email } => migrate_action_create_admin(username, email.as_deref(), db).await?,
+        MigrateAction::CreateAdmin { username, email } => migrate_action_create_admin(username, email, db).await?
     }
     std::process::exit(0); // Exit the process since this is a CLI command
 }
 
-fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = app::create_migration(name)
+fn migrate_action_create(name: String) -> Result<(), CliError> {
+    let file_name = app::create_migration(&name)
         .map_err(|e| CliError::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
@@ -114,7 +115,7 @@ fn migrate_action_list() -> Result<(), CliError> {
     } else {
         println!("Available migrations:");
         for (i, migration) in migrations.iter().enumerate() {
-            println!("{}. {}", i + 1, migration);
+            println!("{i}. {migration}");
         }
     }
     Ok(())
@@ -144,8 +145,8 @@ async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
 }
 
 async fn migrate_action_create_admin(
-    username: &str,
-    email: Option<&str>,
+    username: String,
+    email: Option<String>,
     db: &core::DbContext,
 ) -> Result<(), CliError> {
     // Prompt for password securely
@@ -160,7 +161,7 @@ async fn migrate_action_create_admin(
         .map_or(Ok(()), Err)?;
 
     // Check if user already exists; if found, return an error
-    match db::get_user_by_name(&db, username).await {
+    match db::get_user_by_name(&db, &username).await {
         Err(core::DbError::RowNotFound(_)) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
@@ -169,9 +170,9 @@ async fn migrate_action_create_admin(
     let password_hash = auth::hash_password(&password)
         .map_err(|_| CliError::Other("Failed to hash password".to_string()))?;
     let new_user = db::NewUser {
-        username: username.to_string(),
+        username: username,
         password_hash: Some(password_hash),
-        email: email.map(|e| e.to_string()),
+        email: email,
         tenant_id: Some(1), // Default tenant
         sso_provider: None,
         sso_id: None,
@@ -180,6 +181,6 @@ async fn migrate_action_create_admin(
     db::create_user(&db, new_user).await
         .map_err(|e| CliError::Other(e.to_string()))?;
 
-    println!("Admin user '{}' created successfully!", username);
+    println!("Admin user created successfully.");
     Ok(())
 }
