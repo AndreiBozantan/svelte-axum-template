@@ -28,6 +28,9 @@ pub enum AppError {
 
     #[error("Server error: {0}")]
     ServerStartingFailed(#[from] std::io::Error),
+
+    #[error("Server error: {0}")]
+    HttpClientError(#[from] reqwest::Error),
 }
 
 pub async fn create_db_context(db_config: &core::DatabaseConfig) -> Result<core::DbContext, core::DbError> {
@@ -73,12 +76,12 @@ async fn run_app() -> Result<(), AppError> {
 
     // initialize database and run CLI
     let db = create_db_context(&config.data.database).await?;
-    let context = core::Context::new(db, config.data).into();
+    let context = core::Context::new(db, config.data)?;
     app::run_cli(&context).await?;
 
     let address = config.metadata.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
-    let router = app::create_router(context.into());
+    let router = app::create_router(context);
     tracing::info!("🚀 starting server");
     tracing::info!("   app_env: {}", config.metadata.app_run_env);
     tracing::info!("   cfg_dir: {}", config.metadata.config_dir);
