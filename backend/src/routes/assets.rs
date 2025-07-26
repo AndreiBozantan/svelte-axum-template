@@ -1,5 +1,3 @@
-use std::fmt::Write as _;
-
 use axum::body::Body;
 use axum::http;
 use axum::http::response::Builder as ResponseBuilder;
@@ -47,12 +45,8 @@ impl IntoResponse for AssetError {
 pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
-    let asset = Assets::get(path_str)
-        .or_else(|| {
-            tracing::info!("Falling back to index.html for path: {}", path_str);
-            Assets::get("index.html")
-        })
-        .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
+    let path_str = if Assets::get(path_str).is_none() { "index.html" } else { path_str };
+    let asset = Assets::get(path_str).ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
     let builder = match path_str {
         "index.html" => create_no_cache_response_builder(),
         _ => create_asset_response_builder(&asset, path_str),
