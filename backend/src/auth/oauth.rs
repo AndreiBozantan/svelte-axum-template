@@ -106,7 +106,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Res
         .bearer_auth(access_token)
         .send()
         .await
-        .map_err(|e| OAuthError::UserInfoRetrievalApiCallFailed(e))?
+        .map_err(OAuthError::UserInfoRetrievalApiCallFailed)?
         .json::<GoogleUserInfo>()
         .await?;
     Ok(user_info)

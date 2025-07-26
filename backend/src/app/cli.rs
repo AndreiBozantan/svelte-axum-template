@@ -81,11 +81,11 @@ enum MigrateAction {
     },
 }
 
-pub async fn run_cli(ctx: &core::ArcContext) -> Result<(), CliError> {
+pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &ctx.db).await,
+        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &db).await,
     }
 }
 
@@ -170,9 +170,9 @@ async fn migrate_action_create_admin(
     let password_hash = auth::hash_password(&password)
         .map_err(|_| CliError::Other("Failed to hash password".to_string()))?;
     let new_user = db::NewUser {
-        username: username,
+        username,
         password_hash: Some(password_hash),
-        email: email,
+        email,
         tenant_id: Some(1), // Default tenant
         sso_provider: None,
         sso_id: None,

@@ -26,17 +26,17 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(db: DbContext, config: Config) -> Self {
+    pub fn new(db: DbContext, config: Config) -> Result<ArcContext, reqwest::Error> {
         let jwt = JwtContext::new(&config.jwt);
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .expect("Failed to create HTTP client");
-        Self {db, jwt, config, http_client}
+            .build()?;
+        Ok(Self {db, jwt, config, http_client}.into())
     }
 }
 
 impl JwtContext {
+    #[must_use]
     pub fn new(config: &JwtConfig) -> Self {
         let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());

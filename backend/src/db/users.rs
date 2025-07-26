@@ -99,15 +99,15 @@ pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str
     let user = sqlx::query_as::<_, User>(
         r#"
         SELECT
-            id,
-            username,
+            id "id!",
+            username "username!",
             password_hash,
             email,
             tenant_id,
             sso_provider,
             sso_id,
-            created_at,
-            updated_at
+            created_at "created_at!",
+            updated_at "updated_at!"
         FROM users
         WHERE sso_provider = ? AND sso_id = ?
         "#,

@@ -1,11 +1,15 @@
+use std::fmt::Write as _;
+
 use axum::body::Body;
 use axum::http;
+use axum::http::response::Builder as ResponseBuilder;
 use axum::http::Uri;
 use axum::http::header;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::response::Result;
 use chrono::{TimeZone, Utc};
+use rust_embed::EmbeddedFile;
 use rust_embed::RustEmbed;
 use thiserror::Error;
 
@@ -33,56 +37,51 @@ impl IntoResponse for AssetError {
 
         let body = match self {
             Self::ResponseBuildError(_) => "Internal server error".to_string(),
-            Self::NotFound(path) => format!("Asset not found: {}", path),
+            Self::NotFound(path) => format!("Asset not found: {path}"),
         };
 
-        return (status, body).into_response();
+        (status, body).into_response()
     }
 }
 
 pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
-    let mut path_str = uri.path().trim_start_matches('/');
-    if path_str.is_empty() {
-        path_str = "index.html";
+    let path_str = uri.path().trim_start_matches('/');
+    let path_str = if path_str.is_empty() { "index.html" } else { path_str };
+    let asset = Assets::get(path_str)
+        .or_else(|| {
+            tracing::info!("Falling back to index.html for path: {}", path_str);
+            Assets::get("index.html")
+        })
+        .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
+    let builder = match path_str {
+        "index.html" => create_no_cache_response_builder(),
+        _ => create_asset_response_builder(&asset, path_str),
+    };
+    Ok(builder.body(Body::from(asset.data.to_vec()))?)
+}
+
+fn create_no_cache_response_builder() -> ResponseBuilder {
+    Response::builder()
+        .header(header::CONTENT_TYPE, "text/html")
+        .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+}
+
+fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBuilder {
+    let mime_type = mime_guess::from_path(path).first_or_octet_stream();
+    let etag = hex::encode(asset.metadata.sha256_hash());
+    let builder = Response::builder()
+        .header(header::CONTENT_TYPE, mime_type.as_ref())
+        .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+        .header(header::ETAG, etag);
+    match get_asset_last_modified_date(asset) {
+        Some(last_modified) => builder.header(header::LAST_MODIFIED, last_modified),
+        None => builder,
     }
+}
 
-    let asset = Assets::get(path_str);
-    if asset.is_none() {
-        let asset = Assets::get("index.html");
-        if asset.is_none() {
-            // Critical error: requested asset not found, AND index.html (SPA fallback) is also missing.
-            return Err(AssetError::NotFound(path_str.to_string()));
-        }
-
-        let index_content = asset.unwrap(); // index.html found
-        let response = Response::builder()
-            .header(header::CONTENT_TYPE, "text/html")
-            .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-            .body(Body::from(index_content.data.to_vec()))?;
-
-        return Ok(response);
-    }
-
-    let content = asset.unwrap(); // Asset found directly
-    let mime_type = mime_guess::from_path(path_str).first_or_octet_stream();
-    let mut builder = Response::builder().header(header::CONTENT_TYPE, mime_type.as_ref());
-
-    if path_str == "index.html" {
-        builder = builder.header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate");
-    } else {
-        // Aggressive caching for other assets
-        builder = builder.header(header::CACHE_CONTROL, "public, max-age=31536000, immutable"); // 1 year
-
-        let hash_bytes = content.metadata.sha256_hash();
-        let hex_hash: String = hash_bytes.iter().map(|b| format!("{:02x}", b)).collect();
-        let etag = format!("\"{}\"", hex_hash);
-        builder = builder.header(header::ETAG, etag);
-
-        if let Some(last_modified_ts) = content.metadata.last_modified() {
-            if let Some(dt) = Utc.timestamp_opt(last_modified_ts as i64, 0).single() {
-                builder = builder.header(header::LAST_MODIFIED, dt.to_rfc2822());
-            }
-        }
-    }
-    return Ok(builder.body(Body::from(content.data.to_vec()))?);
+#[allow(clippy::cast_possible_wrap)] // the timestamp will be in the range of i64 for quite some time
+fn get_asset_last_modified_date(asset: &EmbeddedFile) -> Option<String> {
+    asset.metadata.last_modified()
+        .and_then(|ts| Utc.timestamp_opt(ts as i64, 0).single())
+        .map(|dt| dt.to_rfc2822())
 }

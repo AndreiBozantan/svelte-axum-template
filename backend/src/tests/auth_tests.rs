@@ -47,10 +47,10 @@ async fn create_test_server(config: core::Config) -> TestServer {
         sso_id: None,
     };
 
-    let context = core::Context::new(db, config);
+    let context = core::Context::new(db, config).unwrap();
     db::create_user(&context.db, user).await.unwrap();
 
-    let router = app::create_router(context.into());
+    let router = app::create_router(context);
     TestServer::new(router).unwrap()
 }
 
