@@ -14,7 +14,7 @@ use crate::core;
 use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
-pub fn create_router(context: core::ArcContext) -> Router {
+pub fn create_router(context: &core::ArcContext) -> Router {
     // Create API routes that need AppState and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))

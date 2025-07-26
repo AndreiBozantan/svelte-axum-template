@@ -64,35 +64,33 @@ pub async fn run() {
 }
 
 async fn run_app() -> Result<(), AppError> {
-    // TODO: use dot-env to load environment variables
-    // dotenvy::dotenv().ok();
-
+    // TODO: use dot-env to load environment variables dotenvy::dotenv().ok();
     let config = core::ConfigWithMetadata::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&config.data.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // initialize database and run CLI
+    // initialize database, handle CLI commands, and start server
     let db = create_db_context(&config.data.database).await?;
     let context = core::Context::new(db, config.data)?;
     app::run_cli(&context).await?;
+    start_server(&context, &config.metadata).await?;
+    Ok(())
+}
 
-    let address = config.metadata.server_address.parse::<SocketAddr>()?;
+async fn start_server(context: &core::ArcContext, config: &core::ConfigMetadata) -> Result<(), AppError> {
+    let address = config.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context);
     tracing::info!("🚀 starting server");
-    tracing::info!("   app_env: {}", config.metadata.app_run_env);
-    tracing::info!("   cfg_dir: {}", config.metadata.config_dir);
-    tracing::info!("   logging: {}", config.metadata.log_directives);
-    tracing::info!("   address: http://{}", config.metadata.server_address);
-
-    tracing::debug!("test debug log");
-
+    tracing::info!("   app_env: {}", config.app_run_env);
+    tracing::info!("   cfg_dir: {}", config.config_dir);
+    tracing::info!("   logging: {}", config.log_directives);
+    tracing::info!("   address: http://{}", config.server_address);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
-
     Ok(())
 }
 
