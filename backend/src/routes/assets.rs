@@ -68,7 +68,7 @@ fn create_no_cache_response_builder() -> ResponseBuilder {
 
 fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBuilder {
     let mime_type = mime_guess::from_path(path).first_or_octet_stream();
-    let etag = get_asset_etag(asset);
+    let etag = hex::encode(asset.metadata.sha256_hash());
     let builder = Response::builder()
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
@@ -79,16 +79,9 @@ fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBu
     }
 }
 
-#[allow(clippy::cast_possible_wrap, reason = "the timestamp will be in the range of i64 for quite some time")]
+#[allow(clippy::cast_possible_wrap)] // the timestamp will be in the range of i64 for quite some time
 fn get_asset_last_modified_date(asset: &EmbeddedFile) -> Option<String> {
     asset.metadata.last_modified()
         .and_then(|ts| Utc.timestamp_opt(ts as i64, 0).single())
         .map(|dt| dt.to_rfc2822())
-}
-
-fn get_asset_etag(asset: &EmbeddedFile) -> String {
-    let hash_bytes = asset.metadata.sha256_hash();
-    let hex_hash = hash_bytes.iter().fold(String::with_capacity(hash_bytes.len() * 2),
-        |mut acc, b| { let _ = write!(acc, "{b:02x}"); acc });
-    format!(r#""{hex_hash}""#)
 }
