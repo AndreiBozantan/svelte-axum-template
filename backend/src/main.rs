@@ -11,8 +11,7 @@ async fn main() {
 }
 
 #[cfg(test)]
-mod tests
-{
+mod tests {
     mod auth_tests;
 }
 

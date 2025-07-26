@@ -4,13 +4,14 @@ use axum_test::TestServer;
 use serde_json::Value;
 use serde_json::json;
 
-const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
-const TEST_USERNAME: &str = "test_user";
-
 use crate::app;
 use crate::auth;
 use crate::core;
 use crate::db;
+
+const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
+const TEST_USERNAME: &str = "test_user";
+
 
 fn default_config() -> core::Config {
     core::Config {
