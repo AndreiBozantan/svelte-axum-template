@@ -134,24 +134,26 @@ impl Default for Config {
 
 impl ConfigWithMetadata {
     pub fn new() -> Result<Self, ConfigError> {
-        let mut builder = config::Config::builder();
+        // allows to do a cargo run in the backend directory also
         let config_dir = Path::new("backend").exists().then_some("backend/config").unwrap_or("config");
+        let config_path = Path::new(config_dir);
         let app_run_env = env::var("APP_RUN_ENV").unwrap_or("production".to_string());
+        let mut builder = config::Config::builder();
 
         // Layer 1: Add default configuration from files
-        let default_config_path = Path::new(config_dir).join("default.toml");
+        let default_config_path = config_path.join("default.toml");
         if default_config_path.exists() {
             builder = builder.add_source(File::with_name(default_config_path.to_str().unwrap()));
         }
 
         // Layer 2: Add environment-specific config
-        let env_config_path = Path::new(config_dir).join(format!("{app_run_env}.toml"));
+        let env_config_path = config_path.join(format!("{app_run_env}.toml"));
         if env_config_path.exists() {
             builder = builder.add_source(File::with_name(&env_config_path.to_str().unwrap()));
         }
 
         // Layer 3: Add local config overrides
-        let local_config_path = Path::new(config_dir).join("local.toml");
+        let local_config_path = config_path.join("local.toml");
         if local_config_path.exists() {
             builder = builder.add_source(File::with_name(local_config_path.to_str().unwrap()));
         }
@@ -165,7 +167,7 @@ impl ConfigWithMetadata {
 
         // handle JWT secret initialization
         // TODO: probably this should be moved to JwtContext
-        config.jwt.secret = Self::ensure_jwt_secret()?;
+        config.jwt.secret = Self::ensure_jwt_secret(config_path)?;
 
         let metadata = ConfigMetadata {
             app_run_env: app_run_env.clone(),
@@ -181,10 +183,10 @@ impl ConfigWithMetadata {
         //     println!("Created default config file at {env_config_path:?}");
         // }
 
-        Ok(ConfigWithMetadata { data: config, metadata })
+        Ok(Self { data: config, metadata })
     }
 
-    fn ensure_jwt_secret() -> Result<String, ConfigError> {
+    fn ensure_jwt_secret(config_path: &Path) -> Result<String, ConfigError> {
         // Priority 1: Check environment variable
         if let Ok(env_secret) = std::env::var("APP_JWT_SECRET") {
             if !env_secret.is_empty() && env_secret.len() >= 32 {
@@ -193,8 +195,8 @@ impl ConfigWithMetadata {
         }
 
         // Priority 2: Check persisted secret file
-        let secret_file_path = "./config/.jwt_secret";
-        if let Ok(file_secret) = fs::read_to_string(secret_file_path) {
+        let secret_file_path = config_path.join(".jwt_secret");
+        if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
             let trimmed_secret = file_secret.trim();
             if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
                 return Ok(trimmed_secret.to_string());
@@ -205,28 +207,28 @@ impl ConfigWithMetadata {
         let new_secret = Self::generate_secure_secret();
 
         // Create config directory if it doesn't exist
-        if let Some(parent) = Path::new(secret_file_path).parent() {
+        if let Some(parent) = &secret_file_path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| ConfigError::Message(format!("Failed to create config directory: {}", e)))?;
         }
 
         // Write the secret to file with restricted permissions
-        fs::write(secret_file_path, &new_secret)
+        fs::write(&secret_file_path, &new_secret)
             .map_err(|e| ConfigError::Message(format!("Failed to write JWT secret to file: {}", e)))?;
 
         // Set file permissions to be readable only by owner (Unix-like systems)
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(secret_file_path)
+            let mut perms = fs::metadata(&secret_file_path)
                 .map_err(|e| ConfigError::Message(format!("Failed to get file metadata: {}", e)))?
                 .permissions();
             perms.set_mode(0o600); // rw-------
-            fs::set_permissions(secret_file_path, perms)
+            fs::set_permissions(&secret_file_path, perms)
                 .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {}", e)))?;
         }
 
-        tracing::info!("Generated new JWT secret and saved to {}", secret_file_path);
+        tracing::info!("Generated new JWT secret and saved to {}", secret_file_path.to_string_lossy());
         Ok(new_secret)
     }
 
