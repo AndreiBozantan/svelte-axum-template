@@ -74,12 +74,12 @@ async fn run_app() -> Result<(), AppError> {
     // initialize database, handle CLI commands, and start server
     let db = create_db_context(&config.data.database).await?;
     let context = core::Context::new(db, config.data)?;
-    app::run_cli(&context).await?;
-    start_server(&context, &config.metadata).await?;
+    app::run_cli(&context.db).await?;
+    start_server(context, &config.metadata).await?;
     Ok(())
 }
 
-async fn start_server(context: &core::ArcContext, config: &core::ConfigMetadata) -> Result<(), AppError> {
+async fn start_server(context: core::ArcContext, config: &core::ConfigMetadata) -> Result<(), AppError> {
     let address = config.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context);

@@ -81,11 +81,11 @@ enum MigrateAction {
     },
 }
 
-pub async fn run_cli(ctx: &core::ArcContext) -> Result<(), CliError> {
+pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &ctx.db).await,
+        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &db).await,
     }
 }
 
