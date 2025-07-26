@@ -36,6 +36,7 @@ impl Context {
 }
 
 impl JwtContext {
+    #[must_use]
     pub fn new(config: &JwtConfig) -> Self {
         let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());
