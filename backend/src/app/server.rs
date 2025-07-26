@@ -46,19 +46,18 @@ pub async fn create_db_context(db_config: &core::DatabaseConfig) -> Result<core:
     Ok(pool)
 }
 
-pub async fn run() -> () {
+pub async fn run() {
     if let Err(e) = run_app().await {
-        eprintln!("❌ {e}");
-        eprintln!("");
+        eprintln!("❌ {e}\n");
 
         let mut source = e.source();
         while let Some(err) = source {
-            eprintln!("Caused by: {}", err);
+            eprintln!("Caused by: {err}");
             source = err.source();
         }
 
         let backtrace = std::backtrace::Backtrace::capture();
-        eprintln!("{}", backtrace);
+        eprintln!("{backtrace}");
 
         std::process::exit(1);
     }
