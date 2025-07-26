@@ -3,8 +3,10 @@ use jsonwebtoken as jwt;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
-// TODO: consider moving to db module
 pub type DbContext = sqlx::SqlitePool;
+
+pub type DbError = sqlx::Error;
+
 
 #[derive(Clone)]
 pub struct JwtContext {

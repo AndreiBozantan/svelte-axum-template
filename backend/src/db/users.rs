@@ -43,8 +43,7 @@ pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbEr
         new_user.sso_id
     )
     .fetch_one(db)
-    .await
-    .map_err(|e| DbError::OperationFailed(e))?;
+    .await?;
     Ok(user)
 }
 

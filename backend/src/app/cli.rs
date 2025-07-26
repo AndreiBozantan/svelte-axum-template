@@ -81,7 +81,7 @@ enum MigrateAction {
     },
 }
 
-pub async fn run_cli(ctx: &core::Context) -> Result<(), CliError> {
+pub async fn run_cli(ctx: &core::ArcContext) -> Result<(), CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
@@ -162,7 +162,7 @@ async fn migrate_action_create_admin(
 
     // Check if user already exists; if found, return an error
     match db::get_user_by_name(&db, &username).await {
-        Err(core::DbError::RowNotFound(_)) => Ok(()),
+        Err(core::DbError::RowNotFound) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
     }?;
@@ -178,7 +178,8 @@ async fn migrate_action_create_admin(
         sso_id: None,
     };
 
-    db::create_user(&db, new_user).await
+    db::create_user(&db, new_user)
+        .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 
     println!("Admin user created successfully.");
