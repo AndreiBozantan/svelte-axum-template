@@ -42,7 +42,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
 
 /// Middleware function to authenticate JWT tokens.
 /// If the token is valid, it allows the request to proceed.
-/// If the token is invalid or missing, it returns a JwtError.
+/// If the token is invalid or missing, it returns a `JwtError`.
 async fn auth_middleware(
     State(context): State<core::ArcContext>,
     req: Request<Body>,
