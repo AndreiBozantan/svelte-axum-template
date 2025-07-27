@@ -21,5 +21,3 @@ impl Default for OAuthSettings {
         }
     }
 }
-
-

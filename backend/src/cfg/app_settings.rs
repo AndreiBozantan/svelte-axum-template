@@ -9,7 +9,6 @@ use crate::cfg;
 // TODO: write config to file if it doesn't exist, so that it can be modified by users
 // TODO: update default_config.toml to include all settings
 
-
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
@@ -80,7 +79,10 @@ impl AppSettings {
     pub fn get_metadata(&self) -> AppSettingsMetadata {
         let config_dir = Self::get_config_dir();
         let config_path = Path::new(&config_dir);
-        let config_dir = config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string());
+        let config_dir = config_path
+            .canonicalize()
+            .ok()
+            .map_or(config_dir, |p| p.to_string_lossy().to_string());
         AppSettingsMetadata {
             app_run_env: Self::get_app_run_env(),
             config_dir,
