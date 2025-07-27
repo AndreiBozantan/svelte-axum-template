@@ -70,9 +70,10 @@ enum MigrateAction {
     Run,
 }
 
+#[allow(clippy::unit_arg)]
 pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
     let cli = Cli::parse();
-    match cli.command { #[allow(clippy::unit_arg)]
+    match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
         Some(CliCommand::Migrate { action }) => exec_migrate_command(action, db).await,
         Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await

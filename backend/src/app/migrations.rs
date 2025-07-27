@@ -35,7 +35,8 @@ pub enum MigrationError {
 }
 
 /// List all available migrations
-pub fn list_migrations() -> Vec<String> { #![must_use]
+#[must_use]
+pub fn list_migrations() -> Vec<String> {
     sqlx::migrate!("../migrations")
         .iter()
         .map(|m| m.description.to_string())
