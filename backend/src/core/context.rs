@@ -1,5 +1,6 @@
-use crate::core::config::{Config, JwtConfig};
 use jsonwebtoken as jwt;
+
+use crate::cfg;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
@@ -20,12 +21,12 @@ pub struct JwtContext {
 pub struct Context {
     pub db: DbContext,
     pub jwt: JwtContext,
-    pub config: Config,
+    pub config: cfg::AppSettings,
     pub http_client: reqwest::Client,
 }
 
 impl Context {
-    pub fn new(db: DbContext, config: Config) -> Result<ArcContext, reqwest::Error> {
+    pub fn new(db: DbContext, config: cfg::AppSettings) -> Result<ArcContext, reqwest::Error> {
         let jwt = JwtContext::new(&config.jwt);
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
@@ -42,7 +43,7 @@ impl Context {
 
 impl JwtContext {
     #[must_use]
-    pub fn new(config: &JwtConfig) -> Self {
+    pub fn new(config: &cfg::JwtSettings) -> Self {
         let encoding_key = jwt::EncodingKey::from_secret(config.secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(config.secret.as_ref());
         let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);

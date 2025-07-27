@@ -94,7 +94,7 @@ pub async fn revoke_all_refresh_tokens_for_user(db: &DbContext, user_id: i64) ->
 }
 
 /// Cleanup expired refresh tokens
-/// TODO: add a way to use this (e.g. scheduled task)
+/// TODO: add a way to use this (e.g. command in CLI and scheduled task in server or a background task)
 async fn _cleanup_expired(db: &DbContext) -> Result<SqliteQueryResult, DbError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(

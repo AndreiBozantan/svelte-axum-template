@@ -8,6 +8,9 @@ use crate::auth;
 use crate::core;
 use crate::db;
 
+// TODO: add support for secret rotation (should mark all tokens as invalid)
+// TODO: add support for expired tokens cleanup
+
 #[rustfmt::skip]
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
@@ -41,7 +44,6 @@ pub struct Cli {
     command: Option<CliCommand>,
 }
 
-// TODO: add support for secret rotation (should mark all tokens as invalid)
 #[derive(Subcommand)]
 enum CliCommand {
     /// Run database migrations
