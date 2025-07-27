@@ -74,6 +74,7 @@ async fn run_app() -> Result<(), AppError> {
     // initialize database, handle CLI commands, and start server
     let db = create_db_context(&config.data.database).await?;
     let context = core::Context::new(db, config.data)?;
+    app::run_migrations(&context.db).await?;
     app::run_cli(&context.db).await?;
     start_server(context, &config.metadata).await?;
     Ok(())
@@ -83,11 +84,11 @@ async fn start_server(context: core::ArcContext, config: &core::ConfigMetadata) 
     let address = config.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context);
-    tracing::info!("🚀 starting server");
-    tracing::info!("   app_env: {}", config.app_run_env);
-    tracing::info!("   cfg_dir: {}", config.config_dir);
-    tracing::info!("   logging: {}", config.log_directives);
-    tracing::info!("   address: http://{}", config.server_address);
+    tracing::info!("starting server... 🚀 ");
+    tracing::info!("app_env: {}", config.app_run_env);
+    tracing::info!("cfg_dir: {}", config.config_dir);
+    tracing::info!("logging: {}", config.log_directives);
+    tracing::info!("address: http://{}", config.server_address);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

@@ -30,51 +30,43 @@ Work in progress (new features coming), but should be usable as a starting point
 
 By default, the backend will be available at `http://localhost:3000` and the frontend at `http://localhost:5173`.
 
-In dev mode, the vite config is set to proxy the backend requests to the backend server.
+In dev mode, the vite config is set to proxy the backend API requests to the backend server, so you can access the API at `http://localhost:5173/`.
 
 
 # Build the release version
-Execute `npm run build` in the project root folder, to build the frontend and backend in release mode. The npm script will build the frontend before the backend, as the static files are embedded in the backend binary.
+Execute `npm run build` in the project root folder, to build the frontend and backend in release mode. The npm script will build the frontend **before** the backend, as the frontend static files are embedded in the backend binary.
 
-Optionally, you can execute `npm run clean` before the build, to remove all previous build artifacts, including the node_modules folders, so that the build starts from a clean state.
+Optionally, you can execute `npm run clean` before the build, to remove all previous build artifacts, including the `node_modules` folders, so that the build starts from a clean state.
 After running the clean command, you have to run `npm run dev:init` once, to reinitialize the project before running in dev mode.
 
 
 # Backend - Rust Axum
 - located in `./backend`
-- serves front end directory
+- serves front end assets that are embedded in the binary during the build
 - middleware for checking authorization header
-- middleware for checking session that user exists
-- store example that holds token secret for authorization
 - /api route example using authorization header
-- /secure route example using sessions for authorization
+- /secure route example using JWT for authorization
 
-Run `cargo run` from inside the `./backend` folder to start the backend server.
+Run `cargo run` from inside the repo root folder to start the backend server independently from the frontend.
 
 ## Backend Configuration
-The backend can be configured using TOML files in the `./backend/config` directory:
+The backend can be configured using TOML files in the `./config` directory:
 - `default.toml` - Default configuration
 - `development.toml` - Development-specific overrides
 - `production.toml` - Production configuration example
 
 ### Database Migration Control
-By default, the application automatically runs database migrations on startup. This can be controlled via the `run_db_migrations_on_startup ` setting:
+You can run the database migrations by using the `migrate` command in the backend.
+It will run all pending migrations from the `migrations` directory, or the embedded migrations if the directory does not exist.
 
-```toml
-[database]
-url = "sqlite:db.sqlite"
-max_connections = 5
-run_db_migrations_on_startup  = true  # Set to false to disable automatic migrations
-```
-
-**For Development**: Keep `run_db_migrations_on_startup  = true` for convenience.
-
-**For Production**: Set `run_db_migrations_on_startup  = false` and run migrations manually:
 ```bash
-./your-app migrate run
+./your-app migrate run # run this in production
 ```
-
-This provides better control over database schema changes in production environments.
+or
+```bash
+cargo sqlx migrate run # run this in development
+```
+When deploying to production, do not copy the migrations directory to the production server. You should use the embedded migrations instead, which are included in the binary.
 
 # Frontend - Svelte
 - Located in `./frontend`

@@ -13,9 +13,6 @@ pub enum CliError {
     #[error("Migration creation failed")]
     MigrationCreateFailed { source: app::MigrationError },
 
-    #[error("Listing migrations failed")]
-    MigrationListFailed { source: app::MigrationError },
-
     // For the Status command, only actual errors from check_pending should be wrapped.
     // NoMigrationsApplied is handled as informational output.
     #[error("Checking migration status failed")]
@@ -33,14 +30,6 @@ pub enum CliError {
 #[command(name = "migrate")]
 #[command(about = "Database migration utility", long_about = None)]
 pub struct Cli {
-    /// Environment to run the application in, e.g., 'development', 'production'
-    #[arg(long)]
-    pub env: Option<String>,
-
-    /// Log directives for the server, e.g., 'debug,tower_http=info,axum=info'
-    #[arg(long)]
-    pub log: Option<String>,
-
     #[command(subcommand)]
     command: Option<CliCommand>,
 }
@@ -52,6 +41,17 @@ enum CliCommand {
     Migrate {
         #[command(subcommand)]
         action: MigrateAction,
+    },
+
+    /// Create an admin user
+    CreateAdmin {
+        /// Username for the admin user
+        #[arg(short, long)]
+        username: String,
+
+        /// Email for the admin user (optional)
+        #[arg(short, long)]
+        email: Option<String>,
     },
 }
 
@@ -68,48 +68,36 @@ enum MigrateAction {
 
     /// Run all pending migrations
     Run,
-
-    /// Create an admin user
-    CreateAdmin {
-        /// Username for the admin user
-        #[arg(short, long)]
-        username: String,
-
-        /// Email for the admin user (optional)
-        #[arg(short, long)]
-        email: Option<String>,
-    },
 }
 
 pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
     let cli = Cli::parse();
-    match cli.command {
+    match cli.command { #[allow(clippy::unit_arg)]
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, &db).await,
+        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, db).await,
+        Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await
     }
 }
 
 async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
     match action {
-        MigrateAction::Create { name } => migrate_action_create(name)?,
-        MigrateAction::List => migrate_action_list()?,
+        MigrateAction::Create { name } => migrate_action_create(&name)?,
+        MigrateAction::List => migrate_action_list(),
         MigrateAction::Status => migrate_action_status(db).await?,
         MigrateAction::Run => migrate_action_run(db).await?,
-        MigrateAction::CreateAdmin { username, email } => migrate_action_create_admin(username, email, db).await?,
     }
     std::process::exit(0); // Exit the process since this is a CLI command
 }
 
-fn migrate_action_create(name: String) -> Result<(), CliError> {
-    let file_name = app::create_migration(&name)
+fn migrate_action_create(name: &str) -> Result<(), CliError> {
+    let file_name = app::create_migration(name)
         .map_err(|e| CliError::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
 
-fn migrate_action_list() -> Result<(), CliError> {
-    let migrations = app::list_migrations()
-        .map_err(|e| CliError::MigrationListFailed { source: e })?;
+fn migrate_action_list() {
+    let migrations = app::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
     } else {
@@ -118,39 +106,32 @@ fn migrate_action_list() -> Result<(), CliError> {
             println!("{i}. {migration}");
         }
     }
-    Ok(())
 }
 
 async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
-    match app::check_pending_migrations(&db).await {
+    match app::check_pending_migrations(db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
-        Err(e) => {
-            if let app::MigrationError::NoMigrationsApplied = e {
-                println!("No migrations have been applied yet.");
-            } else {
-                // Propagate other MigrationErrors
-                return Err(CliError::MigrationStatusCheckFailed { source: e });
-            }
-        }
+        Err(app::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
+        Err(e) => return Err(CliError::MigrationStatusCheckFailed { source: e }),
     }
     Ok(())
 }
 
 async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
-    app::run_migrations(&db).await
+    app::run_migrations(db).await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn migrate_action_create_admin(
+async fn create_admin(
     username: String,
     email: Option<String>,
     db: &core::DbContext,
 ) -> Result<(), CliError> {
     // Prompt for password securely
-    print!("Enter password for admin user '{}': ", username);
+    print!("Enter password for admin user '{username}': ");
     io::stdout().flush().unwrap();
 
     let password = rpassword::read_password()
@@ -161,7 +142,7 @@ async fn migrate_action_create_admin(
         .map_or(Ok(()), Err)?;
 
     // Check if user already exists; if found, return an error
-    match db::get_user_by_name(&db, &username).await {
+    match db::get_user_by_name(db, &username).await {
         Err(core::DbError::RowNotFound) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
@@ -178,7 +159,7 @@ async fn migrate_action_create_admin(
         sso_id: None,
     };
 
-    db::create_user(&db, new_user)
+    db::create_user(db, new_user)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 
