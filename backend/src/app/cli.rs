@@ -8,6 +8,7 @@ use crate::auth;
 use crate::core;
 use crate::db;
 
+#[rustfmt::skip]
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]

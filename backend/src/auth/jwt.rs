@@ -36,7 +36,7 @@ impl IntoResponse for JwtError {
             error_subtype = %std::any::type_name_of_val(&self),
             error_message = %self);
 
-        // rustfmt::skip::next
+        #[rustfmt::skip]
         let (status, error_message) = match self {
             Self::EncodingError(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::DecodingError(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
