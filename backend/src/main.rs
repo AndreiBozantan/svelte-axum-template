@@ -32,8 +32,10 @@ pub mod cfg {
 
 pub mod core {
     mod context;
+    mod dbtypes;
 
     pub use context::*;
+    pub use dbtypes::*;
 }
 
 pub mod auth {

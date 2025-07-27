@@ -1,12 +1,9 @@
 use jsonwebtoken as jwt;
 
 use crate::cfg;
+use crate::core;
 
 pub type ArcContext = std::sync::Arc<Context>;
-
-pub type DbContext = sqlx::SqlitePool;
-
-pub type DbError = sqlx::Error;
 
 #[derive(Clone)]
 pub struct JwtContext {
@@ -19,14 +16,14 @@ pub struct JwtContext {
 
 #[derive(Clone)]
 pub struct Context {
-    pub db: DbContext,
-    pub jwt: JwtContext,
+    pub db: core::DbContext,
+    pub jwt: core::JwtContext,
     pub config: cfg::AppSettings,
     pub http_client: reqwest::Client,
 }
 
 impl Context {
-    pub fn new(db: DbContext, config: cfg::AppSettings) -> Result<ArcContext, reqwest::Error> {
+    pub fn new(db: core::DbContext, config: cfg::AppSettings) -> Result<ArcContext, reqwest::Error> {
         let jwt = JwtContext::new(&config.jwt);
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
