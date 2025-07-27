@@ -2793,6 +2793,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "dotenvy",
  "hex",
  "jsonwebtoken",
  "md5",
