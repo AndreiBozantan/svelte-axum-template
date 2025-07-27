@@ -65,7 +65,6 @@ pub async fn run() {
 }
 
 async fn run_app() -> Result<(), AppError> {
-    // TODO: use dot-env to load environment variables dotenvy::dotenv().ok();
     let settings = cfg::AppSettings::new()?;
     let metadata = settings.get_metadata();
     tracing_subscriber::registry()

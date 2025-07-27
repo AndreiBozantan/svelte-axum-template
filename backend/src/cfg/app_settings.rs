@@ -4,6 +4,12 @@ use std::{env, fs, path::Path};
 
 use crate::cfg;
 
+// TODO: use dot-env to load environment variables dotenvy::dotenv().ok();
+// TODO: move jwt secret generation to JwtContext
+// TODO: write config to file if it doesn't exist, so that it can be modified by users
+// TODO: update default_config.toml to include all settings
+
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
@@ -59,10 +65,8 @@ impl AppSettings {
         let mut settings = builder.build()?.try_deserialize::<Self>()?;
 
         // handle JWT secret initialization
-        // TODO: probably this should be moved to JwtContext
         settings.jwt.secret = Self::ensure_jwt_secret(config_path)?;
 
-        // TODO: write config to file if it doesn't exist, so that it can be modified by users
         // if !env_config_path.exists() {
         //     fs::write(&env_config_path, toml::to_string(&config).unwrap())
         //         .map_err(|e| ConfigError::Message(format!("Failed to write config file: {}", e)))?;
