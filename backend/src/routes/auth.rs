@@ -112,9 +112,9 @@ pub async fn login(
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
     let token_hash = get_token_hash_as_hex(&refresh_token);
     let new_refresh_token = db::NewRefreshToken {
-        token_hash,
-        user_id: user.id,
         jti: refresh_claims.jti,
+        user_id: user.id,
+        token_hash,
         expires_at: expires_at.naive_utc(),
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
@@ -179,12 +179,6 @@ pub async fn refresh_access_token(
             "tenant_id": user.tenant_id
         }
     })))
-}
-
-fn get_token_hash_as_hex(token: &str) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(token);
-    format!("{:x}", hasher.finalize())
 }
 
 /// Route to revoke a refresh token
@@ -257,9 +251,9 @@ pub async fn google_auth_callback(
     let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(auth::JwtError::InvalidToken)?;
     let token_hash = get_token_hash_as_hex(&refresh_token);
     let new_refresh_token = db::NewRefreshToken {
-        token_hash,
-        user_id: user.id,
         jti: refresh_claims.jti,
+        user_id: user.id,
+        token_hash,
         expires_at: expires_at.naive_utc(),
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
@@ -274,4 +268,10 @@ pub async fn google_auth_callback(
     );
 
     Ok(axum::response::Redirect::to(&redirect_url))
+}
+
+fn get_token_hash_as_hex(token: &str) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(token);
+    format!("{:x}", hasher.finalize())
 }
