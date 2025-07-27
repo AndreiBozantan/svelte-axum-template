@@ -15,7 +15,7 @@ use crate::core;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
-pub enum OAuthError {
+pub enum Error {
     #[error("OAuth2 request failed: {0}")]
     OAuth2RequestFailed(#[from] oauth2::RequestTokenError<oauth2::HttpClientError<oauth2::reqwest::Error>, oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>>),
 
@@ -64,14 +64,14 @@ type GoogleOAuth2Client = oauth2::Client<
     oauth2::EndpointSet,    // HasTokenUrl
 >;
 
-fn validate_google_config(config: &core::OAuthConfig) -> Result<(), OAuthError> {
+fn validate_google_config(config: &core::OAuthConfig) -> Result<(), Error> {
     let valid = !config.google_client_id.is_empty() && !config.google_client_secret.is_empty();
     valid
         .then_some(())
-        .ok_or(OAuthError::InvalidConfig("Google OAuth not configured".to_string()))
+        .ok_or(Error::InvalidConfig("Google OAuth not configured".to_string()))
 }
 
-fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client, OAuthError> {
+fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
     let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap();
@@ -84,7 +84,7 @@ fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client
     Ok(client)
 }
 
-pub fn get_google_auth_url(config: &core::OAuthConfig) -> Result<(Url, oauth2::CsrfToken), OAuthError> {
+pub fn get_google_auth_url(config: &core::OAuthConfig) -> Result<(Url, oauth2::CsrfToken), Error> {
     let client = create_google_client(config)?;
     // For server-side OAuth flow, we don't need PKCE
     let (auth_url, csrf_token) = client
@@ -96,7 +96,7 @@ pub fn get_google_auth_url(config: &core::OAuthConfig) -> Result<(Url, oauth2::C
     Ok((auth_url, csrf_token))
 }
 
-pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Result<GoogleUserInfo, OAuthError> {
+pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Result<GoogleUserInfo, Error> {
     let client = create_google_client(&context.config.oauth)?;
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
@@ -110,7 +110,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Res
         .bearer_auth(access_token)
         .send()
         .await
-        .map_err(OAuthError::UserInfoRetrievalApiCallFailed)?
+        .map_err(Error::UserInfoRetrievalApiCallFailed)?
         .json::<GoogleUserInfo>()
         .await?;
     Ok(user_info)
