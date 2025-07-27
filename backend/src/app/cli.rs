@@ -21,6 +21,12 @@ pub enum CliError {
     #[error("Running migrations failed")]
     MigrationRunFailed { source: app::MigrationError },
 
+    #[error("Password hashing failed")]
+    PasswordHashFailed { #[from] source: argon2::password_hash::Error },
+
+    #[error("Failed to read password input")]
+    PasswordReadFailed { #[from] source: std::io::Error },
+
     // The Other(String) variant is kept as a fallback, though ideally all errors should be specific.
     #[error("An unexpected CLI error occurred: {0}")]
     Other(String),
@@ -91,8 +97,7 @@ async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Re
 }
 
 fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = app::create_migration(name)
-        .map_err(|e| CliError::MigrationCreateFailed { source: e })?;
+    let file_name = app::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
@@ -132,8 +137,7 @@ async fn create_admin(username: String, email: Option<String>, db: &core::DbCont
     print!("Enter password for admin user '{username}': ");
     io::stdout().flush().unwrap();
 
-    let password = rpassword::read_password().map_err(|e| CliError::Other(e.to_string()))?;
-
+    let password = rpassword::read_password()?;
     password
         .trim()
         .is_empty()
@@ -147,8 +151,7 @@ async fn create_admin(username: String, email: Option<String>, db: &core::DbCont
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
     }?;
 
-    let password_hash = auth::hash_password(&password)
-        .map_err(|_| CliError::Other("Failed to hash password".to_string()))?;
+    let password_hash = auth::hash_password(&password)?;
     let new_user = db::NewUser {
         username,
         password_hash: Some(password_hash),

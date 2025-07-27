@@ -45,14 +45,6 @@ pub struct OAuthConfig {
 
     #[serde(default)]
     pub google_redirect_uri: String,
-
-    // Future providers can be added here
-    // #[serde(default)]
-    // pub github_client_id: String,
-    // #[serde(default)]
-    // pub github_client_secret: String,
-    // #[serde(default)]
-    // pub github_redirect_uri: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

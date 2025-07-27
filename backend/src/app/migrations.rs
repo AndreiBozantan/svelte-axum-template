@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::app;
 use crate::core::DbContext;
 
+#[rustfmt::skip]
 #[derive(Debug, Error)]
 pub enum MigrationError {
     #[error("Failed to run embedded migrations")]
@@ -24,11 +25,11 @@ pub enum MigrationError {
     #[error("Failed to create timestamp")]
     TimestampConversionFailed,
 
-    #[error("Failed to fetch applied migrations")]
-    FetchAppliedMigrationsFailed { #[from] source: SqlxError },
-
     #[error("No migrations applied yet")]
     NoMigrationsApplied,
+
+    #[error("Failed to fetch applied migrations")]
+    FetchAppliedMigrationsFailed { #[from] source: SqlxError },
 
     #[error("File system error")]
     FileSystemOperationFailed { #[from] source: std::io::Error },

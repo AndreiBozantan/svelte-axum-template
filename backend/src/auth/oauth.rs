@@ -13,6 +13,7 @@ use crate::core;
 // TODO: check if oauth without PKCE is acceptable for server-side OAuth flow
 // TODO: check if any sensitive info is exposed in the logs
 
+#[rustfmt::skip]
 #[derive(Debug, Error)]
 pub enum OAuthError {
     #[error("OAuth2 request failed: {0}")]
@@ -65,7 +66,9 @@ type GoogleOAuth2Client = oauth2::Client<
 
 fn validate_google_config(config: &core::OAuthConfig) -> Result<(), OAuthError> {
     let valid = !config.google_client_id.is_empty() && !config.google_client_secret.is_empty();
-    valid.then_some(()).ok_or(OAuthError::InvalidConfig("Google OAuth not configured".to_string()))
+    valid
+        .then_some(())
+        .ok_or(OAuthError::InvalidConfig("Google OAuth not configured".to_string()))
 }
 
 fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client, OAuthError> {
