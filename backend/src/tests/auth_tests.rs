@@ -16,14 +16,12 @@ const TEST_USERNAME: &str = "test_user";
 fn default_config() -> cfg::AppSettings {
     cfg::AppSettings {
         jwt: cfg::JwtSettings {
-            secret: "test_secret_key_for_testing_only".to_string(),
             access_token_expiry: 3600,
             refresh_token_expiry: 86400,
         },
         ..Default::default()
     }
 }
-
 async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     let mut config = config.clone();
 
@@ -47,7 +45,14 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
         sso_id: None,
     };
 
-    let context = core::Context::new(db, config).unwrap();
+    let jwt_secret = "test__secret__key__for__jwt__testing";
+    let jwt = auth::JwtContext::new(&config.jwt, jwt_secret).unwrap();
+    let http_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .expect("Failed to create HTTP client");
+
+    let context = core::Context::new(db, jwt, http_client, config);
     db::create_user(&context.db, user).await.unwrap();
 
     let router = app::create_router(context);
@@ -281,7 +286,6 @@ async fn test_access_token_expiry() {
     // Create config with very short token expiry
     let config = cfg::AppSettings {
         jwt: cfg::JwtSettings {
-            secret: "test_secret_key_for_testing_only".to_string(),
             access_token_expiry: 1, // 1 second
             refresh_token_expiry: 86400,
         },

@@ -1,23 +1,34 @@
+use std::fs;
+
 use axum::Json;
 use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
 use chrono::Utc;
 use jsonwebtoken as jwt;
+use rand::TryRngCore;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::core;
+use crate::cfg;
+
+type TryRngError = <rand::rngs::OsRng as rand::TryRngCore>::Error;
 
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Failed to encode JWT token")]
-    EncodingError(jwt::errors::Error),
+    EncodingFailed(jwt::errors::Error),
 
     #[error("Failed to decode JWT token")]
-    DecodingError(jwt::errors::Error),
+    DecodingFailed(jwt::errors::Error),
+
+    #[error("File system operation failed")]
+    FileSystemOperationFailed{ #[from] source: std::io::Error },
+
+    #[error("Random number generation operation failed")]
+    RngOperationFailed{ source: TryRngError },
 
     #[error("Token has expired")]
     TokenExpired,
@@ -37,9 +48,12 @@ impl IntoResponse for JwtError {
             error_message = %self);
 
         #[rustfmt::skip]
+        #[allow(clippy::match_same_arms)]
         let (status, error_message) = match self {
-            Self::EncodingError(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DecodingError(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
+            Self::RngOperationFailed { source: _ } => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::FileSystemOperationFailed { source: _ } => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::EncodingFailed(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::DecodingFailed(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
             Self::TokenExpired => (http::StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
             Self::InvalidToken => (http::StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
             Self::InvalidAuthorizationHeader => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authorization header".to_string()),
@@ -92,7 +106,7 @@ pub struct TokenResponse {
 
 impl TokenResponse {
     #[must_use]
-    pub const fn new(ctx: &core::JwtContext, access_token: String, refresh_token: String) -> Self {
+    pub const fn new(ctx: &JwtContext, access_token: String, refresh_token: String) -> Self {
         Self {
             access_token,
             refresh_token,
@@ -102,9 +116,36 @@ impl TokenResponse {
     }
 }
 
+#[derive(Clone)]
+pub struct JwtContext {
+    pub encoding_key: jwt::EncodingKey,
+    pub decoding_key: jwt::DecodingKey,
+    pub validation: jwt::Validation,
+    pub access_token_expiry: i64,
+    pub refresh_token_expiry: i64,
+}
+
+impl JwtContext {
+    pub fn new(settings: &cfg::JwtSettings, secret: &str) -> Result<Self, JwtError> {
+        let encoding_key = jwt::EncodingKey::from_secret(secret.as_ref());
+        let decoding_key = jwt::DecodingKey::from_secret(secret.as_ref());
+        let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
+        validation.leeway = 0;
+
+        Ok(Self {
+            encoding_key,
+            decoding_key,
+            validation,
+            access_token_expiry: settings.access_token_expiry,
+            refresh_token_expiry: settings.refresh_token_expiry,
+        })
+    }
+}
+
+
 /// Generate a new access token
 pub fn generate_access_token(
-    ctx: &core::JwtContext,
+    ctx: &JwtContext,
     user_id: i64,
     user_name: &str,
     tenant_id: Option<i64>,
@@ -120,11 +161,11 @@ pub fn generate_access_token(
         jti: Uuid::new_v4().to_string(),
         token_type: TokenType::Access,
     };
-    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)
 }
 
 /// Generate a new refresh token
-pub fn generate_refresh_token(ctx: &core::JwtContext, user_id: i64) -> Result<String, JwtError> {
+pub fn generate_refresh_token(ctx: &JwtContext, user_id: i64) -> Result<String, JwtError> {
     let now = Utc::now().timestamp();
     let header = jwt::Header::new(jwt::Algorithm::HS256);
     let claims = RefreshTokenClaims {
@@ -134,10 +175,10 @@ pub fn generate_refresh_token(ctx: &core::JwtContext, user_id: i64) -> Result<St
         jti: Uuid::new_v4().to_string(),
         token_type: TokenType::Refresh,
     };
-    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingError)
+    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)
 }
 
-pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Result<AccessTokenClaims, JwtError> {
+pub fn decode_access_token_from_req(ctx: &JwtContext, req: &Request) -> Result<AccessTokenClaims, JwtError> {
     // Extract the Authorization header
     let auth_header = req
         .headers()
@@ -155,17 +196,57 @@ pub fn decode_access_token_from_req(ctx: &core::JwtContext, req: &Request) -> Re
 }
 
 /// Validate and decode an access token
-pub fn decode_access_token(ctx: &core::JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
+pub fn decode_access_token(ctx: &JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
     let token_data = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
     let valid = token_data.claims.token_type == TokenType::Access;
     valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
 }
 
 /// Validate and decode a refresh token
-pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
+pub fn decode_refresh_token(ctx: &JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
     let token_data = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
     let valid = token_data.claims.token_type == TokenType::Refresh;
     valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
+}
+
+/// Loads or creates a JWT secret
+pub fn get_jwt_secret() -> Result<String, JwtError> {
+    // check persisted secret file
+    let secret_file_path = cfg::AppSettings::get_config_path().join(".jwt_secret");
+    if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
+        let trimmed_secret = file_secret.trim();
+        if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
+            return Ok(trimmed_secret.to_string());
+        }
+    }
+
+    // Create config directory if it doesn't exist
+    if let Some(parent) = &secret_file_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // Write the secret to file with restricted permissions
+    let new_secret = generate_secure_secret()?;
+    fs::write(&secret_file_path, &new_secret)?;
+
+    // Set file permissions to be readable only by owner (Unix-like systems)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&secret_file_path)?.permissions();
+        perms.set_mode(0o600); // rw-------
+        fs::set_permissions(&secret_file_path, perms)?;
+    }
+
+    tracing::info!("Generated new JWT secret in {}", secret_file_path.to_string_lossy());
+    Ok(new_secret)
+}
+
+/// Generates a cryptographically secure random secret
+fn generate_secure_secret() -> Result<String, JwtError> {
+    let mut bytes = [0u8; 32];
+    rand::rngs::OsRng.try_fill_bytes(&mut bytes).map_err(|e| JwtError::RngOperationFailed{ source: e })?;
+    Ok(hex::encode(bytes))
 }
 
 /// Maps jsonwebtoken errors to our custom `JwtError` type
@@ -176,7 +257,7 @@ impl From<jwt::errors::Error> for JwtError {
             jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
             jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
             jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
-            _ => Self::DecodingError(e),
+            _ => Self::DecodingFailed(e),
         }
     }
 }
@@ -187,15 +268,16 @@ mod tests {
     use axum::http::{HeaderValue, Request};
 
     use super::*;
-    use crate::cfg;
+    use crate::cfg::{self, JwtSettings};
 
-    fn create_test_context() -> core::JwtContext {
-        let config = cfg::JwtSettings {
-            secret: "test_secret_key_for_jwt_testing".to_string(),
+    fn create_test_context() -> JwtContext {
+        let settings = cfg::JwtSettings {
             access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
         };
-        core::JwtContext::new(&config)
+        // For tests, create a JwtContext with a fixed secret
+        let secret = "test_secret_key_for_jwt_testing";
+        JwtContext::new(&settings, secret).unwrap()
     }
 
     #[test]
@@ -258,19 +340,21 @@ mod tests {
 
     #[test]
     fn test_decode_access_token_wrong_secret() {
-        let wrong_config = cfg::JwtSettings {
-            secret: "wrong_secret".to_string(),
+        // Create a context with a different secret
+        let settings = cfg::JwtSettings {
             access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
         };
-        let wrong_ctx = core::JwtContext::new(&wrong_config);
+        let wrong_secret = "wrong_secret_for_testing_1234567890";
+        let wrong_ctx = JwtContext::new(&settings, wrong_secret).unwrap();
         let ctx = create_test_context();
+
         let user_id = 123;
         let username = "test_user";
         let token = generate_access_token(&ctx, user_id, username, None).unwrap();
         let result = decode_access_token(&wrong_ctx, &token);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
+        assert!(matches!(result.unwrap_err(), JwtError::DecodingFailed(_)));
     }
 
     #[test]
@@ -280,7 +364,7 @@ mod tests {
 
         let result = decode_access_token(&ctx, invalid_token);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), JwtError::DecodingError(_)));
+        assert!(matches!(result.unwrap_err(), JwtError::DecodingFailed(_)));
     }
 
     #[test]
@@ -295,12 +379,14 @@ mod tests {
 
     #[test]
     fn test_token_expiry() {
-        let config = cfg::JwtSettings {
-            secret: "test_secret_key_for_jwt_testing".to_string(),
+        // Create a context with short expiry times for testing
+        let secret = "test_secret_key_for_jwt_testing";
+        let settings = JwtSettings {
             access_token_expiry: 1,  // 1 second
             refresh_token_expiry: 2, // 2 seconds
         };
-        let ctx = core::JwtContext::new(&config);
+        let ctx = JwtContext::new(&settings, secret).unwrap();
+
         let user_id = 123;
         let username = "test_user";
         let token = generate_access_token(&ctx, user_id, username, None).unwrap();
