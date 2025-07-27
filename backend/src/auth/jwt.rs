@@ -183,12 +183,14 @@ impl From<jwt::errors::Error> for JwtError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use axum::body::Body;
     use axum::http::{HeaderValue, Request};
 
+    use super::*;
+    use crate::cfg;
+
     fn create_test_context() -> core::JwtContext {
-        let config = core::JwtConfig {
+        let config = cfg::JwtSettings {
             secret: "test_secret_key_for_jwt_testing".to_string(),
             access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
@@ -256,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_decode_access_token_wrong_secret() {
-        let wrong_config = core::JwtConfig {
+        let wrong_config = cfg::JwtSettings {
             secret: "wrong_secret".to_string(),
             access_token_expiry: 3600,   // 1 hour
             refresh_token_expiry: 86400, // 24 hours
@@ -293,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_token_expiry() {
-        let config = core::JwtConfig {
+        let config = cfg::JwtSettings {
             secret: "test_secret_key_for_jwt_testing".to_string(),
             access_token_expiry: 1,  // 1 second
             refresh_token_expiry: 2, // 2 seconds

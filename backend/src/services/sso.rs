@@ -4,6 +4,7 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
+use crate::cfg;
 use crate::core;
 
 // 🔒 Security Notes
@@ -64,14 +65,14 @@ type GoogleOAuth2Client = oauth2::Client<
     oauth2::EndpointSet,    // HasTokenUrl
 >;
 
-fn validate_google_config(config: &core::OAuthConfig) -> Result<(), Error> {
+fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), Error> {
     let valid = !config.google_client_id.is_empty() && !config.google_client_secret.is_empty();
     valid
         .then_some(())
         .ok_or(Error::InvalidConfig("Google OAuth not configured".to_string()))
 }
 
-fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client, Error> {
+fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
     let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string()).unwrap();
@@ -84,7 +85,7 @@ fn create_google_client(config: &core::OAuthConfig) -> Result<GoogleOAuth2Client
     Ok(client)
 }
 
-pub fn get_google_auth_url(config: &core::OAuthConfig) -> Result<(Url, oauth2::CsrfToken), Error> {
+pub fn get_google_auth_url(config: &cfg::OAuthSettings) -> Result<(Url, oauth2::CsrfToken), Error> {
     let client = create_google_client(config)?;
     // For server-side OAuth flow, we don't need PKCE
     let (auth_url, csrf_token) = client

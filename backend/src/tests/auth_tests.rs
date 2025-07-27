@@ -6,15 +6,16 @@ use serde_json::json;
 
 use crate::app;
 use crate::auth;
+use crate::cfg;
 use crate::core;
 use crate::db;
 
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
 const TEST_USERNAME: &str = "test_user";
 
-fn default_config() -> core::Config {
-    core::Config {
-        jwt: core::JwtConfig {
+fn default_config() -> cfg::AppSettings {
+    cfg::AppSettings {
+        jwt: cfg::JwtSettings {
             secret: "test_secret_key_for_testing_only".to_string(),
             access_token_expiry: 3600,
             refresh_token_expiry: 86400,
@@ -23,11 +24,11 @@ fn default_config() -> core::Config {
     }
 }
 
-async fn create_test_server(config: core::Config) -> TestServer {
+async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     let mut config = config.clone();
 
     // use a temporary in-memory SQLite database file and use it for testing
-    config.database = core::DatabaseConfig {
+    config.database = cfg::DatabaseSettings {
         url: "sqlite::memory:".to_string(),
         max_connections: 5,
     };
@@ -278,8 +279,8 @@ async fn test_protected_route_with_invalid_token() {
 #[tokio::test]
 async fn test_access_token_expiry() {
     // Create config with very short token expiry
-    let config = core::Config {
-        jwt: core::JwtConfig {
+    let config = cfg::AppSettings {
+        jwt: cfg::JwtSettings {
             secret: "test_secret_key_for_testing_only".to_string(),
             access_token_expiry: 1, // 1 second
             refresh_token_expiry: 86400,

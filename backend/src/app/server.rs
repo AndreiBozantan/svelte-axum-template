@@ -6,6 +6,7 @@ use thiserror::Error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::app;
+use crate::cfg;
 use crate::core;
 
 /// Application-level error type
@@ -33,7 +34,7 @@ pub enum AppError {
     HttpClientError(#[from] reqwest::Error),
 }
 
-pub async fn create_db_context(db_config: &core::DatabaseConfig) -> Result<core::DbContext, core::DbError> {
+pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<core::DbContext, core::DbError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
@@ -65,22 +66,22 @@ pub async fn run() {
 
 async fn run_app() -> Result<(), AppError> {
     // TODO: use dot-env to load environment variables dotenvy::dotenv().ok();
-    let config = core::ConfigWithMetadata::new()?;
+    let config = cfg::AppSettingsWithMetadata::new()?;
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.data.server.log_directives))
+        .with(tracing_subscriber::EnvFilter::new(&config.settings.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     // initialize database, handle CLI commands, and start server
-    let db = create_db_context(&config.data.database).await?;
-    let context = core::Context::new(db, config.data)?;
+    let db = create_db_context(&config.settings.database).await?;
+    let context = core::Context::new(db, config.settings)?;
     app::run_migrations(&context.db).await?;
     app::run_cli(&context.db).await?;
     start_server(context, &config.metadata).await?;
     Ok(())
 }
 
-async fn start_server(context: core::ArcContext, config: &core::ConfigMetadata) -> Result<(), AppError> {
+async fn start_server(context: core::ArcContext, config: &cfg::AppSettingsMetadata) -> Result<(), AppError> {
     let address = config.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context);

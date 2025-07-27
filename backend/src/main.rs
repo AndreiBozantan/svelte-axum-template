@@ -16,11 +16,23 @@ mod tests {
     mod auth_tests;
 }
 
+pub mod cfg {
+    mod app_settings;
+    mod database_settings;
+    mod jwt_settings;
+    mod oauth_settings;
+    mod server_settings;
+
+    pub use app_settings::*;
+    pub use database_settings::*;
+    pub use jwt_settings::*;
+    pub use oauth_settings::*;
+    pub use server_settings::*;
+}
+
 pub mod core {
-    mod config;
     mod context;
 
-    pub use config::*;
     pub use context::*;
 }
 
