@@ -101,7 +101,8 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Res
         .await?;
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
     let user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo";
-    let user_info = context.http_client
+    let user_info = context
+        .http_client
         .get(user_info_url)
         .bearer_auth(access_token)
         .send()

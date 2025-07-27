@@ -160,7 +160,10 @@ impl ConfigWithMetadata {
 
         let metadata = ConfigMetadata {
             app_run_env,
-            config_dir: config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string()),
+            config_dir: config_path
+                .canonicalize()
+                .ok()
+                .map_or(config_dir, |p| p.to_string_lossy().to_string()),
             server_address: format!("{}:{}", config.server.host, config.server.port),
             log_directives: config.server.log_directives.clone(),
         };
@@ -217,7 +220,10 @@ impl ConfigWithMetadata {
                 .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {e}")))?;
         }
 
-        tracing::info!("Generated new JWT secret and saved to {}", secret_file_path.to_string_lossy());
+        tracing::info!(
+            "Generated new JWT secret and saved to {}",
+            secret_file_path.to_string_lossy()
+        );
         Ok(new_secret)
     }
 

@@ -83,7 +83,6 @@ pub fn create_migration(name: &str) -> Result<String, MigrationError> {
     // Create the migration file with template content
     let mut file = File::create(&filepath)?;
     writeln!(file, "-- Migration: {name}")?;
-    writeln!(file, "-- Created at: {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"))?;
     writeln!(file, "--")?;
     writeln!(file, "-- Add migration script here")?;
 

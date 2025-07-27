@@ -203,9 +203,7 @@ pub async fn revoke_token(
 }
 
 /// Handler for initiating Google OAuth flow
-pub async fn google_auth_init(
-    State(context): State<core::ArcContext>,
-) -> Result<impl IntoResponse, AuthError> {
+pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
     let (auth_url, _csrf_token) = auth::get_google_auth_url(&context.config.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
