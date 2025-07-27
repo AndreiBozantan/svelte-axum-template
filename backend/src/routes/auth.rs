@@ -12,6 +12,7 @@ use thiserror::Error;
 use crate::auth;
 use crate::core;
 use crate::db;
+use crate::services::sso;
 
 #[derive(Deserialize)]
 pub struct Login {
@@ -50,7 +51,7 @@ pub enum AuthError {
     DatabaseOperationFailed(core::DbError),
 
     #[error("OAuth operation failed: {0}")]
-    OAuthOperationFailed(#[from] auth::OAuthError),
+    OAuthOperationFailed(#[from] sso::Error),
 }
 
 impl From<core::DbError> for AuthError {
@@ -198,7 +199,7 @@ pub async fn revoke_token(
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
-    let (auth_url, _csrf_token) = auth::get_google_auth_url(&context.config.oauth)?;
+    let (auth_url, _csrf_token) = sso::get_google_auth_url(&context.config.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
     Ok(axum::response::Redirect::to(auth_url.as_str()))
@@ -207,10 +208,10 @@ pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
     State(context): State<core::ArcContext>,
-    axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
+    axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
     tracing::info!("Google OAuth callback received with state: {}", params.state);
-    let user_info = auth::get_google_user_info(&context, &params.code).await?;
+    let user_info = sso::get_google_user_info(&context, &params.code).await?;
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
 
     // Check if user already exists

@@ -26,11 +26,9 @@ pub mod core {
 
 pub mod auth {
     mod jwt;
-    mod oauth;
     mod password;
 
     pub use jwt::*;
-    pub use oauth::*;
     pub use password::*;
 }
 
@@ -49,6 +47,10 @@ pub mod routes {
     pub mod assets;
     pub mod auth;
     pub mod health;
+}
+
+pub mod services {
+    pub mod sso;
 }
 
 pub mod app {
