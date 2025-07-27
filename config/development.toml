@@ -6,7 +6,6 @@ log_directives = "debug,tower_http=debug,axum=debug"
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 5
-run_db_migrations_on_startup = true # Auto-migrate is enabled by default for development
 
 [oauth]
 # google_client_id = ""      # ⚠️ LEAVE EMPTY - set via secure method above

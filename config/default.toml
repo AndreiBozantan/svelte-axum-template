@@ -6,13 +6,12 @@ log_directives = "debug"
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 5
-run_db_migrations_on_startup = true # Set to false in production for manual migration control
 
 [oauth]
 # ⚠️ SECURITY WARNING: NEVER commit real OAuth secrets to git!
 # Use one of these secure methods instead:
 # 1. Environment variables: APP_OAUTH_GOOGLE_CLIENT_ID, APP_OAUTH_GOOGLE_CLIENT_SECRET
-# 2. Create backend/config/local.toml (git-ignored)
+# 2. Create config/local.toml (git-ignored)
 # 3. Create .env file in project root (git-ignored)
 
 # Google OAuth2 Secrets

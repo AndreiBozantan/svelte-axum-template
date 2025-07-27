@@ -2784,8 +2784,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "svelte-axum-template"
-version = "0.7.2"
+name = "svelaxum"
+version = "0.8.0"
 dependencies = [
  "argon2",
  "axum",

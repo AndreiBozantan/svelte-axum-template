@@ -55,7 +55,7 @@ pub struct OAuthConfig {
     // pub github_redirect_uri: String,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub server: ServerConfig,
@@ -104,7 +104,7 @@ impl Default for DatabaseConfig {
 impl Default for JwtConfig {
     fn default() -> Self {
         Self {
-            secret: "".to_string(),
+            secret: String::new(),
             access_token_expiry: 15 * 60,             // 15 minutes
             refresh_token_expiry: 200 * 24 * 60 * 60, // 200 days
         }
@@ -114,30 +114,19 @@ impl Default for JwtConfig {
 impl Default for OAuthConfig {
     fn default() -> Self {
         Self {
-            google_client_id: "".to_string(),
-            google_client_secret: "".to_string(),
+            google_client_id: String::new(),
+            google_client_secret: String::new(),
             google_redirect_uri: "http://localhost:3000/auth/oauth/google/callback".to_string(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            database: DatabaseConfig::default(),
-            jwt: JwtConfig::default(),
-            oauth: OAuthConfig::default(),
         }
     }
 }
 
 impl ConfigWithMetadata {
     pub fn new() -> Result<Self, ConfigError> {
-        // allows to do a cargo run in the backend directory also
-        let config_dir = Path::new("backend").exists().then_some("backend/config").unwrap_or("config");
-        let config_path = Path::new(config_dir);
-        let app_run_env = env::var("APP_RUN_ENV").unwrap_or("production".to_string());
+        let config_dir = "config".to_string();
+        let config_path = Path::new(&config_dir);
+        let default_app_run_env = "production".to_string();
+        let app_run_env = env::var("APP_RUN_ENV").unwrap_or(default_app_run_env);
         let mut builder = config::Config::builder();
 
         // Layer 1: Add default configuration from files
@@ -170,8 +159,8 @@ impl ConfigWithMetadata {
         config.jwt.secret = Self::ensure_jwt_secret(config_path)?;
 
         let metadata = ConfigMetadata {
-            app_run_env: app_run_env.clone(),
-            config_dir: config_dir.to_string(),
+            app_run_env,
+            config_dir: config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string()),
             server_address: format!("{}:{}", config.server.host, config.server.port),
             log_directives: config.server.log_directives.clone(),
         };

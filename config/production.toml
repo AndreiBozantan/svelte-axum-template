@@ -6,9 +6,6 @@ log_directives = "info,tower_http=info"
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 10
-# Disable auto-migrations in production for manual control
-# Run migrations manually with: ./app migrate run
-run_db_migrations_on_startup = false
 
 [jwt]
 # JWT secret should be set via environment variable in production

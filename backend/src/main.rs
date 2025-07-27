@@ -2,6 +2,8 @@
 #![warn(clippy::nursery)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::todo)]
+// #![warn(clippy::cargo)]
+
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 

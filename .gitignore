@@ -5,7 +5,7 @@
 Cargo.lock
 target
 local.toml
-backend/config/.jwt_secret
+config/.jwt_secret
 
 # svelte files
 frontend/dist/
