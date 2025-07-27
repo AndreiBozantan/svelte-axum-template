@@ -24,7 +24,7 @@
     "dev:backend": "cargo watch --ignore db.sqlite --watch backend/src --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd frontend && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && open http://localhost:5173",
-    "dev": "concurrently --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green npm:dev:frontend npm:dev:backend npm:dev:open",
+    "dev": "concurrently npm:dev:frontend npm:dev:backend npm:dev:open --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green",
 
     "start": "npm run dev"
   },
