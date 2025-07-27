@@ -5,7 +5,7 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
-    "clean": "node clean.js",
+    "clean": "node -e \"['.sqlx','node_modules','target','frontend/dist','frontend/node_modules'].forEach(p=>{try{require('fs').rmSync(p,{recursive:true,force:true});console.log('Removed:', p);}catch{}});\"",
     "reset": "npm run clean && npm run db:drop",
 
     "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
