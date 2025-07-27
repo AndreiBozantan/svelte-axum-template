@@ -5,7 +5,7 @@
   "version": "0.7.2",
   "type": "module",
   "scripts": {
-    "clean": "node clean.js",
+    "clean": "node -e \"targets=['.sqlx','node_modules','target','frontend/dist','frontend/node_modules'];fs=require('fs');targets.forEach(p=>{try{if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});console.log('\\x1b[32m','removed:',p,'\\x1b[0m')}else{console.log('\\x1b[33m','missing:',p,'\\x1b[0m')}}catch(e){console.error('\\x1b[31m','error!!:','t','('+e.message+')','\\x1b[0m')}})\"",
     "reset": "npm run clean && npm run db:drop",
 
     "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
@@ -24,7 +24,7 @@
     "dev:backend": "cargo watch --ignore db.sqlite --watch backend/src --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd frontend && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && open http://localhost:5173",
-    "dev": "concurrently --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green npm:dev:frontend npm:dev:backend npm:dev:open",
+    "dev": "concurrently npm:dev:frontend npm:dev:backend npm:dev:open --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green",
 
     "start": "npm run dev"
   },
