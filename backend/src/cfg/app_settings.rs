@@ -26,17 +26,11 @@ pub struct AppSettingsMetadata {
     pub log_directives: String,
 }
 
-pub struct AppSettingsWithMetadata {
-    pub settings: AppSettings,
-    pub metadata: AppSettingsMetadata,
-}
-
-impl AppSettingsWithMetadata {
+impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
-        let config_dir = "config".to_string();
+        let app_run_env = Self::get_app_run_env();
+        let config_dir = Self::get_config_dir();
         let config_path = Path::new(&config_dir);
-        let default_app_run_env = "production".to_string();
-        let app_run_env = env::var("APP_RUN_ENV").unwrap_or(default_app_run_env);
         let mut builder = config::Config::builder();
 
         // Layer 1: Add default configuration from files
@@ -62,19 +56,11 @@ impl AppSettingsWithMetadata {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let mut settings = builder.build()?.try_deserialize::<AppSettings>()?;
+        let mut settings = builder.build()?.try_deserialize::<Self>()?;
 
         // handle JWT secret initialization
         // TODO: probably this should be moved to JwtContext
         settings.jwt.secret = Self::ensure_jwt_secret(config_path)?;
-
-        let config_dir = config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string());
-        let metadata = AppSettingsMetadata {
-            app_run_env,
-            config_dir,
-            server_address: format!("{}:{}", settings.server.host, settings.server.port),
-            log_directives: settings.server.log_directives.clone(),
-        };
 
         // TODO: write config to file if it doesn't exist, so that it can be modified by users
         // if !env_config_path.exists() {
@@ -83,7 +69,20 @@ impl AppSettingsWithMetadata {
         //     println!("Created default config file at {env_config_path:?}");
         // }
 
-        Ok(Self { settings, metadata })
+        Ok(settings)
+    }
+
+    #[must_use]
+    pub fn get_metadata(&self) -> AppSettingsMetadata {
+        let config_dir = Self::get_config_dir();
+        let config_path = Path::new(&config_dir);
+        let config_dir = config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string());
+        AppSettingsMetadata {
+            app_run_env: Self::get_app_run_env(),
+            config_dir,
+            server_address: format!("{}:{}", self.server.host, self.server.port),
+            log_directives: self.server.log_directives.clone(),
+        }
     }
 
     fn ensure_jwt_secret(config_path: &Path) -> Result<String, ConfigError> {
@@ -139,5 +138,13 @@ impl AppSettingsWithMetadata {
         use rand::Rng;
         let random_bytes: [u8; 32] = rand::rng().random();
         hex::encode(random_bytes)
+    }
+
+    fn get_app_run_env() -> String {
+        env::var("APP_RUN_ENV").unwrap_or_else(|_| "production".to_string())
+    }
+
+    fn get_config_dir() -> String {
+        "config".to_string()
     }
 }

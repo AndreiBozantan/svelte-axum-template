@@ -66,30 +66,31 @@ pub async fn run() {
 
 async fn run_app() -> Result<(), AppError> {
     // TODO: use dot-env to load environment variables dotenvy::dotenv().ok();
-    let config = cfg::AppSettingsWithMetadata::new()?;
+    let settings = cfg::AppSettings::new()?;
+    let metadata = settings.get_metadata();
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.settings.server.log_directives))
+        .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     // initialize database, handle CLI commands, and start server
-    let db = create_db_context(&config.settings.database).await?;
-    let context = core::Context::new(db, config.settings)?;
+    let db = create_db_context(&settings.database).await?;
+    let context = core::Context::new(db, settings)?;
     app::run_migrations(&context.db).await?;
     app::run_cli(&context.db).await?;
-    start_server(context, &config.metadata).await?;
+    start_server(context, metadata).await?;
     Ok(())
 }
 
-async fn start_server(context: core::ArcContext, config: &cfg::AppSettingsMetadata) -> Result<(), AppError> {
-    let address = config.server_address.parse::<SocketAddr>()?;
+async fn start_server(context: core::ArcContext, metadata: cfg::AppSettingsMetadata) -> Result<(), AppError> {
+    let address = metadata.server_address.parse::<SocketAddr>()?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     let router = app::create_router(context);
     tracing::info!("starting server... 🚀 ");
-    tracing::info!("app_env: {}", config.app_run_env);
-    tracing::info!("cfg_dir: {}", config.config_dir);
-    tracing::info!("logging: {}", config.log_directives);
-    tracing::info!("address: http://{}", config.server_address);
+    tracing::info!("app_env: {}", metadata.app_run_env);
+    tracing::info!("cfg_dir: {}", metadata.config_dir);
+    tracing::info!("logging: {}", metadata.log_directives);
+    tracing::info!("address: http://{}", metadata.server_address);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;

@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[test]
-    fn test_different_tokens_have_different_jtis() {
+    fn test_different_tokens_have_different_jwt_ids() {
         let ctx = create_test_context();
         let user_id = 123;
         let username = "test_user";
