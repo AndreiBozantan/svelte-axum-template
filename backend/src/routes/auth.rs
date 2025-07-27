@@ -56,13 +56,14 @@ pub enum AuthError {
 impl From<core::DbError> for AuthError {
     fn from(db_error: core::DbError) -> Self {
         match db_error {
-            core::DbError::RowNotFound => AuthError::InvalidCredentials,
-            other => AuthError::DatabaseOperationFailed(other),
+            core::DbError::RowNotFound => Self::InvalidCredentials,
+            other => Self::DatabaseOperationFailed(other),
         }
     }
 }
 
 impl IntoResponse for AuthError {
+    #[allow(clippy::match_same_arms)]
     fn into_response(self) -> axum::response::Response {
         tracing::error!(
             error_type = %std::any::type_name::<Self>(),
@@ -109,13 +110,11 @@ pub async fn login(
     // store refresh token in database
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
     let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(&refresh_token);
-    let token_hash = format!("{:x}", hasher.finalize());
+    let token_hash = get_token_hash_as_hex(&refresh_token);
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
-        token_hash: token_hash,
+        token_hash,
         expires_at: expires_at.naive_utc(),
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
@@ -161,9 +160,7 @@ pub async fn refresh_access_token(
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
 
     // Verify token hash
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(&request.refresh_token);
-    let token_hash = format!("{:x}", hasher.finalize());
+    let token_hash = get_token_hash_as_hex(&request.refresh_token);
     if stored_token.token_hash != token_hash {
         return Err(AuthError::TokenInvalid);
     }
@@ -200,9 +197,7 @@ pub async fn revoke_token(
 }
 
 /// Handler for initiating Google OAuth flow
-pub async fn google_auth_init(
-    State(context): State<core::ArcContext>,
-) -> Result<impl IntoResponse, AuthError> {
+pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
     let (auth_url, _csrf_token) = auth::get_google_auth_url(&context.config.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
@@ -254,13 +249,11 @@ pub async fn google_auth_callback(
     // Store refresh token in database
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
     let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(auth::JwtError::InvalidToken)?;
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(&refresh_token);
-    let token_hash = format!("{:x}", hasher.finalize());
+    let token_hash = get_token_hash_as_hex(&refresh_token);
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_claims.jti,
         user_id: user.id,
-        token_hash: token_hash,
+        token_hash,
         expires_at: expires_at.naive_utc(),
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
@@ -275,4 +268,10 @@ pub async fn google_auth_callback(
     );
 
     Ok(axum::response::Redirect::to(&redirect_url))
+}
+
+fn get_token_hash_as_hex(token: &str) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(token);
+    format!("{:x}", hasher.finalize())
 }

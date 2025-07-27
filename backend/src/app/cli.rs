@@ -8,6 +8,7 @@ use crate::auth;
 use crate::core;
 use crate::db;
 
+#[rustfmt::skip]
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]
@@ -20,6 +21,12 @@ pub enum CliError {
 
     #[error("Running migrations failed")]
     MigrationRunFailed { source: app::MigrationError },
+
+    #[error("Password hashing failed")]
+    PasswordHashFailed { #[from] source: argon2::password_hash::Error },
+
+    #[error("Failed to read password input")]
+    PasswordReadFailed { #[from] source: std::io::Error },
 
     // The Other(String) variant is kept as a fallback, though ideally all errors should be specific.
     #[error("An unexpected CLI error occurred: {0}")]
@@ -76,7 +83,7 @@ pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
     match cli.command {
         None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
         Some(CliCommand::Migrate { action }) => exec_migrate_command(action, db).await,
-        Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await
+        Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await,
     }
 }
 
@@ -91,8 +98,7 @@ async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Re
 }
 
 fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = app::create_migration(name)
-        .map_err(|e| CliError::MigrationCreateFailed { source: e })?;
+    let file_name = app::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
@@ -120,25 +126,22 @@ async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
 }
 
 async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
-    app::run_migrations(db).await
+    app::run_migrations(db)
+        .await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn create_admin(
-    username: String,
-    email: Option<String>,
-    db: &core::DbContext,
-) -> Result<(), CliError> {
+async fn create_admin(username: String, email: Option<String>, db: &core::DbContext) -> Result<(), CliError> {
     // Prompt for password securely
     print!("Enter password for admin user '{username}': ");
     io::stdout().flush().unwrap();
 
-    let password = rpassword::read_password()
-        .map_err(|e| CliError::Other(e.to_string()))?;
-
-    password.trim().is_empty()
+    let password = rpassword::read_password()?;
+    password
+        .trim()
+        .is_empty()
         .then(|| CliError::Other("Password cannot be empty".to_string()))
         .map_or(Ok(()), Err)?;
 
@@ -149,8 +152,7 @@ async fn create_admin(
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
     }?;
 
-    let password_hash = auth::hash_password(&password)
-        .map_err(|_| CliError::Other("Failed to hash password".to_string()))?;
+    let password_hash = auth::hash_password(&password)?;
     let new_user = db::NewUser {
         username,
         password_hash: Some(password_hash),

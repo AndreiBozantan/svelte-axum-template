@@ -1,8 +1,8 @@
 use axum::body::Body;
 use axum::http;
-use axum::http::response::Builder as ResponseBuilder;
 use axum::http::Uri;
 use axum::http::header;
+use axum::http::response::Builder as ResponseBuilder;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::response::Result;
@@ -47,7 +47,8 @@ pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
     let asset = Assets::get(path_str);
     let path_str = if asset.is_none() { "index.html" } else { path_str };
-    let asset = asset.or_else(|| Assets::get(path_str))
+    let asset = asset
+        .or_else(|| Assets::get(path_str))
         .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
     let builder = match path_str {
         "index.html" => create_no_cache_response_builder(),
@@ -77,7 +78,9 @@ fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBu
 
 #[allow(clippy::cast_possible_wrap)] // the timestamp will be in the range of i64 for quite some time
 fn get_asset_last_modified_date(asset: &EmbeddedFile) -> Option<String> {
-    asset.metadata.last_modified()
+    asset
+        .metadata
+        .last_modified()
         .and_then(|ts| Utc.timestamp_opt(ts as i64, 0).single())
         .map(|dt| dt.to_rfc2822())
 }

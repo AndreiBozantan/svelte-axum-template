@@ -7,7 +7,6 @@ pub type DbContext = sqlx::SqlitePool;
 
 pub type DbError = sqlx::Error;
 
-
 #[derive(Clone)]
 pub struct JwtContext {
     pub encoding_key: jwt::EncodingKey,
@@ -31,7 +30,13 @@ impl Context {
         let http_client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
-        Ok(Self {db, jwt, config, http_client}.into())
+        Ok(Self {
+            db,
+            jwt,
+            config,
+            http_client,
+        }
+        .into())
     }
 }
 

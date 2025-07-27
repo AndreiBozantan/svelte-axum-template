@@ -3,7 +3,6 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::todo)]
 // #![warn(clippy::cargo)]
-
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 
@@ -53,13 +52,13 @@ pub mod routes {
 }
 
 pub mod app {
-    mod server;
     mod cli;
     mod migrations;
     mod router;
+    mod server;
 
-    pub use server::*;
     pub use cli::*;
     pub use migrations::*;
     pub use router::*;
+    pub use server::*;
 }

@@ -12,7 +12,6 @@ use crate::db;
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
 const TEST_USERNAME: &str = "test_user";
 
-
 fn default_config() -> core::Config {
     core::Config {
         jwt: core::JwtConfig {

@@ -45,14 +45,6 @@ pub struct OAuthConfig {
 
     #[serde(default)]
     pub google_redirect_uri: String,
-
-    // Future providers can be added here
-    // #[serde(default)]
-    // pub github_client_id: String,
-    // #[serde(default)]
-    // pub github_client_secret: String,
-    // #[serde(default)]
-    // pub github_redirect_uri: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -132,19 +124,19 @@ impl ConfigWithMetadata {
         // Layer 1: Add default configuration from files
         let default_config_path = config_path.join("default.toml");
         if default_config_path.exists() {
-            builder = builder.add_source(File::with_name(default_config_path.to_str().unwrap()));
+            builder = builder.add_source(File::from(default_config_path));
         }
 
         // Layer 2: Add environment-specific config
         let env_config_path = config_path.join(format!("{app_run_env}.toml"));
         if env_config_path.exists() {
-            builder = builder.add_source(File::with_name(&env_config_path.to_str().unwrap()));
+            builder = builder.add_source(File::from(env_config_path));
         }
 
         // Layer 3: Add local config overrides
         let local_config_path = config_path.join("local.toml");
         if local_config_path.exists() {
-            builder = builder.add_source(File::with_name(local_config_path.to_str().unwrap()));
+            builder = builder.add_source(File::from(local_config_path));
         }
 
         // Layer 4: Override with environment variables
@@ -160,7 +152,10 @@ impl ConfigWithMetadata {
 
         let metadata = ConfigMetadata {
             app_run_env,
-            config_dir: config_path.canonicalize().ok().map_or(config_dir, |p| p.to_string_lossy().to_string()),
+            config_dir: config_path
+                .canonicalize()
+                .ok()
+                .map_or(config_dir, |p| p.to_string_lossy().to_string()),
             server_address: format!("{}:{}", config.server.host, config.server.port),
             log_directives: config.server.log_directives.clone(),
         };
@@ -198,26 +193,29 @@ impl ConfigWithMetadata {
         // Create config directory if it doesn't exist
         if let Some(parent) = &secret_file_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| ConfigError::Message(format!("Failed to create config directory: {}", e)))?;
+                .map_err(|e| ConfigError::Message(format!("Failed to create config directory: {e}")))?;
         }
 
         // Write the secret to file with restricted permissions
         fs::write(&secret_file_path, &new_secret)
-            .map_err(|e| ConfigError::Message(format!("Failed to write JWT secret to file: {}", e)))?;
+            .map_err(|e| ConfigError::Message(format!("Failed to write JWT secret to file: {e}")))?;
 
         // Set file permissions to be readable only by owner (Unix-like systems)
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = fs::metadata(&secret_file_path)
-                .map_err(|e| ConfigError::Message(format!("Failed to get file metadata: {}", e)))?
+                .map_err(|e| ConfigError::Message(format!("Failed to get file metadata: {e}")))?
                 .permissions();
             perms.set_mode(0o600); // rw-------
             fs::set_permissions(&secret_file_path, perms)
-                .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {}", e)))?;
+                .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {e}")))?;
         }
 
-        tracing::info!("Generated new JWT secret and saved to {}", secret_file_path.to_string_lossy());
+        tracing::info!(
+            "Generated new JWT secret and saved to {}",
+            secret_file_path.to_string_lossy()
+        );
         Ok(new_secret)
     }
 

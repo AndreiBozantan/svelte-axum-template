@@ -36,6 +36,7 @@ impl IntoResponse for JwtError {
             error_subtype = %std::any::type_name_of_val(&self),
             error_message = %self);
 
+        #[rustfmt::skip]
         let (status, error_message) = match self {
             Self::EncodingError(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             Self::DecodingError(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
@@ -53,7 +54,7 @@ impl IntoResponse for JwtError {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TokenType {
     Access,
@@ -90,7 +91,8 @@ pub struct TokenResponse {
 }
 
 impl TokenResponse {
-    pub fn new(ctx: &core::JwtContext, access_token: String, refresh_token: String) -> Self {
+    #[must_use]
+    pub const fn new(ctx: &core::JwtContext, access_token: String, refresh_token: String) -> Self {
         Self {
             access_token,
             refresh_token,
@@ -166,14 +168,15 @@ pub fn decode_refresh_token(ctx: &core::JwtContext, token: &str) -> Result<Refre
     valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
 }
 
-/// Maps jsonwebtoken errors to our custom JwtError type
+/// Maps jsonwebtoken errors to our custom `JwtError` type
+#[allow(clippy::match_same_arms)]
 impl From<jwt::errors::Error> for JwtError {
     fn from(e: jwt::errors::Error) -> Self {
         match e.kind() {
-            jwt::errors::ErrorKind::ExpiredSignature => JwtError::TokenExpired,
-            jwt::errors::ErrorKind::InvalidToken => JwtError::InvalidToken,
-            jwt::errors::ErrorKind::Json(_) => JwtError::InvalidToken,
-            _ => JwtError::DecodingError(e),
+            jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
+            jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
+            jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
+            _ => Self::DecodingError(e),
         }
     }
 }
@@ -203,8 +206,8 @@ mod tests {
         let token = generate_access_token(&ctx, user_id, username, tenant_id).unwrap();
 
         // Token should be non-empty and contain JWT structure (header.payload.signature)
-        let parts: Vec<&str> = token.split('.').collect();
-        assert_eq!(parts.len(), 3);
+        let parts = token.split('.');
+        assert_eq!(parts.count(), 3);
     }
 
     #[test]
@@ -215,8 +218,8 @@ mod tests {
         let token = generate_refresh_token(&ctx, user_id).unwrap();
 
         // Token should be non-empty and contain JWT structure
-        let parts: Vec<&str> = token.split('.').collect();
-        assert_eq!(parts.len(), 3);
+        let parts = token.split('.');
+        assert_eq!(parts.count(), 3);
     }
 
     #[test]
@@ -351,7 +354,7 @@ mod tests {
         let mut req = Request::new(Body::empty());
         req.headers_mut().insert(
             http::header::AUTHORIZATION,
-            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+            HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
         );
 
         let claims = decode_access_token_from_req(&ctx, &req).unwrap();
