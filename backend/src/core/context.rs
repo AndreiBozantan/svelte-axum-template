@@ -14,7 +14,18 @@ pub struct Context {
 
 impl Context {
     #[must_use]
-    pub fn new(db: core::DbContext, jwt: auth::JwtContext, http_client: reqwest::Client, settings: cfg::AppSettings) -> ArcContext {
-        Self { db, jwt, settings, http_client, } .into()
+    pub fn new(
+        db: core::DbContext,
+        jwt: auth::JwtContext,
+        http_client: reqwest::Client,
+        settings: cfg::AppSettings,
+    ) -> ArcContext {
+        Self {
+            db,
+            jwt,
+            settings,
+            http_client,
+        }
+        .into()
     }
 }

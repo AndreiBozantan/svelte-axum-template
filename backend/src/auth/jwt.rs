@@ -16,6 +16,7 @@ use crate::cfg;
 
 type TryRngError = <rand::rngs::OsRng as rand::TryRngCore>::Error;
 
+#[rustfmt::skip]
 #[derive(Debug, Error)]
 pub enum JwtError {
     #[error("Failed to encode JWT token")]
@@ -25,10 +26,10 @@ pub enum JwtError {
     DecodingFailed(jwt::errors::Error),
 
     #[error("File system operation failed")]
-    FileSystemOperationFailed{ #[from] source: std::io::Error },
+    FileSystemOperationFailed { #[from] source: std::io::Error },
 
     #[error("Random number generation operation failed")]
-    RngOperationFailed{ source: TryRngError },
+    RngOperationFailed { source: TryRngError },
 
     #[error("Token has expired")]
     TokenExpired,
@@ -142,7 +143,6 @@ impl JwtContext {
     }
 }
 
-
 /// Generate a new access token
 pub fn generate_access_token(
     ctx: &JwtContext,
@@ -245,7 +245,9 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
 /// Generates a cryptographically secure random secret
 fn generate_secure_secret() -> Result<String, JwtError> {
     let mut bytes = [0u8; 32];
-    rand::rngs::OsRng.try_fill_bytes(&mut bytes).map_err(|e| JwtError::RngOperationFailed{ source: e })?;
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut bytes)
+        .map_err(|e| JwtError::RngOperationFailed { source: e })?;
     Ok(hex::encode(bytes))
 }
 
@@ -380,11 +382,11 @@ mod tests {
     #[test]
     fn test_token_expiry() {
         // Create a context with short expiry times for testing
-        let secret = "test_secret_key_for_jwt_testing";
         let settings = JwtSettings {
             access_token_expiry: 1,  // 1 second
             refresh_token_expiry: 2, // 2 seconds
         };
+        let secret = "test_secret_key_for_jwt_testing";
         let ctx = JwtContext::new(&settings, secret).unwrap();
 
         let user_id = 123;
