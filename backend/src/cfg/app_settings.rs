@@ -1,6 +1,6 @@
 use config::{ConfigError, Environment, File};
 use serde::Deserialize;
-use std::{env, fs, path::Path};
+use std::{env, path::Path};
 
 use crate::cfg;
 
@@ -23,18 +23,12 @@ pub struct AppSettings {
     pub oauth: cfg::OAuthSettings,
 }
 
-pub struct AppSettingsMetadata {
-    pub app_run_env: String,
-    pub config_dir: String,
-    pub server_address: String,
-    pub log_directives: String,
-}
-
 impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
+        dotenvy::dotenv().ok();
+
         let app_run_env = Self::get_app_run_env();
-        let config_dir = Self::get_config_dir();
-        let config_path = Path::new(&config_dir);
+        let config_path = Self::get_config_path();
         let mut builder = config::Config::builder();
 
         // Layer 1: Add default configuration from files
@@ -60,10 +54,7 @@ impl AppSettings {
         builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
 
         // Build the config
-        let mut settings = builder.build()?.try_deserialize::<Self>()?;
-
-        // handle JWT secret initialization
-        settings.jwt.secret = Self::ensure_jwt_secret(config_path)?;
+        let settings = builder.build()?.try_deserialize::<Self>()?;
 
         // if !env_config_path.exists() {
         //     fs::write(&env_config_path, toml::to_string(&config).unwrap())
@@ -75,81 +66,28 @@ impl AppSettings {
     }
 
     #[must_use]
-    pub fn get_metadata(&self) -> AppSettingsMetadata {
-        let config_dir = Self::get_config_dir();
-        let config_path = Path::new(&config_dir);
-        let config_dir = config_path
-            .canonicalize()
-            .ok()
-            .map_or(config_dir, |p| p.to_string_lossy().to_string());
-        AppSettingsMetadata {
-            app_run_env: Self::get_app_run_env(),
-            config_dir,
-            server_address: format!("{}:{}", self.server.host, self.server.port),
-            log_directives: self.server.log_directives.clone(),
-        }
+    pub fn get_server_address(&self) -> String {
+        format!("{}:{}", self.server.host, self.server.port)
     }
 
-    fn ensure_jwt_secret(config_path: &Path) -> Result<String, ConfigError> {
-        // Priority 1: Check environment variable
-        if let Ok(env_secret) = std::env::var("APP_JWT_SECRET") {
-            if !env_secret.is_empty() && env_secret.len() >= 32 {
-                return Ok(env_secret);
-            }
-        }
-
-        // Priority 2: Check persisted secret file
-        let secret_file_path = config_path.join(".jwt_secret");
-        if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
-            let trimmed_secret = file_secret.trim();
-            if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
-                return Ok(trimmed_secret.to_string());
-            }
-        }
-
-        // Priority 3: Generate new secret and persist it
-        let new_secret = Self::generate_secure_secret();
-
-        // Create config directory if it doesn't exist
-        if let Some(parent) = &secret_file_path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| ConfigError::Message(format!("Failed to create config directory: {e}")))?;
-        }
-
-        // Write the secret to file with restricted permissions
-        fs::write(&secret_file_path, &new_secret)
-            .map_err(|e| ConfigError::Message(format!("Failed to write JWT secret to file: {e}")))?;
-
-        // Set file permissions to be readable only by owner (Unix-like systems)
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&secret_file_path)
-                .map_err(|e| ConfigError::Message(format!("Failed to get file metadata: {e}")))?
-                .permissions();
-            perms.set_mode(0o600); // rw-------
-            fs::set_permissions(&secret_file_path, perms)
-                .map_err(|e| ConfigError::Message(format!("Failed to set file permissions: {e}")))?;
-        }
-
-        tracing::info!(
-            "Generated new JWT secret and saved to {}",
-            secret_file_path.to_string_lossy()
-        );
-        Ok(new_secret)
-    }
-
-    fn generate_secure_secret() -> String {
-        use rand::Rng;
-        let random_bytes: [u8; 32] = rand::rng().random();
-        hex::encode(random_bytes)
-    }
-
-    fn get_app_run_env() -> String {
+    #[must_use]
+    pub fn get_app_run_env() -> String {
         env::var("APP_RUN_ENV").unwrap_or_else(|_| "production".to_string())
     }
 
-    fn get_config_dir() -> String {
-        "config".to_string()
+    #[must_use]
+    pub fn get_config_path() -> &'static Path {
+        Path::new("config")
+    }
+
+    #[must_use]
+    pub fn get_config_full_path() -> String {
+        let config_path = Self::get_config_path();
+        config_path
+            .canonicalize()
+            .ok()
+            .unwrap_or_else(|| config_path.to_path_buf())
+            .to_string_lossy()
+            .to_string()
     }
 }

@@ -98,7 +98,7 @@ pub fn get_google_auth_url(config: &cfg::OAuthSettings) -> Result<(Url, oauth2::
 }
 
 pub async fn get_google_user_info(context: &core::ArcContext, code: &str) -> Result<GoogleUserInfo, Error> {
-    let client = create_google_client(&context.config.oauth)?;
+    let client = create_google_client(&context.settings.oauth)?;
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
         .request_async(&context.http_client)

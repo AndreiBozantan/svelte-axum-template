@@ -173,7 +173,7 @@ pub async fn refresh_access_token(
     Ok(Json(json!({
         "result": "ok",
         "access_token": new_access_token,
-        "expires_in": context.config.jwt.access_token_expiry,
+        "expires_in": context.settings.jwt.access_token_expiry,
         "user": {
             "id": user.id,
             "username": user.username,
@@ -199,7 +199,7 @@ pub async fn revoke_token(
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
-    let (auth_url, _csrf_token) = sso::get_google_auth_url(&context.config.oauth)?;
+    let (auth_url, _csrf_token) = sso::get_google_auth_url(&context.settings.oauth)?;
     // In production, you should store the CSRF token in a secure session store
     // For now, we'll rely on the OAuth provider's state validation
     Ok(axum::response::Redirect::to(auth_url.as_str()))

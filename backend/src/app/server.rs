@@ -6,6 +6,7 @@ use thiserror::Error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::app;
+use crate::auth;
 use crate::cfg;
 use crate::core;
 
@@ -17,6 +18,9 @@ pub enum AppError {
 
     #[error("Database error: {0}")]
     DatabaseOperationFailed(#[from] core::DbError),
+
+    #[error("JWT error: {0}")]
+    JwtOperationFailed(#[from] auth::JwtError),
 
     #[error("Migration error: {0}")]
     MigrationFailed(#[from] app::MigrationError),
@@ -31,7 +35,7 @@ pub enum AppError {
     ServerStartingFailed(#[from] std::io::Error),
 
     #[error("Server error: {0}")]
-    HttpClientError(#[from] reqwest::Error),
+    HttpClientCreationFailed(#[from] reqwest::Error),
 }
 
 pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<core::DbContext, core::DbError> {
@@ -65,36 +69,42 @@ pub async fn run() {
 }
 
 async fn run_app() -> Result<(), AppError> {
-    dotenvy::dotenv().ok();
     let settings = cfg::AppSettings::new()?;
-    let metadata = settings.get_metadata();
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // initialize database, handle CLI commands, and start server
+    let http_client = create_http_client()?;
     let db = create_db_context(&settings.database).await?;
-    let context = core::Context::new(db, settings)?;
-    app::run_migrations(&context.db).await?;
-    app::run_cli(&context.db).await?;
-    start_server(context, metadata).await?;
+    let jwt_secret = auth::get_jwt_secret()?;
+    let jwt = auth::JwtContext::new(&settings.jwt, &jwt_secret)?;
+    let ctx = core::Context::new(db, jwt, http_client, settings);
+    app::run_migrations(&ctx.db).await?;
+    app::run_cli(&ctx.db).await?;
+    start_server(ctx).await?;
     Ok(())
 }
 
-async fn start_server(context: core::ArcContext, metadata: cfg::AppSettingsMetadata) -> Result<(), AppError> {
-    let address = metadata.server_address.parse::<SocketAddr>()?;
-    let listener = tokio::net::TcpListener::bind(address).await?;
-    let router = app::create_router(context);
+async fn start_server(ctx: core::ArcContext) -> Result<(), AppError> {
+    let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
+    let router = app::create_router(ctx.clone());
+    let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("starting server... 🚀 ");
-    tracing::info!("app_env: {}", metadata.app_run_env);
-    tracing::info!("cfg_dir: {}", metadata.config_dir);
-    tracing::info!("logging: {}", metadata.log_directives);
-    tracing::info!("address: http://{}", metadata.server_address);
+    tracing::info!("app_env: {}", cfg::AppSettings::get_app_run_env());
+    tracing::info!("cfg_dir: {}", cfg::AppSettings::get_config_full_path());
+    tracing::info!("logging: {}", ctx.settings.server.log_directives);
+    tracing::info!("address: http://{}", addr);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+fn create_http_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
 }
 
 /// Tokio signal handler that will wait for a user to press CTRL+C.

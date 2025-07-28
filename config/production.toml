@@ -8,7 +8,5 @@ url = "sqlite:db.sqlite"
 max_connections = 10
 
 [jwt]
-# JWT secret should be set via environment variable in production
-# secret = ""  # Set via SVELTE_AXUM_TEMPLATE__JWT__SECRET env var
 access_token_expiry = 900    # 15 minutes
 refresh_token_expiry = 604800  # 7 days
