@@ -14,6 +14,7 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     mod auth_tests;
+    mod jwt_tests;
 }
 
 pub mod cfg {
