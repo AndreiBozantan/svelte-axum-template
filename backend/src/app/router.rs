@@ -15,7 +15,7 @@ use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: core::ArcContext) -> Router {
-    // Create API routes that need AppState and auth middleware
+    // Create API routes that need ArcContext and auth middleware
     let api_routes = Router::new()
         .route("/api", get(routes::api::handler))
         .layer(middleware::from_fn_with_state(context.clone(), auth_middleware))
@@ -29,6 +29,9 @@ pub fn create_router(context: core::ArcContext) -> Router {
         .route("/auth/revoke", post(routes::auth::revoke_token)) // revoke refresh token
         .route("/auth/oauth/google", get(routes::auth::google_auth_init)) // initiate Google OAuth
         .route("/auth/oauth/google/callback", get(routes::auth::google_auth_callback)) // Google OAuth callback
+        .with_state(context.clone());
+
+    let public_routes = Router::new()
         .route("/health", get(routes::health::health_check)) // Health check endpoint
         .with_state(context);
 
@@ -36,7 +39,8 @@ pub fn create_router(context: core::ArcContext) -> Router {
     Router::new()
         .merge(auth_routes)
         .merge(api_routes)
-        .fallback(routes::assets::static_handler)
+        .merge(public_routes)
+        .fallback(routes::assets::static_handler) // Serve static assets
         .layer(TraceLayer::new_for_http())
 }
 
