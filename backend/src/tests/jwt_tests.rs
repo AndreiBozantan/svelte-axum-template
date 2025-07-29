@@ -4,7 +4,7 @@ use axum::http::{HeaderValue, Request};
 
 
 use crate::auth::*;
-use crate::cfg::{self, JwtSettings};
+use crate::cfg;
 
 fn create_test_context() -> JwtContext {
     let settings = cfg::JwtSettings {
@@ -115,29 +115,110 @@ fn test_decode_malformed_token() {
 
 #[test]
 fn test_token_expiry() {
-    // Create a context with short expiry times for testing
-    let settings = JwtSettings {
-        access_token_expiry: 1,  // 1 second
-        refresh_token_expiry: 2, // 2 seconds
-    };
-    let secret = "test_secret_key_for_jwt_testing";
-    let ctx = JwtContext::new(&settings, secret).unwrap();
+    use chrono::Utc;
+    use jsonwebtoken as jwt;
+    use uuid::Uuid;
 
+    let ctx = create_test_context();
     let user_id = 123;
     let username = "test_user";
-    let token = generate_access_token(&ctx, user_id, username, None).unwrap();
 
-    // Should work immediately
-    let claims = decode_access_token(&ctx, &token).unwrap();
-    assert_eq!(claims.sub, user_id.to_string());
+    // Create an expired token by manually setting past timestamps
+    let now = Utc::now().timestamp();
+    let expired_time = now - 3600; // 1 hour ago
 
-    // Wait for token to expire
-    std::thread::sleep(std::time::Duration::from_secs(2));
+    let header = jwt::Header::new(jwt::Algorithm::HS256);
+    let expired_claims = AccessTokenClaims {
+        sub: user_id.to_string(),
+        username: username.to_string(),
+        tenant_id: None,
+        exp: expired_time, // Expired timestamp
+        iat: expired_time - 3600, // Issued 2 hours ago
+        jti: Uuid::new_v4().to_string(),
+        token_type: TokenType::Access,
+    };
 
-    // Should now fail with expiry error
-    let result = decode_access_token(&ctx, &token);
+    let expired_token = jwt::encode(&header, &expired_claims, &ctx.encoding_key).unwrap();
+
+    // Test that expired token is rejected
+    let result = decode_access_token(&ctx, &expired_token);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), JwtError::TokenExpired));
+
+    // Test that a valid token still works
+    let valid_token = generate_access_token(&ctx, user_id, username, None).unwrap();
+    let claims = decode_access_token(&ctx, &valid_token).unwrap();
+    assert_eq!(claims.sub, user_id.to_string());
+    assert_eq!(claims.username, username);
+}
+
+#[test]
+fn test_refresh_token_expiry() {
+    use chrono::Utc;
+    use jsonwebtoken as jwt;
+    use uuid::Uuid;
+
+    let ctx = create_test_context();
+    let user_id = 123;
+
+    // Create an expired refresh token by manually setting past timestamps
+    let now = Utc::now().timestamp();
+    let expired_time = now - 3600; // 1 hour ago
+
+    let header = jwt::Header::new(jwt::Algorithm::HS256);
+    let expired_refresh_claims = RefreshTokenClaims {
+        sub: user_id.to_string(),
+        exp: expired_time, // Expired timestamp
+        iat: expired_time - 3600, // Issued 2 hours ago
+        jti: Uuid::new_v4().to_string(),
+        token_type: TokenType::Refresh,
+    };
+
+    let expired_refresh_token = jwt::encode(&header, &expired_refresh_claims, &ctx.encoding_key).unwrap();
+
+    // Test that expired refresh token is rejected
+    let result = decode_refresh_token(&ctx, &expired_refresh_token);
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), JwtError::TokenExpired));
+
+    // Test that a valid refresh token still works
+    let valid_token = generate_refresh_token(&ctx, user_id).unwrap();
+    let claims = decode_refresh_token(&ctx, &valid_token).unwrap();
+    assert_eq!(claims.sub, user_id.to_string());
+}
+
+#[test]
+fn test_future_token_valid() {
+    use chrono::Utc;
+    use jsonwebtoken as jwt;
+    use uuid::Uuid;
+
+    let ctx = create_test_context();
+    let user_id = 123;
+    let username = "test_user";
+
+    // Create a token that expires far in the future
+    let now = Utc::now().timestamp();
+    let future_expiry = now + 86400; // 24 hours from now
+
+    let header = jwt::Header::new(jwt::Algorithm::HS256);
+    let future_claims = AccessTokenClaims {
+        sub: user_id.to_string(),
+        username: username.to_string(),
+        tenant_id: None,
+        exp: future_expiry,
+        iat: now,
+        jti: Uuid::new_v4().to_string(),
+        token_type: TokenType::Access,
+    };
+
+    let future_token = jwt::encode(&header, &future_claims, &ctx.encoding_key).unwrap();
+
+    // Test that future token is accepted
+    let claims = decode_access_token(&ctx, &future_token).unwrap();
+    assert_eq!(claims.sub, user_id.to_string());
+    assert_eq!(claims.username, username);
+    assert_eq!(claims.exp, future_expiry);
 }
 
 #[test]

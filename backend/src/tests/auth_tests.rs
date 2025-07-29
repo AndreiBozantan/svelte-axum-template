@@ -283,18 +283,15 @@ async fn test_protected_route_with_invalid_token() {
 
 #[tokio::test]
 async fn test_access_token_expiry() {
-    // Create config with very short token expiry
-    let config = cfg::AppSettings {
-        jwt: cfg::JwtSettings {
-            access_token_expiry: 1, // 1 second
-            refresh_token_expiry: 86400,
-        },
-        ..Default::default()
-    };
+    // Instead of using sleep and waiting for tokens to expire (which is slow and flaky),
+    // we manually create expired tokens with past timestamps for fast, deterministic testing
+    use chrono::Utc;
+    use jsonwebtoken as jwt;
+    use uuid::Uuid;
 
-    let server = create_test_server(config).await;
+    let server = create_test_server(default_config()).await;
 
-    // Login
+    // First, login to verify the endpoint works with valid tokens
     let login_response = server
         .post("/auth/login")
         .json(&json!({
@@ -304,25 +301,47 @@ async fn test_access_token_expiry() {
         .await;
 
     let login_body: Value = login_response.json();
-    let access_token = login_body["tokens"]["access_token"].as_str().unwrap();
+    let valid_access_token = login_body["tokens"]["access_token"].as_str().unwrap();
 
-    // Test token works before expiry
-    let response_before = server
+    // Test that a valid token works
+    let response_valid = server
         .get("/api")
-        .add_header(header::AUTHORIZATION, format!("Bearer {access_token}"))
+        .add_header(header::AUTHORIZATION, format!("Bearer {valid_access_token}"))
         .await;
-    response_before.assert_status(StatusCode::OK);
+    response_valid.assert_status(StatusCode::OK);
 
-    // Wait for token to expire (longer wait to ensure expiration)
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    // Now create an expired token manually using the same JWT context setup as the server
+    let jwt_settings = cfg::JwtSettings {
+        access_token_expiry: 3600,
+        refresh_token_expiry: 86400,
+    };
+    let jwt_secret = "test__secret__key__for__jwt__testing";
+    let jwt_context = auth::JwtContext::new(&jwt_settings, jwt_secret).unwrap();
 
-    // Try to use expired token
-    let response = server
+    // Create an expired access token by setting past timestamps
+    let now = Utc::now().timestamp();
+    let expired_time = now - 3600; // 1 hour ago
+
+    let header = jwt::Header::new(jwt::Algorithm::HS256);
+    let expired_claims = auth::AccessTokenClaims {
+        sub: "1".to_string(), // User ID from our test user
+        username: TEST_USERNAME.to_string(),
+        tenant_id: Some(1),
+        exp: expired_time, // Expired timestamp
+        iat: expired_time - 3600, // Issued 2 hours ago
+        jti: Uuid::new_v4().to_string(),
+        token_type: auth::TokenType::Access,
+    };
+
+    let expired_token = jwt::encode(&header, &expired_claims, &jwt_context.encoding_key).unwrap();
+
+    // Test that expired token is rejected
+    let response_expired = server
         .get("/api")
-        .add_header(header::AUTHORIZATION, format!("Bearer {access_token}"))
+        .add_header(header::AUTHORIZATION, format!("Bearer {expired_token}"))
         .await;
 
-    response.assert_status(StatusCode::UNAUTHORIZED);
+    response_expired.assert_status(StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
