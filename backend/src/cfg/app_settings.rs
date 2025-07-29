@@ -32,19 +32,19 @@ impl AppSettings {
         let mut builder = config::Config::builder();
 
         // Layer 1: Add default configuration from files
-        let default_config_path = config_path.join("default.toml");
+        let default_config_path = config_path.join("configs.default.toml");
         if default_config_path.exists() {
             builder = builder.add_source(File::from(default_config_path));
         }
 
         // Layer 2: Add environment-specific config
-        let env_config_path = config_path.join(format!("{app_run_env}.toml"));
+        let env_config_path = config_path.join(format!("configs.{app_run_env}.toml"));
         if env_config_path.exists() {
             builder = builder.add_source(File::from(env_config_path));
         }
 
         // Layer 3: Add local config overrides
-        let local_config_path = config_path.join("local.toml");
+        let local_config_path = config_path.join("configs.local.toml");
         if local_config_path.exists() {
             builder = builder.add_source(File::from(local_config_path));
         }
