@@ -77,7 +77,7 @@ impl AppSettings {
 
     #[must_use]
     pub fn get_config_path() -> &'static Path {
-        Path::new("config")
+        Path::new(".")
     }
 
     #[must_use]
