@@ -20,3 +20,9 @@ refresh_token_expiry_days = 128
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = "http://localhost:3000/auth/oauth/google/callback"
+
+# Security: Allowed domains for OAuth redirects (prevents open redirect attacks)
+allowed_redirect_domains = ["localhost", "127.0.0.1"]  # Add production domains here
+
+# Session timeout for OAuth flow (in minutes)
+session_timeout_minutes = 10

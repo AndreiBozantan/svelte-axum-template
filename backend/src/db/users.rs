@@ -118,3 +118,27 @@ pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str
     .await?;
     Ok(user)
 }
+
+pub async fn get_user_by_email(db: &DbContext, email: &str) -> Result<User, DbError> {
+    let user = sqlx::query_as!(
+        User,
+        r#"
+        SELECT
+            id "id!",
+            username "username!",
+            password_hash,
+            email,
+            tenant_id,
+            sso_provider,
+            sso_id,
+            created_at "created_at!",
+            updated_at "updated_at!"
+        FROM users
+        WHERE email = ?
+        "#,
+        email
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(user)
+}

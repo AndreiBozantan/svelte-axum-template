@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Request, StatusCode};
+use axum::http::{Request, StatusCode, HeaderMap};
 use axum::response::IntoResponse;
 use chrono::DateTime;
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::auth;
 use crate::core;
 use crate::db;
-use crate::services::sso;
+use crate::services::{sso, audit};
 
 #[derive(Deserialize)]
 pub struct Login {
@@ -198,31 +198,105 @@ pub async fn revoke_token(
 }
 
 /// Handler for initiating Google OAuth flow
-pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
-    let (auth_url, _csrf_token) = sso::get_google_auth_url(&context.settings.oauth)?;
-    // In production, you should store the CSRF token in a secure session store
-    // For now, we'll rely on the OAuth provider's state validation
+pub async fn google_auth_init(
+    State(context): State<core::ArcContext>,
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<impl IntoResponse, AuthError> {
+    let client_ip = audit::extract_client_ip(&headers);
+    let user_agent = audit::extract_user_agent(&headers);
+    let redirect_url = params.get("redirect_url").cloned();
+
+    // Audit log
+    audit::log_oauth_event(&audit::OAuthAuditEvent::FlowInitiated {
+        provider: "google".to_string(),
+        client_ip: client_ip.clone(),
+        user_agent,
+        redirect_url: redirect_url.clone(),
+    });
+
+    tracing::info!("Initiating Google OAuth flow from IP: {}", client_ip);
+
+    let (auth_url, _state) = sso::get_google_auth_url(
+        &context.settings.oauth,
+        &context.oauth_session_store,
+        redirect_url,
+    ).await?;
+
     Ok(axum::response::Redirect::to(auth_url.as_str()))
 }
 
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
     State(context): State<core::ArcContext>,
+    headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Google OAuth callback received with state: {}", params.state);
-    let user_info = sso::get_google_user_info(&context, &params.code).await?;
+    let client_ip = audit::extract_client_ip(&headers);
+    tracing::info!("Google OAuth callback received with state: {} from IP: {}", params.state, client_ip);
+
+    let (user_info, redirect_url) = match sso::get_google_user_info(
+        &context,
+        &params.code,
+        &params.state,
+        &context.oauth_session_store,
+    ).await {
+        Ok(result) => {
+            audit::log_oauth_event(&audit::OAuthAuditEvent::CallbackReceived {
+                provider: "google".to_string(),
+                client_ip: client_ip.clone(),
+                state: params.state.clone(),
+                success: true,
+                error: None,
+            });
+            result
+        }
+        Err(e) => {
+            audit::log_oauth_event(&audit::OAuthAuditEvent::CallbackReceived {
+                provider: "google".to_string(),
+                client_ip: client_ip.clone(),
+                state: params.state.clone(),
+                success: false,
+                error: Some(e.to_string()),
+            });
+            return Err(AuthError::OAuthOperationFailed(e));
+        }
+    };
+
     tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
+
+    // Validate email is verified
+    if !user_info.verified_email {
+        tracing::warn!("User email not verified: {}", user_info.email);
+        audit::log_oauth_event(&audit::OAuthAuditEvent::SecurityViolation {
+            violation_type: "unverified_email".to_string(),
+            client_ip: client_ip.clone(),
+            details: format!("Attempted login with unverified email: {}", user_info.email),
+        });
+        return Err(AuthError::InvalidCredentials);
+    }
 
     // Check if user already exists
     let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
-    let user = match existing_user {
+    let (user, is_new_user) = match existing_user {
         Ok(user) => {
             tracing::info!("Existing SSO user found: {}", user.username);
-            user
+            (user, false)
         }
         Err(core::DbError::RowNotFound) => {
             tracing::info!("No existing user found, creating new user for: {}", user_info.email);
+
+            // Check if email is already in use by a non-SSO user
+            if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
+                tracing::warn!("Email already in use by existing user: {}", user_info.email);
+                audit::log_oauth_event(&audit::OAuthAuditEvent::SecurityViolation {
+                    violation_type: "email_already_exists".to_string(),
+                    client_ip: client_ip.clone(),
+                    details: format!("OAuth attempt with email already in use: {}", user_info.email),
+                });
+                return Err(AuthError::InvalidCredentials);
+            }
+
             let new_user = db::NewUser {
                 username: user_info.email.clone(), // Use email as username for SSO users
                 password_hash: None,               // No password for SSO users
@@ -233,7 +307,7 @@ pub async fn google_auth_callback(
             };
             let user = db::create_user(&context.db, new_user).await?;
             tracing::info!("Created new SSO user: {}", user.username);
-            user
+            (user, true)
         }
         Err(e) => {
             tracing::error!("Failed to retrieve or create user: {}", e);
@@ -241,10 +315,17 @@ pub async fn google_auth_callback(
         }
     };
 
-    // TODO: move duplicate code (login function) to a common function
+    // Log successful authentication
+    audit::log_oauth_event(&audit::OAuthAuditEvent::UserAuthenticated {
+        provider: "google".to_string(),
+        user_id: user.id,
+        email: user_info.email.clone(),
+        is_new_user,
+        client_ip,
+    });
+
     // Generate JWT tokens for the user (same as regular login)
     let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
-
     let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
 
     // Store refresh token in database
@@ -261,14 +342,19 @@ pub async fn google_auth_callback(
 
     let jwt_token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
 
-    // For OAuth flow, redirect to frontend with success status
-    // TODO: In production, consider a more secure approach like server-side session or secure cookies
-    let redirect_url = format!(
-        "http://localhost:5173/login?oauth_success=true&access_token={}&refresh_token={}",
-        jwt_token_response.access_token, jwt_token_response.refresh_token
+    // Use provided redirect URL or default
+    let final_redirect_url = redirect_url.unwrap_or_else(|| {
+        "http://localhost:5173/login".to_string()
+    });
+
+    let redirect_url_with_tokens = format!(
+        "{}?oauth_success=true&access_token={}&refresh_token={}",
+        final_redirect_url,
+        jwt_token_response.access_token,
+        jwt_token_response.refresh_token
     );
 
-    Ok(axum::response::Redirect::to(&redirect_url))
+    Ok(axum::response::Redirect::to(&redirect_url_with_tokens))
 }
 
 fn get_token_hash_as_hex(token: &str) -> String {

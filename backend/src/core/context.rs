@@ -1,6 +1,7 @@
 use crate::auth;
 use crate::cfg;
 use crate::core;
+use crate::services::sso;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
@@ -10,6 +11,7 @@ pub struct Context {
     pub jwt: auth::JwtContext,
     pub settings: cfg::AppSettings,
     pub http_client: reqwest::Client,
+    pub oauth_session_store: sso::OAuthSessionStore,
 }
 
 impl Context {
@@ -25,6 +27,7 @@ impl Context {
             jwt,
             settings,
             http_client,
+            oauth_session_store: sso::create_oauth_session_store(),
         }
         .into()
     }

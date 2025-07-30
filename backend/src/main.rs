@@ -64,7 +64,12 @@ pub mod routes {
     pub mod health;
 }
 
+pub mod middleware {
+    pub mod rate_limit;
+}
+
 pub mod services {
+    pub mod audit;
     pub mod sso;
 }
 
