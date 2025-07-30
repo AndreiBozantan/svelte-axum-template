@@ -5,10 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::cfg;
 
-// TODO: move jwt secret generation to JwtContext
-// TODO: write config to file if it doesn't exist, so that it can be modified by users
-// TODO: update default_config.toml to include all settings
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AppSettings {
     #[serde(default)]

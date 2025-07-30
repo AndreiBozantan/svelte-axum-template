@@ -12,6 +12,6 @@ access_token_expiry_minutes = 16
 refresh_token_expiry_days = 128
 
 [oauth]
-google_client_id = ""      # ⚠️ LEAVE EMPTY - set via secure method above
-google_client_secret = ""  # ⚠️ LEAVE EMPTY - set via secure method above
+google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
+google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = "http://localhost:3000/auth/oauth/google/callback"
