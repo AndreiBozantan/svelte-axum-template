@@ -64,8 +64,9 @@ impl AppSettings {
         // Build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;
 
-        // if !env_config_exists
-        {
+        // In the production environment, create the config file if it doesn't exist.
+        // This allows users to easily modify the file without needing to copy it during deployment.
+        if app_run_env == "production" && !env_config_exists {
             let settings_str = toml::to_string(&settings)
                 .map_err(|e| ConfigError::Message(format!("Failed to serialize config: {e}")))?;
             fs::write(&env_config_path, settings_str)
