@@ -8,8 +8,8 @@ use crate::cfg;
 
 fn create_test_context() -> JwtContext {
     let settings = cfg::JwtSettings {
-        access_token_expiry: 3600,   // 1 hour
-        refresh_token_expiry: 86400, // 24 hours
+        access_token_expiry_minutes: 60,
+        refresh_token_expiry_days: 1,
     };
     // For tests, create a JwtContext with a fixed secret
     let secret = "test_secret_key_for_jwt_testing";
@@ -78,8 +78,8 @@ fn test_decode_refresh_token_success() {
 fn test_decode_access_token_wrong_secret() {
     // Create a context with a different secret
     let settings = cfg::JwtSettings {
-        access_token_expiry: 3600,   // 1 hour
-        refresh_token_expiry: 86400, // 24 hours
+        access_token_expiry_minutes: 60,
+        refresh_token_expiry_days: 1,
     };
     let wrong_secret = "wrong_secret_for_testing_1234567890";
     let wrong_ctx = JwtContext::new(&settings, wrong_secret).unwrap();

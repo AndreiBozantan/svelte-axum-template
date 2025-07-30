@@ -2,11 +2,11 @@
 .vscode
 
 # rust files
-Cargo.lock
-target
-local.toml
-config/.jwt_secret
 .env
+.jwt.secret
+Cargo.lock
+configs.local.toml
+target
 
 # svelte files
 frontend/dist/

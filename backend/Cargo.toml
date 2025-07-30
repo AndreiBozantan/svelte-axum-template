@@ -39,6 +39,7 @@ oauth2 = { version = "5.0", features = ["reqwest"] }
 url = { version = "2.5" }
 reqwest = { version = "0.12", features = ["json"] }
 dotenvy = { version = "0.15" }
+toml = { version = "0.9.3" }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]

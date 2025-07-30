@@ -1,6 +1,6 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OAuthSettings {
     #[serde(default)]
     pub google_client_id: String,

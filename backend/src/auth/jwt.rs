@@ -137,8 +137,8 @@ impl JwtContext {
             encoding_key,
             decoding_key,
             validation,
-            access_token_expiry: settings.access_token_expiry,
-            refresh_token_expiry: settings.refresh_token_expiry,
+            access_token_expiry: 60 * i64::from(settings.access_token_expiry_minutes),
+            refresh_token_expiry: 60 * 60 * 24 * i64::from(settings.refresh_token_expiry_days)
         })
     }
 }
@@ -212,7 +212,7 @@ pub fn decode_refresh_token(ctx: &JwtContext, token: &str) -> Result<RefreshToke
 /// Loads or creates a JWT secret
 pub fn get_jwt_secret() -> Result<String, JwtError> {
     // check persisted secret file
-    let secret_file_path = cfg::AppSettings::get_config_path().join(".jwt_secret");
+    let secret_file_path = cfg::AppSettings::get_config_path().join(".jwt.secret");
     if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
         let trimmed_secret = file_secret.trim();
         if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {

@@ -173,7 +173,7 @@ pub async fn refresh_access_token(
     Ok(Json(json!({
         "result": "ok",
         "access_token": new_access_token,
-        "expires_in": context.settings.jwt.access_token_expiry,
+        "expires_in": context.settings.jwt.access_token_expiry_minutes * 60,
         "user": {
             "id": user.id,
             "username": user.username,
