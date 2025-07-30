@@ -16,8 +16,8 @@ const TEST_USERNAME: &str = "test_user";
 fn default_config() -> cfg::AppSettings {
     cfg::AppSettings {
         jwt: cfg::JwtSettings {
-            access_token_expiry: 3600,
-            refresh_token_expiry: 86400,
+            access_token_expiry_minutes: 60,
+            refresh_token_expiry_days: 1,
         },
         ..Default::default()
     }
@@ -312,8 +312,8 @@ async fn test_access_token_expiry() {
 
     // Now create an expired token manually using the same JWT context setup as the server
     let jwt_settings = cfg::JwtSettings {
-        access_token_expiry: 3600,
-        refresh_token_expiry: 86400,
+        access_token_expiry_minutes: 60,
+        refresh_token_expiry_days: 1,
     };
     let jwt_secret = "test__secret__key__for__jwt__testing";
     let jwt_context = auth::JwtContext::new(&jwt_settings, jwt_secret).unwrap();

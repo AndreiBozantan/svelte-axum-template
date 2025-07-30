@@ -1,12 +1,17 @@
 [server]
-host = "0.0.0.0"
+host = "127.0.0.1"
 port = 3000
-log_directives = "info,tower_http=info"
+log_directives = "debug,tower_http=debug,axum=debug"
 
 [database]
 url = "sqlite:db.sqlite"
-max_connections = 10
+max_connections = 5
 
 [jwt]
-access_token_expiry = 900    # 15 minutes
-refresh_token_expiry = 604800  # 7 days
+access_token_expiry_minutes = 16
+refresh_token_expiry_days = 128
+
+[oauth]
+google_client_id = ""      # ⚠️ LEAVE EMPTY - set via secure method above
+google_client_secret = ""  # ⚠️ LEAVE EMPTY - set via secure method above
+google_redirect_uri = ""

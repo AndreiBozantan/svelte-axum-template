@@ -1,19 +1,19 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct JwtSettings {
     #[serde(default)]
-    pub access_token_expiry: i64, // In seconds (e.g., 15 minutes = 900)
+    pub access_token_expiry_minutes: u32,
 
     #[serde(default)]
-    pub refresh_token_expiry: i64, // In seconds (e.g., 7 days = 604800)
+    pub refresh_token_expiry_days: u32,
 }
 
 impl Default for JwtSettings {
     fn default() -> Self {
         Self {
-            access_token_expiry: 15 * 60,             // 15 minutes
-            refresh_token_expiry: 200 * 24 * 60 * 60, // 200 days
+            access_token_expiry_minutes: 16,
+            refresh_token_expiry_days: 128,
         }
     }
 }

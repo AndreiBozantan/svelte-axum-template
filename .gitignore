@@ -3,7 +3,7 @@
 
 # rust files
 .env
-.jwtsecret
+.jwt.secret
 Cargo.lock
 configs.local.toml
 target
