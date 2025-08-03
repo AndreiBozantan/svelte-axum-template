@@ -203,26 +203,13 @@ pub async fn google_auth_init(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let client_ip = audit::extract_client_ip(&headers);
-    let user_agent = audit::extract_user_agent(&headers);
-    let redirect_url = params.get("redirect_url").cloned();
-
-    // Audit log
-    audit::log_oauth_event(&audit::OAuthAuditEvent::FlowInitiated {
-        provider: "google".to_string(),
-        client_ip: client_ip.clone(),
-        user_agent,
-        redirect_url: redirect_url.clone(),
-    });
-
-    tracing::info!("Initiating Google OAuth flow from IP: {}", client_ip);
-
+    let redirect_url = params.get("redirect_url");
+    audit::log_oauth_flow_initiated("google", &headers, &redirect_url);
     let (auth_url, _state) = sso::get_google_auth_url(
         &context.settings.oauth,
         &context.oauth_session_store,
         redirect_url,
     ).await?;
-
     Ok(axum::response::Redirect::to(auth_url.as_str()))
 }
 
@@ -232,47 +219,18 @@ pub async fn google_auth_callback(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let client_ip = audit::extract_client_ip(&headers);
-    tracing::info!("Google OAuth callback received with state: {} from IP: {}", params.state, client_ip);
-
-    let (user_info, redirect_url) = match sso::get_google_user_info(
-        &context,
-        &params.code,
-        &params.state,
-        &context.oauth_session_store,
-    ).await {
-        Ok(result) => {
-            audit::log_oauth_event(&audit::OAuthAuditEvent::CallbackReceived {
-                provider: "google".to_string(),
-                client_ip: client_ip.clone(),
-                state: params.state.clone(),
-                success: true,
-                error: None,
-            });
-            result
-        }
-        Err(e) => {
-            audit::log_oauth_event(&audit::OAuthAuditEvent::CallbackReceived {
-                provider: "google".to_string(),
-                client_ip: client_ip.clone(),
-                state: params.state.clone(),
-                success: false,
-                error: Some(e.to_string()),
-            });
-            return Err(AuthError::OAuthOperationFailed(e));
-        }
-    };
-
-    tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
+    let result = sso::get_google_user_info(&context, &params.code, &params.state).await;
+    audit::log_oauth_callback_received("google", &headers, &params.state, &result.as_ref().err());
+    let (user_info, redirect_url) = result?;
 
     // Validate email is verified
     if !user_info.verified_email {
         tracing::warn!("User email not verified: {}", user_info.email);
-        audit::log_oauth_event(&audit::OAuthAuditEvent::SecurityViolation {
-            violation_type: "unverified_email".to_string(),
-            client_ip: client_ip.clone(),
-            details: format!("Attempted login with unverified email: {}", user_info.email),
-        });
+        audit::log_oauth_security_violation(
+            "unverified_email",
+            &headers,
+            &format!("User attempted login with unverified email: {}", user_info.email),
+        );
         return Err(AuthError::InvalidCredentials);
     }
 
@@ -289,11 +247,11 @@ pub async fn google_auth_callback(
             // Check if email is already in use by a non-SSO user
             if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
                 tracing::warn!("Email already in use by existing user: {}", user_info.email);
-                audit::log_oauth_event(&audit::OAuthAuditEvent::SecurityViolation {
-                    violation_type: "email_already_exists".to_string(),
-                    client_ip: client_ip.clone(),
-                    details: format!("OAuth attempt with email already in use: {}", user_info.email),
-                });
+                audit::log_oauth_security_violation(
+                    "email_already_exists",
+                    &headers,
+                    &format!("OAuth attempt with email already in use: {}", user_info.email),
+                );
                 return Err(AuthError::InvalidCredentials);
             }
 
@@ -315,14 +273,7 @@ pub async fn google_auth_callback(
         }
     };
 
-    // Log successful authentication
-    audit::log_oauth_event(&audit::OAuthAuditEvent::UserAuthenticated {
-        provider: "google".to_string(),
-        user_id: user.id,
-        email: user_info.email.clone(),
-        is_new_user,
-        client_ip,
-    });
+    audit::log_oauth_user_authenticated("google", &headers, user.id, &user_info.email, is_new_user);
 
     // Generate JWT tokens for the user (same as regular login)
     let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;

@@ -134,7 +134,7 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
 pub async fn get_google_auth_url(
     config: &cfg::OAuthSettings,
     session_store: &OAuthSessionStore,
-    redirect_url: Option<String>,
+    redirect_url: Option<&String>,
 ) -> Result<(Url, String), Error> {
     let client = create_google_client(config)?;
 
@@ -154,7 +154,7 @@ pub async fn get_google_auth_url(
     let state = csrf_token.secret().clone();
     let session = OAuthSession {
         csrf_token: state.clone(),
-        redirect_url,
+        redirect_url: redirect_url.cloned(),
         created_at: Utc::now(),
     };
 
@@ -175,15 +175,10 @@ pub async fn get_google_auth_url(
     Ok((auth_url, state))
 }
 
-pub async fn get_google_user_info(
-    context: &core::ArcContext,
-    code: &str,
-    state: &str,
-    session_store: &OAuthSessionStore,
-) -> Result<(GoogleUserInfo, Option<String>), Error> {
+pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state: &str) -> Result<(GoogleUserInfo, Option<String>), Error> {
     // Validate state parameter (CSRF protection)
     let session = {
-        let mut store = session_store.write().await;
+        let mut store = context.oauth_session_store.write().await;
         store.remove(state).ok_or(Error::CsrfValidationFailed)?
     };
 
