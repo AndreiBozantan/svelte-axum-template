@@ -66,27 +66,20 @@ impl From<core::DbError> for AuthError {
 impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
     fn into_response(self) -> axum::response::Response {
-        // TODO: replace with audit::log_ call??
-        tracing::error!(
-            error_type = %std::any::type_name::<Self>(),
-            error_subtype = %std::any::type_name_of_val(&self),
-            error_message = %self);
-
-        let (status, error_message) = match self {
-            Self::PasswordHashingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::JwtOperationFailed(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::UserNotFound => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::TokenInvalid => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::OAuthOperationFailed(e) => (StatusCode::UNAUTHORIZED, e.to_string()),
+        audit::log_auth_error(&self);
+        let status = match self {
+            Self::PasswordHashingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::DatabaseOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
+            Self::UserNotFound => StatusCode::UNAUTHORIZED,
+            Self::TokenInvalid => StatusCode::UNAUTHORIZED,
+            Self::OAuthOperationFailed(_) => StatusCode::UNAUTHORIZED,
         };
-
         let body = Json(json!({
             "result": "error",
-            "message": error_message
+            "message": self.to_string(),
         }));
-
         (status, body).into_response()
     }
 }
@@ -94,14 +87,15 @@ impl IntoResponse for AuthError {
 /// Login route
 pub async fn login(
     State(context): State<core::ArcContext>,
+    headers: HeaderMap,
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Logging in user: {}", login.username);
+    audit::log_user_login(&headers, &login.username);
 
     // Get user from database
     let user = db::get_user_by_name(&context.db, &login.username).await?;
     if !auth::verify_password(&login.password, user.password_hash)? {
-        tracing::warn!("Invalid password for user: {}", login.username);
+        audit::log_invalid_password(&headers, &login.username);
         return Err(AuthError::InvalidCredentials);
     }
 
@@ -139,7 +133,7 @@ pub async fn logout(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     let claims = auth::decode_access_token_from_req(&context.jwt, &req)?;
-    tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
+    audit::log_user_logout(req.headers(), &claims.sub, &claims.username);
 
     // revoke all the associated refresh tokens
     let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
@@ -153,9 +147,10 @@ pub async fn logout(
 /// Route to refresh access token using refresh token
 pub async fn refresh_access_token(
     State(context): State<core::ArcContext>,
+    headers: HeaderMap,
     Json(request): Json<RefreshTokenRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Refreshing access token");
+    audit::log_token_refresh(&headers);
 
     // Decode refresh token and check if it exists in database and is not revoked
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
@@ -186,9 +181,10 @@ pub async fn refresh_access_token(
 /// Route to revoke a refresh token
 pub async fn revoke_token(
     State(context): State<core::ArcContext>,
+    headers: HeaderMap,
     Json(request): Json<RevokeTokenRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Revoking refresh token");
+    audit::log_token_revoke(&headers);
 
     // Decode refresh token to get JTI
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
