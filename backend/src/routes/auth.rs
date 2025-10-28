@@ -222,7 +222,6 @@ pub async fn google_auth_callback(
 
     // Validate email is verified
     if !user_info.verified_email {
-        tracing::warn!("User email not verified: {}", user_info.email);
         audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email, &params.state);
         return Err(AuthError::InvalidCredentials);
     }
@@ -239,16 +238,15 @@ pub async fn google_auth_callback(
 
             // Check if email is already in use by a non-SSO user
             if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
-                tracing::warn!("Email already in use by existing user: {}", user_info.email);
                 audit::log_oauth_security_violation("email_already_exists", &headers, &user_info.email, &params.state);
                 return Err(AuthError::InvalidCredentials);
             }
 
             let new_user = db::NewUser {
-                username: user_info.email.clone(), // Use email as username for SSO users
-                password_hash: None,               // No password for SSO users
+                username: user_info.email.clone(),      // use email as username for SSO users
+                password_hash: None,                    // no password for SSO users
                 email: Some(user_info.email.clone()),
-                tenant_id: None, // You might want to assign a default tenant
+                tenant_id: None,                        // TODO: how to assign to a tenant???
                 sso_provider: Some("google".to_string()),
                 sso_id: Some(user_info.id.clone()),
             };
