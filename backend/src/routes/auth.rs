@@ -1,7 +1,7 @@
 use axum::Json;
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{Request, StatusCode, HeaderMap};
+use axum::http::{HeaderMap, Request, StatusCode};
 use axum::response::IntoResponse;
 use chrono::DateTime;
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::auth;
 use crate::core;
 use crate::db;
-use crate::services::{sso, audit};
+use crate::services::{audit, sso};
 
 #[derive(Deserialize)]
 pub struct Login {
@@ -290,15 +290,11 @@ pub async fn google_auth_callback(
     let jwt_token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
 
     // Use provided redirect URL or default
-    let final_redirect_url = redirect_url.unwrap_or_else(|| {
-        "http://localhost:5173/login".to_string()
-    });
+    let final_redirect_url = redirect_url.unwrap_or_else(|| "http://localhost:5173/login".to_string());
 
     let redirect_url_with_tokens = format!(
         "{}?oauth_success=true&access_token={}&refresh_token={}",
-        final_redirect_url,
-        jwt_token_response.access_token,
-        jwt_token_response.refresh_token
+        final_redirect_url, jwt_token_response.access_token, jwt_token_response.refresh_token
     );
 
     Ok(axum::response::Redirect::to(&redirect_url_with_tokens))

@@ -1,7 +1,6 @@
-use axum::http;
 use axum::body::Body;
+use axum::http;
 use axum::http::{HeaderValue, Request};
-
 
 use crate::auth::*;
 use crate::cfg;
@@ -132,7 +131,7 @@ fn test_token_expiry() {
         sub: user_id.to_string(),
         username: username.to_string(),
         tenant_id: None,
-        exp: expired_time, // Expired timestamp
+        exp: expired_time,        // Expired timestamp
         iat: expired_time - 3600, // Issued 2 hours ago
         jti: Uuid::new_v4().to_string(),
         token_type: TokenType::Access,
@@ -168,7 +167,7 @@ fn test_refresh_token_expiry() {
     let header = jwt::Header::new(jwt::Algorithm::HS256);
     let expired_refresh_claims = RefreshTokenClaims {
         sub: user_id.to_string(),
-        exp: expired_time, // Expired timestamp
+        exp: expired_time,        // Expired timestamp
         iat: expired_time - 3600, // Issued 2 hours ago
         jti: Uuid::new_v4().to_string(),
         token_type: TokenType::Refresh,

@@ -138,7 +138,7 @@ impl JwtContext {
             decoding_key,
             validation,
             access_token_expiry: 60 * i64::from(settings.access_token_expiry_minutes),
-            refresh_token_expiry: 60 * 60 * 24 * i64::from(settings.refresh_token_expiry_days)
+            refresh_token_expiry: 60 * 60 * 24 * i64::from(settings.refresh_token_expiry_days),
         })
     }
 }

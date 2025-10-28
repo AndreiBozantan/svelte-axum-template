@@ -1,3 +1,4 @@
+use chrono::{DateTime, Duration, Utc};
 use oauth2;
 use serde::Deserialize;
 use serde::Serialize;
@@ -6,7 +7,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use url::Url;
-use chrono::{DateTime, Utc, Duration};
 
 use crate::cfg;
 use crate::core;
@@ -96,19 +96,28 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), Error> {
         return Err(Error::InvalidConfig("Google Client ID is not configured".to_string()));
     }
     if config.google_client_secret.is_empty() {
-        return Err(Error::InvalidConfig("Google Client Secret is not configured".to_string()));
+        return Err(Error::InvalidConfig(
+            "Google Client Secret is not configured".to_string(),
+        ));
     }
     if config.google_redirect_uri.is_empty() {
-        return Err(Error::InvalidConfig("Google Redirect URI is not configured".to_string()));
+        return Err(Error::InvalidConfig(
+            "Google Redirect URI is not configured".to_string(),
+        ));
     }
 
     // validate redirect URI format
-    let _: Url = config.google_redirect_uri.parse()
+    let _: Url = config
+        .google_redirect_uri
+        .parse()
         .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
 
     // in production, ensure HTTPS
     if !config.google_redirect_uri.starts_with("https://") && !config.google_redirect_uri.contains("localhost") {
-        tracing::warn!("Google OAuth redirect URI should use HTTPS in production: {}", config.google_redirect_uri);
+        tracing::warn!(
+            "Google OAuth redirect URI should use HTTPS in production: {}",
+            config.google_redirect_uri
+        );
     }
 
     Ok(())
@@ -131,7 +140,10 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
     Ok(client)
 }
 
-pub async fn get_google_auth_url(context: &core::ArcContext, redirect_url: Option<&String>) -> Result<(Url, String), Error> {
+pub async fn get_google_auth_url(
+    context: &core::ArcContext,
+    redirect_url: Option<&String>,
+) -> Result<(Url, String), Error> {
     // validate redirect URL if provided
     if let Some(ref url) = redirect_url {
         validate_redirect_url(url, &context.settings.oauth)?;
@@ -153,7 +165,11 @@ pub async fn get_google_auth_url(context: &core::ArcContext, redirect_url: Optio
     Ok((auth_url, state))
 }
 
-pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state: &str) -> Result<(GoogleUserInfo, Option<String>), Error> {
+pub async fn get_google_user_info(
+    context: &core::ArcContext,
+    code: &str,
+    state: &str,
+) -> Result<(GoogleUserInfo, Option<String>), Error> {
     // validate state parameter (CSRF protection)
     let session_entry = {
         let mut store = context.oauth_session_store.write().await;
@@ -161,7 +177,11 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
     };
 
     if session_entry.csrf_token != state {
-        tracing::warn!("CSRF token mismatch: expected {}, got {}", session_entry.csrf_token, state);
+        tracing::warn!(
+            "CSRF token mismatch: expected {}, got {}",
+            session_entry.csrf_token,
+            state
+        );
         return Err(Error::CsrfValidationFailed);
     }
 
@@ -169,7 +189,9 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
     let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
     let session_entry_age = Utc::now() - session_entry.created_at;
     if session_entry_age > timeout_minutes {
-        return Err(Error::SessionNotFound { age_minutes: session_entry_age.num_minutes() });
+        return Err(Error::SessionNotFound {
+            age_minutes: session_entry_age.num_minutes(),
+        });
     }
 
     let client = create_google_client(&context.settings.oauth)?;
@@ -202,10 +224,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
         return Err(Error::InvalidConfig("Google userinfo API returned error".to_string()));
     }
 
-    let user_info: GoogleUserInfo = response
-        .json()
-        .await
-        .map_err(Error::UserInfoRetrievalApiCallFailed)?;
+    let user_info: GoogleUserInfo = response.json().await.map_err(Error::UserInfoRetrievalApiCallFailed)?;
 
     // validate user info
     if user_info.email.is_empty() || user_info.id.is_empty() {
@@ -247,7 +266,9 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), E
     // check against allowed domains from configuration
     match parsed_url.host_str() {
         Some(host) => {
-            let is_allowed = config.allowed_redirect_domains.iter()
+            let is_allowed = config
+                .allowed_redirect_domains
+                .iter()
                 .any(|allowed| host == allowed || host.ends_with(&format!(".{}", allowed)));
 
             if !is_allowed {

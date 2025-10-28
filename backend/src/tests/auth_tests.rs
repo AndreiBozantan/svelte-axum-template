@@ -327,7 +327,7 @@ async fn test_access_token_expiry() {
         sub: "1".to_string(), // User ID from our test user
         username: TEST_USERNAME.to_string(),
         tenant_id: Some(1),
-        exp: expired_time, // Expired timestamp
+        exp: expired_time,        // Expired timestamp
         iat: expired_time - 3600, // Issued 2 hours ago
         jti: Uuid::new_v4().to_string(),
         token_type: auth::TokenType::Access,

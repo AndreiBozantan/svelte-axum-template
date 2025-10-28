@@ -46,11 +46,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
         .layer(TraceLayer::new_for_http())
 }
 
-async fn auth_middleware(
-    State(context): State<core::ArcContext>,
-    req: Request<Body>,
-    next: Next,
-) -> Response {
+async fn auth_middleware(State(context): State<core::ArcContext>, req: Request<Body>, next: Next) -> Response {
     match auth::decode_access_token_from_req(&context.jwt, &req) {
         Ok(claims) => {
             tracing::debug!(
