@@ -16,7 +16,7 @@ use crate::services::{audit, sso};
 
 #[derive(Deserialize)]
 pub struct Login {
-    pub username: String,
+    pub username: String, // TODO: replace with email
     pub password: String,
 }
 
@@ -91,15 +91,18 @@ pub async fn login(
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
     audit::log_user_login(&headers, &login.username);
-
-    // Get user from database
     let user = db::get_user_by_name(&context.db, &login.username).await?;
-    if !auth::verify_password(&login.password, user.password_hash)? {
+    let password_hash = user.password_hash.as_ref().ok_or_else(|| {
+        audit::log_missing_password(&headers, &login.username);
+        AuthError::InvalidCredentials
+    })?;
+    if !auth::verify_password(&login.password, &password_hash)? {
         audit::log_invalid_password(&headers, &login.username);
         return Err(AuthError::InvalidCredentials);
     }
+    audit::log_user_login_success(&headers, &user.username);
 
-    // Generate JWT tokens with appropriate expiration
+    // generate JWT tokens with appropriate expiration
     let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
     let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
 
@@ -208,7 +211,7 @@ pub async fn google_auth_callback(
     axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
     let (user_info, redirect_url) = sso::get_google_user_info(&context, &params.code, &params.state).await?;
-    audit::log_oauth_callback_received("google", &headers, &params.state);
+    audit::log_oauth_callback_received("google", &headers, &params.state, &user_info.email);
 
     if !user_info.verified_email {
         audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email, &params.state);

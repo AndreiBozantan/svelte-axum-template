@@ -7,7 +7,7 @@ use crate::core::{DbContext, DbError};
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: i64,
-    pub username: String,
+    pub username: String,              // TODO: remove and use email only
     pub password_hash: Option<String>, // Nullable for SSO users
     pub email: Option<String>,
     pub tenant_id: Option<i64>,

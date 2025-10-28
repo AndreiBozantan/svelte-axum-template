@@ -35,7 +35,7 @@ pub fn log_oauth_redirecting(provider: &str, headers: &axum::http::HeaderMap, au
     );
 }
 
-pub fn log_oauth_callback_received(provider: &str, headers: &axum::http::HeaderMap, state: &str) {
+pub fn log_oauth_callback_received(provider: &str, headers: &axum::http::HeaderMap, state: &str, email: &str) {
     tracing::info!(
         event_type = "oauth_audit",
         client_ip = extract_client_ip(headers),
@@ -43,6 +43,7 @@ pub fn log_oauth_callback_received(provider: &str, headers: &axum::http::HeaderM
         state_hash = hash_state(state),
         message = "OAuth callback received",
         provider,
+        email,
     );
 }
 
@@ -97,7 +98,27 @@ pub fn log_user_login(headers: &axum::http::HeaderMap, username: &str) {
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
-        message = "User login",
+        message = "User login attempt",
+        username,
+    );
+}
+
+pub fn log_user_login_success(headers: &axum::http::HeaderMap, username: &str) {
+    tracing::info!(
+        event_type = "auth_audit",
+        client_ip = extract_client_ip(headers),
+        user_agent = extract_user_agent(headers),
+        message = "User login successful",
+        username,
+    );
+}
+
+pub fn log_missing_password(headers: &axum::http::HeaderMap, username: &str) {
+    tracing::warn!(
+        event_type = "auth_audit",
+        client_ip = extract_client_ip(headers),
+        user_agent = extract_user_agent(headers),
+        message = "Attempt login without password",
         username,
     );
 }
