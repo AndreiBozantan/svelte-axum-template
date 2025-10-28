@@ -66,6 +66,7 @@ impl From<core::DbError> for AuthError {
 impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
     fn into_response(self) -> axum::response::Response {
+        // TODO: replace with audit::log_ call??
         tracing::error!(
             error_type = %std::any::type_name::<Self>(),
             error_subtype = %std::any::type_name_of_val(&self),
@@ -216,58 +217,23 @@ pub async fn google_auth_callback(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let result = sso::get_google_user_info(&context, &params.code, &params.state).await;
-    audit::log_oauth_callback_received("google", &headers, &params.state, &result.as_ref().err());
-    let (user_info, redirect_url) = result?;
+    let (user_info, redirect_url) = sso::get_google_user_info(&context, &params.code, &params.state).await?;
+    audit::log_oauth_callback_received("google", &headers, &params.state);
 
-    // Validate email is verified
     if !user_info.verified_email {
         audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email, &params.state);
         return Err(AuthError::InvalidCredentials);
     }
 
-    // Check if user already exists
+    // check if user already exists
     let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
-    let (user, is_new_user) = match existing_user {
-        Ok(user) => {
-            tracing::info!("Existing SSO user found: {}", user.username);
-            (user, false)
-        }
-        Err(core::DbError::RowNotFound) => {
-            tracing::info!("No existing user found, creating new user for: {}", user_info.email);
+    let user = match existing_user {
+        Ok(user) => Ok(user),
+        Err(core::DbError::RowNotFound) => Ok(create_sso_user(&context, &user_info, "google", &headers, &params.state).await?),
+        Err(e) => Err(AuthError::DatabaseOperationFailed(e)),
+    }?;
 
-            // Check if email is already in use by a non-SSO user
-            if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
-                audit::log_oauth_security_violation("email_already_exists", &headers, &user_info.email, &params.state);
-                return Err(AuthError::InvalidCredentials);
-            }
-
-            let new_user = db::NewUser {
-                username: user_info.email.clone(),      // use email as username for SSO users
-                password_hash: None,                    // no password for SSO users
-                email: Some(user_info.email.clone()),
-                tenant_id: None,                        // TODO: how to assign to a tenant???
-                sso_provider: Some("google".to_string()),
-                sso_id: Some(user_info.id.clone()),
-            };
-            let user = db::create_user(&context.db, new_user).await?;
-            tracing::info!("Created new SSO user: {}", user.username);
-            (user, true)
-        }
-        Err(e) => {
-            tracing::error!("Failed to retrieve or create user: {}", e);
-            return Err(AuthError::DatabaseOperationFailed(e));
-        }
-    };
-
-    audit::log_oauth_user_authenticated(
-        "google",
-        &headers,
-        user.id,
-        &user_info.email,
-        is_new_user,
-        &params.state,
-    );
+    audit::log_oauth_user_authenticated("google", &headers, &user_info.email, &params.state);
 
     // Generate JWT tokens for the user (same as regular login)
     let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
@@ -287,15 +253,43 @@ pub async fn google_auth_callback(
 
     let jwt_token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
 
-    // Use provided redirect URL or default
+    // use provided redirect URL or default TODO: replace hardcoded URL
     let final_redirect_url = redirect_url.unwrap_or_else(|| "http://localhost:5173/login".to_string());
 
+    // TODO: !!!! don't put the tokens in the URL
     let redirect_url_with_tokens = format!(
         "{}?oauth_success=true&access_token={}&refresh_token={}",
         final_redirect_url, jwt_token_response.access_token, jwt_token_response.refresh_token
     );
 
     Ok(axum::response::Redirect::to(&redirect_url_with_tokens))
+}
+
+async fn create_sso_user(
+    context: &core::ArcContext,
+    user_info: &sso::GoogleUserInfo,
+    provider: &str,
+    headers: &HeaderMap,
+    state: &str,
+) -> Result<db::User, AuthError> {
+    audit::log_oauth_create_new_user(provider, headers, &user_info.email, state);
+
+    // Check if email is already in use by a non-SSO user
+    if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
+        audit::log_oauth_security_violation("email_already_exists", headers, &user_info.email, state);
+        return Err(AuthError::InvalidCredentials);
+    }
+
+    let new_user = db::NewUser {
+        username: user_info.email.clone(), // use email as username for SSO users
+        password_hash: None,               // no password for SSO users
+        email: Some(user_info.email.clone()),
+        tenant_id: None, // TODO: !!! how to assign to a tenant???
+        sso_provider: Some(provider.to_string()),
+        sso_id: Some(user_info.id.clone()),
+    };
+
+    db::create_user(&context.db, new_user).await.map_err(AuthError::from)
 }
 
 fn get_token_hash_as_hex(token: &str) -> String {

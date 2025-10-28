@@ -27,20 +27,13 @@ pub fn log_oauth_redirecting(provider: &str, headers: &axum::http::HeaderMap, au
     );
 }
 
-pub fn log_oauth_callback_received(
-    provider: &str,
-    headers: &axum::http::HeaderMap,
-    state: &str,
-    err: &Option<impl std::error::Error>,
-) {
+pub fn log_oauth_callback_received(provider: &str, headers: &axum::http::HeaderMap, state: &str) {
     let client_ip = extract_client_ip(headers);
     tracing::info!(
         event_type = "oauth_audit",
         provider = provider,
         client_ip = client_ip,
         state_hash = %hash_state(state),
-        success = err.is_none(),
-        error = ?err,
         message = "OAuth callback received"
     );
 }
@@ -57,21 +50,24 @@ pub fn log_oauth_security_violation(violation_type: &str, headers: &axum::http::
     );
 }
 
-pub fn log_oauth_user_authenticated(
-    provider: &str,
-    headers: &axum::http::HeaderMap,
-    user_id: i64,
-    email: &str,
-    is_new_user: bool,
-    state: &str,
-) {
+pub fn log_oauth_create_new_user(provider: &str, headers: &axum::http::HeaderMap, email: &str, state: &str) {
     let client_ip = extract_client_ip(headers);
     tracing::info!(
         event_type = "oauth_audit",
         provider = provider,
-        user_id = user_id,
         email = email,
-        is_new_user = is_new_user,
+        client_ip = client_ip,
+        state_hash = %hash_state(state),
+        message = "Creating new user for OAuth login"
+    );
+}
+
+pub fn log_oauth_user_authenticated(provider: &str, headers: &axum::http::HeaderMap, email: &str, state: &str) {
+    let client_ip = extract_client_ip(headers);
+    tracing::info!(
+        event_type = "oauth_audit",
+        provider = provider,
+        email = email,
         client_ip = client_ip,
         state_hash = %hash_state(state),
         message = "User authenticated via OAuth"
