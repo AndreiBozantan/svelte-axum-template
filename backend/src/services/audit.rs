@@ -108,21 +108,26 @@ pub fn log_user_logout(headers: &axum::http::HeaderMap, user_id: &str, username:
     );
 }
 
-pub fn log_token_refresh(headers: &axum::http::HeaderMap) {
+pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &str, subject: &str) {
     tracing::info!(
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        message = "Token refresh"
+        user_agent = extract_user_agent(headers),
+user_id = user_id,
+        subject = subject,
+        jti = jti,
+        message = "Token refreshed"
     );
 }
 
-pub fn log_token_revoke(headers: &axum::http::HeaderMap) {
+pub fn log_token_revoke(headers: &axum::http::HeaderMap, jti: &str, subject: &str) {
     tracing::info!(
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        message = "Token revoke"
+        user_agent = extract_user_agent(headers),
+subject = subject,
+        jti = jti,
+        message = "Token revoked"
     );
 }
 

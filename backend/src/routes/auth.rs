@@ -150,21 +150,18 @@ pub async fn refresh_access_token(
     headers: HeaderMap,
     Json(request): Json<RefreshTokenRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    audit::log_token_refresh(&headers);
-
-    // Decode refresh token and check if it exists in database and is not revoked
+    // decode refresh token and check if it exists in database and is not revoked
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
-
-    // Verify token hash
-    let token_hash = get_token_hash_as_hex(&request.refresh_token);
+    let token_hash = get_token_hash_as_hex(&request.refresh_token); // verify token hash
     if stored_token.token_hash != token_hash {
         return Err(AuthError::TokenInvalid);
     }
 
-    // Generate new access token for the user
+    // generate new access token for the user
     let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
     let new_access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
+    audit::log_token_refresh(&headers, user.id, &refresh_claims.jti, &refresh_claims.sub);
 
     Ok(Json(json!({
         "result": "ok",
@@ -184,13 +181,10 @@ pub async fn revoke_token(
     headers: HeaderMap,
     Json(request): Json<RevokeTokenRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    audit::log_token_revoke(&headers);
-
-    // Decode refresh token to get JTI
+    // decode refresh token to get JTI
     let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
-
-    // Revoke the token
-    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
+    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?; // revoke the token
+    audit::log_token_revoke(&headers, &refresh_claims.jti, &refresh_claims.sub);
     Ok(Json(json!({"result": "ok"})))
 }
 
@@ -225,7 +219,9 @@ pub async fn google_auth_callback(
     let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
     let user = match existing_user {
         Ok(user) => Ok(user),
-        Err(core::DbError::RowNotFound) => Ok(create_sso_user(&context, &user_info, "google", &headers, &params.state).await?),
+        Err(core::DbError::RowNotFound) => {
+            Ok(create_sso_user(&context, &user_info, "google", &headers, &params.state).await?)
+        }
         Err(e) => Err(AuthError::DatabaseOperationFailed(e)),
     }?;
 
