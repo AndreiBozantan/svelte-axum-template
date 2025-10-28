@@ -2,69 +2,83 @@ use sha2::{Digest, Sha256};
 
 use crate::routes::auth::AuthError;
 
+pub fn log_auth_error(error: &AuthError) {
+    tracing::error!(
+        event_type = "auth_audit",
+        error_type = "AuthError",
+        error_subtype = std::any::type_name_of_val(error),
+        error_message = %error,
+        message = "Authentication error occurred"
+    );
+}
+
 pub fn log_oauth_flow_initiated(provider: &str, headers: &axum::http::HeaderMap, redirect_url: &Option<&String>) {
     tracing::info!(
         event_type = "oauth_audit",
-        provider = provider,
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        redirect_url = ?redirect_url,
-        message = "OAuth flow initiated"
+        user_agent = extract_user_agent(headers),
+        message = "OAuth flow initiated",
+        provider,
+        redirect_url,
     );
 }
 
 pub fn log_oauth_redirecting(provider: &str, headers: &axum::http::HeaderMap, auth_url: &url::Url, state: &str) {
     tracing::info!(
         event_type = "oauth_audit",
-        provider = provider,
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        auth_url = ?auth_url,
-        state_hash = %hash_state(state),
-        message = "OAuth flow initiated"
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "OAuth flow redirecting",
+        provider,
+        %auth_url,
     );
 }
 
 pub fn log_oauth_callback_received(provider: &str, headers: &axum::http::HeaderMap, state: &str) {
     tracing::info!(
         event_type = "oauth_audit",
-        provider = provider,
         client_ip = extract_client_ip(headers),
-        state_hash = %hash_state(state),
-        message = "OAuth callback received"
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "OAuth callback received",
+        provider,
     );
 }
 
 pub fn log_oauth_security_violation(violation_type: &str, headers: &axum::http::HeaderMap, email: &str, state: &str) {
     tracing::warn!(
         event_type = "oauth_audit",
-        violation_type = violation_type,
         client_ip = extract_client_ip(headers),
-        email = email,
-        state_hash = %hash_state(state),
-        message = "OAuth security violation detected"
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "OAuth security violation detected",
+        violation_type,
+        email,
     );
 }
 
 pub fn log_oauth_create_new_user(provider: &str, headers: &axum::http::HeaderMap, email: &str, state: &str) {
     tracing::info!(
         event_type = "oauth_audit",
-        provider = provider,
-        email = email,
         client_ip = extract_client_ip(headers),
-        state_hash = %hash_state(state),
-        message = "Creating new user for OAuth login"
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "Creating new user for OAuth login",
+        provider,
+        email,
     );
 }
 
 pub fn log_oauth_user_authenticated(provider: &str, headers: &axum::http::HeaderMap, email: &str, state: &str) {
     tracing::info!(
         event_type = "oauth_audit",
-        provider = provider,
-        email = email,
         client_ip = extract_client_ip(headers),
-        state_hash = %hash_state(state),
-        message = "User authenticated via OAuth"
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "User authenticated via OAuth",
+        provider,
+        email,
     );
 }
 
@@ -72,8 +86,9 @@ pub fn log_oauth_rate_limit_exceeded(headers: &axum::http::HeaderMap, endpoint: 
     tracing::warn!(
         event_type = "oauth_audit",
         client_ip = extract_client_ip(headers),
-        endpoint = endpoint,
-        message = "OAuth rate limit exceeded"
+        user_agent = extract_user_agent(headers),
+        message = "OAuth rate limit exceeded",
+        endpoint,
     );
 }
 
@@ -81,9 +96,9 @@ pub fn log_user_login(headers: &axum::http::HeaderMap, username: &str) {
     tracing::info!(
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        username = username,
-        message = "User login"
+        user_agent = extract_user_agent(headers),
+        message = "User login",
+        username,
     );
 }
 
@@ -91,9 +106,9 @@ pub fn log_invalid_password(headers: &axum::http::HeaderMap, username: &str) {
     tracing::warn!(
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        username = username,
-        message = "Invalid password attempt"
+        user_agent = extract_user_agent(headers),
+        message = "Invalid password attempt",
+        username,
     );
 }
 
@@ -101,10 +116,10 @@ pub fn log_user_logout(headers: &axum::http::HeaderMap, user_id: &str, username:
     tracing::info!(
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
-        user_agent = ?extract_user_agent(headers),
-        user_id = user_id,
-        username = username,
-        message = "User logout"
+        user_agent = extract_user_agent(headers),
+        message = "User logout",
+        user_id,
+        username,
     );
 }
 
@@ -113,10 +128,10 @@ pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &st
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
-user_id = user_id,
-        subject = subject,
-        jti = jti,
-        message = "Token refreshed"
+        message = "Token refreshed",
+        user_id,
+        subject,
+        jti,
     );
 }
 
@@ -125,19 +140,9 @@ pub fn log_token_revoke(headers: &axum::http::HeaderMap, jti: &str, subject: &st
         event_type = "auth_audit",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
-subject = subject,
-        jti = jti,
-        message = "Token revoked"
-    );
-}
-
-pub fn log_auth_error(error: &AuthError) {
-    tracing::error!(
-        event_type = "auth_audit",
-        error_type = "AuthError",
-        error_subtype = %std::any::type_name_of_val(error),
-        error_message = %error,
-        message = "Authentication error occurred"
+        message = "Token revoked",
+        subject,
+        jti,
     );
 }
 
