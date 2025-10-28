@@ -223,7 +223,7 @@ pub async fn google_auth_callback(
     // Validate email is verified
     if !user_info.verified_email {
         tracing::warn!("User email not verified: {}", user_info.email);
-        audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email);
+        audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email, &params.state);
         return Err(AuthError::InvalidCredentials);
     }
 
@@ -240,7 +240,7 @@ pub async fn google_auth_callback(
             // Check if email is already in use by a non-SSO user
             if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
                 tracing::warn!("Email already in use by existing user: {}", user_info.email);
-                audit::log_oauth_security_violation("email_already_exists", &headers, &user_info.email);
+                audit::log_oauth_security_violation("email_already_exists", &headers, &user_info.email, &params.state);
                 return Err(AuthError::InvalidCredentials);
             }
 
@@ -262,7 +262,14 @@ pub async fn google_auth_callback(
         }
     };
 
-    audit::log_oauth_user_authenticated("google", &headers, user.id, &user_info.email, is_new_user);
+    audit::log_oauth_user_authenticated(
+        "google",
+        &headers,
+        user.id,
+        &user_info.email,
+        is_new_user,
+        &params.state,
+    );
 
     // Generate JWT tokens for the user (same as regular login)
     let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;

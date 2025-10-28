@@ -1,3 +1,5 @@
+use sha2::{Digest, Sha256};
+
 pub fn log_oauth_flow_initiated(
     provider: &str,
     headers: &axum::http::HeaderMap,
@@ -29,7 +31,7 @@ pub fn log_oauth_redirecting(
         client_ip = client_ip,
         user_agent = ?user_agent,
         auth_url = ?auth_url,
-        state = state,
+        state_hash = %hash_state(state),
         message = "OAuth flow initiated"
     );
 }
@@ -45,7 +47,7 @@ pub fn log_oauth_callback_received(
         event_type = "oauth_audit",
         provider = provider,
         client_ip = client_ip,
-        state = state,
+        state_hash = %hash_state(state),
         success = err.is_none(),
         error = ?err,
         message = "OAuth callback received"
@@ -56,6 +58,7 @@ pub fn log_oauth_security_violation(
     violation_type: &str,
     headers: &axum::http::HeaderMap,
     email: &str,
+    state: &str,
 ) {
     let client_ip = extract_client_ip(headers);
     tracing::warn!(
@@ -63,6 +66,7 @@ pub fn log_oauth_security_violation(
         violation_type = violation_type,
         client_ip = client_ip,
         email = email,
+        state_hash = %hash_state(state),
         message = "OAuth security violation detected"
     );
 }
@@ -73,6 +77,7 @@ pub fn log_oauth_user_authenticated(
     user_id: i64,
     email: &str,
     is_new_user: bool,
+    state: &str,
 ) {
     let client_ip = extract_client_ip(headers);
     tracing::info!(
@@ -82,6 +87,7 @@ pub fn log_oauth_user_authenticated(
         email = email,
         is_new_user = is_new_user,
         client_ip = client_ip,
+        state_hash = %hash_state(state),
         message = "User authenticated via OAuth"
     );
 }
@@ -123,4 +129,11 @@ fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
     headers.get("user-agent")
         .and_then(|ua| ua.to_str().ok())
         .map(|s| s.to_string())
+}
+
+// Helper to avoid logging raw state token
+fn hash_state(state: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(state.as_bytes());
+    format!("{:x}", hasher.finalize())
 }

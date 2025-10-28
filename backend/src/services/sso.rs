@@ -35,8 +35,8 @@ pub enum Error {
     #[error("State parameter is missing or invalid")]
     InvalidState,
 
-    #[error("OAuth session expired or not found")]
-    SessionNotFound,
+    #[error("OAuth session expired: age {age_minutes} minutes")]
+    SessionNotFound { age_minutes: i64 },
 
     #[error("Invalid redirect URL")]
     InvalidRedirectUrl,
@@ -169,8 +169,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
     let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
     let session_entry_age = Utc::now() - session_entry.created_at;
     if session_entry_age > timeout_minutes {
-        tracing::warn!("OAuth session expired: age {} minutes", session_entry_age.num_minutes());
-        return Err(Error::SessionNotFound);
+        return Err(Error::SessionNotFound { age_minutes: session_entry_age.num_minutes() });
     }
 
     let client = create_google_client(&context.settings.oauth)?;

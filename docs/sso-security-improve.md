@@ -44,5 +44,5 @@ Recommendation: The most reliable source for the client IP is the one from your 
 
 # Low Priority / Defense-in-Depth
 (auth.rs) Hardcoded HTTP Redirect: The fallback redirect URL in google_auth_callback is hardcoded to http://localhost:5173/login. Using HTTP, even for localhost, is not ideal. It would be better to make this configurable and use HTTPS.
-(audit.rs) Logging of Sensitive Information: The log_oauth_redirecting function logs the state parameter (the CSRF token) in cleartext. While this token is short-lived, it's better to avoid logging secrets. Consider logging a hash of the state parameter instead.
+
 (sso.rs) Open Redirect Risk with Subdomains: The validate_redirect_url function allows redirects to any subdomain of an allowed domain (e.g., *.example.com). If a subdomain could be compromised, it could be used to stage phishing attacks. For higher security, it's better to use an explicit allow-list of exact domain names.
