@@ -15,6 +15,25 @@ pub fn log_oauth_flow_initiated(
     );
 }
 
+pub fn log_oauth_redirecting(
+    provider: &str,
+    headers: &axum::http::HeaderMap,
+    auth_url: &url::Url,
+    state: &str,
+) {
+    let client_ip = extract_client_ip(headers);
+    let user_agent = extract_user_agent(headers);
+    tracing::info!(
+        event_type = "oauth_audit",
+        provider = provider,
+        client_ip = client_ip,
+        user_agent = ?user_agent,
+        auth_url = ?auth_url,
+        state = state,
+        message = "OAuth flow initiated"
+    );
+}
+
 pub fn log_oauth_callback_received(
     provider: &str,
     headers: &axum::http::HeaderMap,
@@ -36,14 +55,14 @@ pub fn log_oauth_callback_received(
 pub fn log_oauth_security_violation(
     violation_type: &str,
     headers: &axum::http::HeaderMap,
-    details: &str,
+    email: &str,
 ) {
     let client_ip = extract_client_ip(headers);
     tracing::warn!(
         event_type = "oauth_audit",
         violation_type = violation_type,
         client_ip = client_ip,
-        details = details,
+        email = email,
         message = "OAuth security violation detected"
     );
 }

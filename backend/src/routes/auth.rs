@@ -205,11 +205,8 @@ pub async fn google_auth_init(
 ) -> Result<impl IntoResponse, AuthError> {
     let redirect_url = params.get("redirect_url");
     audit::log_oauth_flow_initiated("google", &headers, &redirect_url);
-    let (auth_url, _state) = sso::get_google_auth_url(
-        &context.settings.oauth,
-        &context.oauth_session_store,
-        redirect_url,
-    ).await?;
+    let (auth_url, state) = sso::get_google_auth_url(&context, redirect_url).await?;
+    audit::log_oauth_redirecting("google", &headers, &auth_url, &state);
     Ok(axum::response::Redirect::to(auth_url.as_str()))
 }
 
@@ -226,11 +223,7 @@ pub async fn google_auth_callback(
     // Validate email is verified
     if !user_info.verified_email {
         tracing::warn!("User email not verified: {}", user_info.email);
-        audit::log_oauth_security_violation(
-            "unverified_email",
-            &headers,
-            &format!("User attempted login with unverified email: {}", user_info.email),
-        );
+        audit::log_oauth_security_violation("unverified_email", &headers, &user_info.email);
         return Err(AuthError::InvalidCredentials);
     }
 
@@ -247,11 +240,7 @@ pub async fn google_auth_callback(
             // Check if email is already in use by a non-SSO user
             if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
                 tracing::warn!("Email already in use by existing user: {}", user_info.email);
-                audit::log_oauth_security_violation(
-                    "email_already_exists",
-                    &headers,
-                    &format!("OAuth attempt with email already in use: {}", user_info.email),
-                );
+                audit::log_oauth_security_violation("email_already_exists", &headers, &user_info.email);
                 return Err(AuthError::InvalidCredentials);
             }
 

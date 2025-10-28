@@ -64,14 +64,14 @@ pub struct AuthRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct OAuthSession {
+pub struct OAuthSessionEntry {
     pub csrf_token: String,
     pub redirect_url: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
 // In-memory store for OAuth sessions (in production, use Redis or database)
-pub type OAuthSessionStore = Arc<RwLock<HashMap<String, OAuthSession>>>;
+pub type OAuthSessionStore = Arc<RwLock<HashMap<String, OAuthSessionEntry>>>;
 
 pub fn create_oauth_session_store() -> OAuthSessionStore {
     Arc::new(RwLock::new(HashMap::new()))
@@ -102,11 +102,11 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), Error> {
         return Err(Error::InvalidConfig("Google Redirect URI is not configured".to_string()));
     }
 
-    // Validate redirect URI format
+    // validate redirect URI format
     let _: Url = config.google_redirect_uri.parse()
         .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
 
-    // In production, ensure HTTPS
+    // in production, ensure HTTPS
     if !config.google_redirect_uri.starts_with("https://") && !config.google_redirect_uri.contains("localhost") {
         tracing::warn!("Google OAuth redirect URI should use HTTPS in production: {}", config.google_redirect_uri);
     }
@@ -131,19 +131,14 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
     Ok(client)
 }
 
-pub async fn get_google_auth_url(
-    config: &cfg::OAuthSettings,
-    session_store: &OAuthSessionStore,
-    redirect_url: Option<&String>,
-) -> Result<(Url, String), Error> {
-    let client = create_google_client(config)?;
-
-    // Validate redirect URL if provided
+pub async fn get_google_auth_url(context: &core::ArcContext, redirect_url: Option<&String>) -> Result<(Url, String), Error> {
+    // validate redirect URL if provided
     if let Some(ref url) = redirect_url {
-        validate_redirect_url(url, config)?;
+        validate_redirect_url(url, &context.settings.oauth)?;
     }
 
-    // Generate CSRF token and create OAuth session
+    // generate CSRF token and create OAuth session
+    let client = create_google_client(&context.settings.oauth)?;
     let (auth_url, csrf_token) = client
         .authorize_url(oauth2::CsrfToken::new_random)
         .add_scope(oauth2::Scope::new("openid".to_string()))
@@ -151,53 +146,36 @@ pub async fn get_google_auth_url(
         .add_scope(oauth2::Scope::new("profile".to_string()))
         .url();
 
+    // store session_entry with cleanup of expired entries
     let state = csrf_token.secret().clone();
-    let session = OAuthSession {
-        csrf_token: state.clone(),
-        redirect_url: redirect_url.cloned(),
-        created_at: Utc::now(),
-    };
+    store_session_entry(context, redirect_url.cloned(), state.clone());
 
-    // Store session with cleanup of expired sessions
-    {
-        let mut store = session_store.write().await;
-
-        // Clean up expired sessions (configurable timeout)
-        let timeout_minutes = Duration::minutes(config.session_timeout_minutes as i64);
-        let cutoff = Utc::now() - timeout_minutes;
-        store.retain(|_, session| session.created_at > cutoff);
-
-        // Store new session
-        store.insert(state.clone(), session);
-    }
-
-    tracing::info!("Generated Google OAuth URL with state: {}", state);
     Ok((auth_url, state))
 }
 
 pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state: &str) -> Result<(GoogleUserInfo, Option<String>), Error> {
-    // Validate state parameter (CSRF protection)
-    let session = {
+    // validate state parameter (CSRF protection)
+    let session_entry = {
         let mut store = context.oauth_session_store.write().await;
         store.remove(state).ok_or(Error::CsrfValidationFailed)?
     };
 
-    if session.csrf_token != state {
-        tracing::warn!("CSRF token mismatch: expected {}, got {}", session.csrf_token, state);
+    if session_entry.csrf_token != state {
+        tracing::warn!("CSRF token mismatch: expected {}, got {}", session_entry.csrf_token, state);
         return Err(Error::CsrfValidationFailed);
     }
 
-    // Check session age (configurable timeout)
+    // check session_entry age (configurable timeout)
     let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
-    let session_age = Utc::now() - session.created_at;
-    if session_age > timeout_minutes {
-        tracing::warn!("OAuth session expired: age {} minutes", session_age.num_minutes());
+    let session_entry_age = Utc::now() - session_entry.created_at;
+    if session_entry_age > timeout_minutes {
+        tracing::warn!("OAuth session expired: age {} minutes", session_entry_age.num_minutes());
         return Err(Error::SessionNotFound);
     }
 
     let client = create_google_client(&context.settings.oauth)?;
 
-    // Exchange authorization code for tokens
+    // exchange authorization code for tokens
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
         .request_async(&context.http_client)
@@ -209,7 +187,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
 
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
 
-    // Fetch user info from Google
+    // fetch user info from Google
     let user_info_url = "https://www.googleapis.com/oauth2/v2/userinfo";
     let response = context
         .http_client
@@ -230,7 +208,7 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
         .await
         .map_err(Error::UserInfoRetrievalApiCallFailed)?;
 
-    // Validate user info
+    // validate user info
     if user_info.email.is_empty() || user_info.id.is_empty() {
         tracing::error!("Invalid user info received from Google: missing email or ID");
         return Err(Error::InvalidConfig("Invalid user info from Google".to_string()));
@@ -242,14 +220,32 @@ pub async fn get_google_user_info(context: &core::ArcContext, code: &str, state:
         user_info.email
     );
 
-    Ok((user_info, session.redirect_url))
+    Ok((user_info, session_entry.redirect_url))
 }
 
-/// Validate redirect URL to prevent open redirect attacks
+async fn store_session_entry(context: &core::ArcContext, redirect_url: Option<String>, state: String) {
+    // store session_entry with cleanup of expired entries
+    let mut session_store = context.oauth_session_store.write().await;
+    let session_entry = OAuthSessionEntry {
+        csrf_token: state.clone(),
+        redirect_url: redirect_url,
+        created_at: Utc::now(),
+    };
+
+    // clean up expired sessions (configurable timeout)
+    let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
+    let cutoff = Utc::now() - timeout_minutes;
+    session_store.retain(|_, entry| entry.created_at > cutoff);
+
+    // store new session
+    session_store.insert(state, session_entry);
+}
+
+/// validate redirect URL to prevent open redirect attacks
 fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), Error> {
     let parsed_url: Url = url.parse().map_err(|_| Error::InvalidRedirectUrl)?;
 
-    // Check against allowed domains from configuration
+    // check against allowed domains from configuration
     match parsed_url.host_str() {
         Some(host) => {
             let is_allowed = config.allowed_redirect_domains.iter()
@@ -263,7 +259,7 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), E
         None => return Err(Error::InvalidRedirectUrl),
     }
 
-    // Ensure HTTPS in production (except localhost)
+    // ensure HTTPS in production (except localhost)
     if parsed_url.scheme() != "https" && !parsed_url.host_str().unwrap_or("").contains("localhost") {
         tracing::warn!("Rejected non-HTTPS redirect URL in production: {}", url);
         return Err(Error::InvalidRedirectUrl);
