@@ -1,7 +1,8 @@
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
+
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use thiserror::Error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -80,15 +81,16 @@ async fn run_app() -> Result<(), AppError> {
     let jwt_secret = auth::get_jwt_secret()?;
     let jwt = auth::JwtContext::new(&settings.jwt, &jwt_secret)?;
     let ctx = core::Context::new(db, jwt, http_client, settings);
-    app::run_migrations(&ctx.db).await?;
-    app::run_cli(&ctx.db).await?;
-    start_server(ctx).await?;
+    if !app::run_cli(&ctx.db).await? {
+        app::run_migrations(&ctx.db).await?;
+        start_server(ctx).await?;
+    }
     Ok(())
 }
 
 async fn start_server(ctx: core::ArcContext) -> Result<(), AppError> {
     let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
-    let router = app::create_router(ctx.clone());
+    let router = app::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("starting server... 🚀 ");
     tracing::info!("app_env: {}", cfg::AppSettings::get_app_run_env());

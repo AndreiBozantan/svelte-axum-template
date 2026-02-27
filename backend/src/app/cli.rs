@@ -80,23 +80,31 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
+pub async fn run_cli(db: &core::DbContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
-        None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, db).await,
-        Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await,
+        None => {
+            tracing::info!("CLI command not provided. Use --help for CLI usage.");
+            Ok(false)
+        }
+        Some(CliCommand::Migrate { action }) => {
+            exec_migrate_command(action, db).await?;
+            Ok(true)
+        }
+        Some(CliCommand::CreateAdmin { username, email }) => {
+            create_admin(username, email, db).await?;
+            Ok(true)
+        }
     }
 }
 
 async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
     match action {
-        MigrateAction::Create { name } => migrate_action_create(&name)?,
+        MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
-        MigrateAction::Status => migrate_action_status(db).await?,
-        MigrateAction::Run => migrate_action_run(db).await?,
+        MigrateAction::Status => migrate_action_status(db).await,
+        MigrateAction::Run => migrate_action_run(db).await,
     }
-    std::process::exit(0); // Exit the process since this is a CLI command
 }
 
 fn migrate_action_create(name: &str) -> Result<(), CliError> {
@@ -105,7 +113,7 @@ fn migrate_action_create(name: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-fn migrate_action_list() {
+fn migrate_action_list() -> Result<(), CliError> {
     let migrations = app::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
@@ -115,6 +123,7 @@ fn migrate_action_list() {
             println!("{i}. {migration}");
         }
     }
+    Ok(())
 }
 
 async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
