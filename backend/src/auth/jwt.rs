@@ -1,9 +1,10 @@
 use std::fs;
 
 use axum::Json;
-use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
+use chrono::DateTime;
+use chrono::NaiveDateTime;
 use chrono::Utc;
 use jsonwebtoken as jwt;
 use rand::TryRngCore;
@@ -36,9 +37,19 @@ pub enum JwtError {
 
     #[error("Invalid token")]
     InvalidToken,
+}
 
-    #[error("Invalid authorization header")]
-    InvalidAuthorizationHeader,
+/// Maps jsonwebtoken errors to our custom `JwtError` type
+#[allow(clippy::match_same_arms)]
+impl From<jwt::errors::Error> for JwtError {
+    fn from(e: jwt::errors::Error) -> Self {
+        match e.kind() {
+            jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
+            jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
+            jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
+            _ => Self::DecodingFailed(e),
+        }
+    }
 }
 
 impl IntoResponse for JwtError {
@@ -57,7 +68,6 @@ impl IntoResponse for JwtError {
             Self::DecodingFailed(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
             Self::TokenExpired => (http::StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
             Self::InvalidToken => (http::StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
-            Self::InvalidAuthorizationHeader => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authorization header".to_string()),
         };
 
         let body = Json(json!({
@@ -94,6 +104,12 @@ pub struct RefreshTokenClaims {
     pub iat: i64,              // Issued at
     pub jti: String,           // JWT ID (unique identifier)
     pub token_type: TokenType, // "refresh"
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct RefreshTokenWithClaims {
+    pub token: String,
+    pub claims: RefreshTokenClaims,
 }
 
 /// Response structure for token endpoints
@@ -165,7 +181,7 @@ pub fn generate_access_token(
 }
 
 /// Generate a new refresh token
-pub fn generate_refresh_token(ctx: &JwtContext, user_id: i64) -> Result<String, JwtError> {
+pub fn generate_refresh_token(ctx: &JwtContext, user_id: i64) -> Result<RefreshTokenWithClaims, JwtError> {
     let now = Utc::now().timestamp();
     let header = jwt::Header::new(jwt::Algorithm::HS256);
     let claims = RefreshTokenClaims {
@@ -175,24 +191,14 @@ pub fn generate_refresh_token(ctx: &JwtContext, user_id: i64) -> Result<String, 
         jti: Uuid::new_v4().to_string(),
         token_type: TokenType::Refresh,
     };
-    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)
+    let token = jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)?;
+    Ok(RefreshTokenWithClaims { token, claims })
 }
 
-pub fn decode_access_token_from_req(ctx: &JwtContext, req: &Request) -> Result<AccessTokenClaims, JwtError> {
-    // Extract the Authorization header
-    let auth_header = req
-        .headers()
-        .get(http::header::AUTHORIZATION)
-        .and_then(|header| header.to_str().ok())
-        .ok_or(JwtError::InvalidAuthorizationHeader)?;
-
-    // Extract Bearer token
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or(JwtError::InvalidAuthorizationHeader)?;
-
-    // Decode the access token
-    decode_access_token(ctx, token)
+pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime, JwtError> {
+    DateTime::from_timestamp(timestamp, 0)
+        .map(|dt| dt.naive_utc())
+        .ok_or(JwtError::InvalidToken)
 }
 
 /// Validate and decode an access token
@@ -220,16 +226,16 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
         }
     }
 
-    // Create config directory if it doesn't exist
+    // create config directory if it doesn't exist
     if let Some(parent) = &secret_file_path.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    // Write the secret to file with restricted permissions
+    // write the secret to file with restricted permissions
     let new_secret = generate_secure_secret()?;
     fs::write(&secret_file_path, &new_secret)?;
 
-    // Set file permissions to be readable only by owner (Unix-like systems)
+    // set file permissions to be readable only by owner (Unix-like systems)
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -249,17 +255,4 @@ fn generate_secure_secret() -> Result<String, JwtError> {
         .try_fill_bytes(&mut bytes)
         .map_err(|e| JwtError::RngOperationFailed { source: e })?;
     Ok(hex::encode(bytes))
-}
-
-/// Maps jsonwebtoken errors to our custom `JwtError` type
-#[allow(clippy::match_same_arms)]
-impl From<jwt::errors::Error> for JwtError {
-    fn from(e: jwt::errors::Error) -> Self {
-        match e.kind() {
-            jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
-            jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
-            jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
-            _ => Self::DecodingFailed(e),
-        }
-    }
 }

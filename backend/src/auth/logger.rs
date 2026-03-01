@@ -1,8 +1,6 @@
 use sha2::{Digest, Sha256};
 
-use crate::routes::auth::AuthError;
-
-pub fn log_auth_error(error: &AuthError) {
+pub fn log_auth_error(error: &dyn std::error::Error) {
     tracing::error!(
         event_type = "auth_audit",
         error_type = "AuthError",

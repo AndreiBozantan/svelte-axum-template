@@ -1,22 +1,19 @@
-use axum::{
-    extract::{ConnectInfo, Request},
-    http::StatusCode,
-    middleware::Next,
-    response::Response,
-};
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use axum::extract::{ConnectInfo, Request};
+use axum::http::StatusCode;
+use axum::middleware::Next;
+use axum::response::Response;
 use tokio::sync::RwLock;
 
 /// Rate limiting entry for tracking requests
 #[derive(Debug, Clone)]
-struct RateLimitEntry {
-    count: u32,
-    window_start: Instant,
+pub struct RateLimitEntry {
+    pub count: u32,
+    pub window_start: Instant,
 }
 
 /// In-memory rate limiter (in production, use Redis)
@@ -27,40 +24,41 @@ pub fn create_rate_limiter() -> RateLimiter {
 }
 
 /// Rate limiting middleware for OAuth endpoints
-pub async fn oauth_rate_limit_middleware(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    req: Request,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    // Only apply rate limiting to OAuth endpoints
-    if !req.uri().path().contains("/auth/oauth/") {
+pub async fn oauth_rate_limit_middleware(req: Request, next: Next) -> Result<Response, StatusCode> {
+    // apply rate limiting to all auth endpoints
+    if !req.uri().path().contains("/auth/") {
         return Ok(next.run(req).await);
     }
 
-    let client_ip = addr.ip().to_string();
+    let client_ip = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|ConnectInfo(a)| a.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
 
-    // Rate limit: 10 requests per minute per IP for OAuth endpoints
-    const MAX_REQUESTS: u32 = 10;
+    // rate limit: 100 requests per minute per IP for auth endpoints
+    // TODO: make this configurable
+    const MAX_REQUESTS: u32 = 100;
     const WINDOW_DURATION: Duration = Duration::from_secs(60);
 
-    // This would be better stored in the app state, but for now using a simple approach
-    // In production, use a proper rate limiting service like Redis
+    // this would be better stored in the app state, but for now using a simple approach
+    // in production, use a proper rate limiting service like Redis
     static RATE_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
     let rate_limiter = RATE_LIMITER.get_or_init(create_rate_limiter);
 
     let now = Instant::now();
     let mut limiter = rate_limiter.write().await;
 
-    // Clean up expired entries
+    // clean up expired entries
     limiter.retain(|_, entry| now.duration_since(entry.window_start) <= WINDOW_DURATION);
 
-    // Check current rate limit
+    // check current rate limit
     let entry = limiter.entry(client_ip.clone()).or_insert_with(|| RateLimitEntry {
         count: 0,
         window_start: now,
     });
 
-    // Reset window if expired
+    // reset window if expired
     if now.duration_since(entry.window_start) > WINDOW_DURATION {
         entry.count = 0;
         entry.window_start = now;
@@ -69,10 +67,10 @@ pub async fn oauth_rate_limit_middleware(
     entry.count += 1;
 
     if entry.count > MAX_REQUESTS {
-        tracing::warn!("OAuth rate limit exceeded for IP: {}", client_ip);
+        tracing::warn!("auth rate limit exceeded for IP: {}", client_ip);
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
-    drop(limiter); // Release the lock
+    drop(limiter); // release the lock
     Ok(next.run(req).await)
 }
