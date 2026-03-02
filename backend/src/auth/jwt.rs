@@ -87,29 +87,20 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct AccessTokenClaims {
-    pub sub: String,            // Subject (user ID)
-    pub username: String,       // Username for convenience
-    pub tenant_id: Option<i64>, // Tenant ID if applicable
-    pub exp: i64,               // Expiration time
-    pub iat: i64,               // Issued at
-    pub jti: String,            // JWT ID (unique identifier)
-    pub token_type: TokenType,  // "access"
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct RefreshTokenClaims {
+pub struct TokenClaims {
     pub sub: String,           // Subject (user ID)
+    pub tenant_id: i64,        // Tenant ID if applicable
+    pub email: String,         // Email for convenience
     pub exp: i64,              // Expiration time
     pub iat: i64,              // Issued at
     pub jti: String,           // JWT ID (unique identifier)
-    pub token_type: TokenType, // "refresh"
+    pub token_type: TokenType, // "access"
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct RefreshTokenWithClaims {
-    pub token: String,
-    pub claims: RefreshTokenClaims,
+pub struct TokenWithClaims {
+    pub value: String,
+    pub claims: TokenClaims,
 }
 
 /// Response structure for token endpoints
@@ -160,39 +151,26 @@ impl JwtContext {
 }
 
 /// Generate a new access token
-pub fn generate_access_token(
+pub fn generate_token(
     ctx: &JwtContext,
     user_id: i64,
-    user_name: &str,
-    tenant_id: Option<i64>,
-) -> Result<String, JwtError> {
+    tenant_id: i64,
+    email: &str,
+    token_type: TokenType,
+) -> Result<TokenWithClaims, JwtError> {
     let now = Utc::now().timestamp();
     let header = jwt::Header::new(jwt::Algorithm::HS256);
-    let claims = AccessTokenClaims {
+    let claims = TokenClaims {
         sub: user_id.to_string(),
-        username: user_name.to_string(),
         tenant_id,
+        email: email.to_string(),
         exp: now + ctx.access_token_expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
-        token_type: TokenType::Access,
-    };
-    jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)
-}
-
-/// Generate a new refresh token
-pub fn generate_refresh_token(ctx: &JwtContext, user_id: i64) -> Result<RefreshTokenWithClaims, JwtError> {
-    let now = Utc::now().timestamp();
-    let header = jwt::Header::new(jwt::Algorithm::HS256);
-    let claims = RefreshTokenClaims {
-        sub: user_id.to_string(),
-        exp: now + ctx.refresh_token_expiry,
-        iat: now,
-        jti: Uuid::new_v4().to_string(),
-        token_type: TokenType::Refresh,
+        token_type,
     };
     let token = jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)?;
-    Ok(RefreshTokenWithClaims { token, claims })
+    Ok(TokenWithClaims { value: token, claims })
 }
 
 pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime, JwtError> {
@@ -201,17 +179,10 @@ pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime
         .ok_or(JwtError::InvalidToken)
 }
 
-/// Validate and decode an access token
-pub fn decode_access_token(ctx: &JwtContext, token: &str) -> Result<AccessTokenClaims, JwtError> {
-    let token_data = jwt::decode::<AccessTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token_data.claims.token_type == TokenType::Access;
-    valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
-}
-
-/// Validate and decode a refresh token
-pub fn decode_refresh_token(ctx: &JwtContext, token: &str) -> Result<RefreshTokenClaims, JwtError> {
-    let token_data = jwt::decode::<RefreshTokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
-    let valid = token_data.claims.token_type == TokenType::Refresh;
+/// Validate and decode an access or refresh token
+pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Result<TokenClaims, JwtError> {
+    let token_data = jwt::decode::<TokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
+    let valid = token_data.claims.token_type == token_type;
     valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
 }
 

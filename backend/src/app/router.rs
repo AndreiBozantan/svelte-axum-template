@@ -59,11 +59,11 @@ async fn auth_middleware(
     req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Response {
-    match auth::decode_access_token_from_req(&context, &req) {
+    match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
         Ok(claims) => {
             tracing::debug!(
                 user_id = claims.sub,
-                username = claims.username,
+                email = claims.email,
                 tenant_id = ?claims.tenant_id,
                 "Authenticated user accessing API"
             );

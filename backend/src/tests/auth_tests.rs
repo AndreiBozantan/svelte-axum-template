@@ -14,8 +14,8 @@ use crate::cfg;
 use crate::core;
 use crate::db;
 
+const TEST_USER_EMAIL: &str = "test@example.com";
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
-const TEST_USERNAME: &str = "test_user";
 
 fn default_config() -> cfg::AppSettings {
     cfg::AppSettings {
@@ -53,10 +53,9 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     // create test user
     let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
     let user = db::NewUser {
-        username: TEST_USERNAME.to_string(),
+        tenant_id: 0,
+        email: "test@example.com".to_string(),
         password_hash: Some(password_hash),
-        email: Some("test@example.com".to_string()),
-        tenant_id: Some(1),
         sso_provider: None,
         sso_id: None,
     };
@@ -66,11 +65,11 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>()).unwrap()
 }
 
-async fn login_and_get_tokens(server: &TestServer, username: &str, password: &str) -> (Value, String, String) {
+async fn login_and_get_tokens(server: &TestServer, email: &str, password: &str) -> (Value, String, String) {
     let response = server
         .post("/api/auth/login")
         .json(&json!({
-            "username": username,
+            "email": email,
             "password": password
         }))
         .await;
@@ -83,7 +82,7 @@ async fn login_and_get_tokens(server: &TestServer, username: &str, password: &st
 }
 
 async fn login_testuser_and_get_tokens(server: &TestServer) -> (Value, String, String) {
-    let (body, access_token, refresh_token) = login_and_get_tokens(server, TEST_USERNAME, TEST_PASSWORD).await;
+    let (body, access_token, refresh_token) = login_and_get_tokens(server, TEST_USER_EMAIL, TEST_PASSWORD).await;
     assert!(!access_token.is_empty());
     assert!(!refresh_token.is_empty());
     (body, access_token, refresh_token)
@@ -96,7 +95,7 @@ async fn test_login_invalid_endpoint() {
     let response = server
         .post("/api/invalid_endpoint")
         .json(&json!({
-            "username": TEST_USERNAME,
+            "email": TEST_USER_EMAIL,
             "password": "wrong_password"
         }))
         .await;
@@ -111,7 +110,7 @@ async fn test_login_invalid_credentials() {
     let response = server
         .post("/api/auth/login")
         .json(&json!({
-            "username": TEST_USERNAME,
+            "email": TEST_USER_EMAIL,
             "password": "wrong_password"
         }))
         .await;
@@ -128,7 +127,7 @@ async fn test_login_nonexistent_user() {
     let response = server
         .post("/api/auth/login")
         .json(&json!({
-            "username": "nonexistent",
+            "email": "nonexistent",
             "password": "password"
         }))
         .await;
@@ -180,7 +179,7 @@ async fn test_login_success() {
     assert_eq!(body["result"], "ok");
     assert!(!access_token.is_empty());
     assert!(!refresh_token.is_empty());
-    assert_eq!(body["user"]["username"], TEST_USERNAME);
+    assert_eq!(body["user"]["email"], TEST_USER_EMAIL);
 }
 
 #[tokio::test]
@@ -199,7 +198,7 @@ async fn test_missing_fields_login() {
     let response = server
         .post("/api/auth/login")
         .json(&json!({
-            "username": TEST_USERNAME
+            "email": TEST_USER_EMAIL
             // missing password
         }))
         .await;
@@ -222,7 +221,7 @@ async fn test_refresh_token_success() {
     let refresh_body: Value = refresh_response.json();
     assert_eq!(refresh_body["result"], "ok");
     assert!(!refresh_response.cookie("access_token").value().is_empty());
-    assert_eq!(refresh_body["user"]["username"], TEST_USERNAME);
+    assert_eq!(refresh_body["user"]["email"], TEST_USER_EMAIL);
 }
 
 #[tokio::test]
@@ -301,7 +300,7 @@ async fn test_access_token_expiry() {
     let login_response = server
         .post("/api/auth/login")
         .json(&json!({
-            "username": TEST_USERNAME,
+            "email": TEST_USER_EMAIL,
             "password": TEST_PASSWORD
         }))
         .await;
@@ -328,10 +327,10 @@ async fn test_access_token_expiry() {
     let expired_time = now - 3600; // 1 hour ago
 
     let header = jwt::Header::new(jwt::Algorithm::HS256);
-    let expired_claims = auth::AccessTokenClaims {
+    let expired_claims = auth::TokenClaims {
         sub: "1".to_string(), // user ID from our test user
-        username: TEST_USERNAME.to_string(),
-        tenant_id: Some(1),
+        tenant_id: 1,
+        email: TEST_USER_EMAIL.to_string(),
         exp: expired_time,        // expired timestamp
         iat: expired_time - 3600, // issued 2 hours ago
         jti: Uuid::new_v4().to_string(),
@@ -353,35 +352,35 @@ async fn test_access_token_expiry() {
 async fn test_decode_access_token_from_req_cookie_success() {
     let ctx = create_test_context(default_config()).await;
     let user_id = 123;
-    let username = "test_user";
-    let token = auth::generate_access_token(&ctx.jwt, user_id, username, None).unwrap();
+    let email = "test_user";
+    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access).unwrap();
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::COOKIE,
-        HeaderValue::from_str(&format!("access_token={token}")).unwrap(),
+        HeaderValue::from_str(&format!("access_token={}", token.value)).unwrap(),
     );
-    let claims = auth::decode_access_token_from_req(&ctx, &req).unwrap();
+    let claims = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
-    assert_eq!(claims.username, username);
+    assert_eq!(claims.email, email);
 }
 
 #[tokio::test]
 async fn test_decode_access_token_from_req_success() {
     let ctx = create_test_context(default_config()).await;
     let user_id = 123;
-    let username = "test_user";
+    let email = "test_user";
 
-    let token = auth::generate_access_token(&ctx.jwt, user_id, username, None).unwrap();
+    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access).unwrap();
 
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {token}")).unwrap(),
+        HeaderValue::from_str(&format!("Bearer {}", token.value)).unwrap(),
     );
 
-    let claims = auth::decode_access_token_from_req(&ctx, &req).unwrap();
+    let claims = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
-    assert_eq!(claims.username, username);
+    assert_eq!(claims.email, email);
 }
 
 #[tokio::test]
@@ -389,7 +388,7 @@ async fn test_decode_access_token_from_req_missing_header() {
     let ctx = create_test_context(default_config()).await;
     let req = Request::new(Body::empty());
 
-    let result = auth::decode_access_token_from_req(&ctx, &req);
+    let result = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), auth::TokenError::TokenInvalid));
 }
@@ -405,7 +404,7 @@ async fn test_decode_access_token_from_req_wrong_format() {
         HeaderValue::from_str("some_token").unwrap(),
     );
 
-    let result = auth::decode_access_token_from_req(&ctx, &req);
+    let result = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), auth::TokenError::TokenInvalid));
 }

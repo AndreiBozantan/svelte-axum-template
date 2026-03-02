@@ -48,7 +48,7 @@ impl From<core::DbError> for AuthError {
 
 #[derive(Deserialize)]
 pub struct Login {
-    pub username: String, // TODO: replace with email
+    pub email: String,
     pub password: String,
 }
 
@@ -73,35 +73,35 @@ impl IntoResponse for AuthError {
     }
 }
 
-/// Handler for logging in using username and password credentials
+/// Handler for logging in using email and password credentials
 pub async fn login(
     State(context): State<core::ArcContext>,
     headers: HeaderMap,
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
-    auth::log_user_login(&headers, &login.username);
-    let user = db::get_user_by_name(&context.db, &login.username).await?;
+    auth::log_user_login(&headers, &login.email);
+    let user = db::get_user_by_email(&context.db, &login.email).await?;
     let password_hash = user.password_hash.as_ref().ok_or_else(|| {
-        auth::log_missing_password(&headers, &login.username);
+        auth::log_missing_password(&headers, &login.email);
         AuthError::InvalidCredentials
     })?;
     if !auth::verify_password(&login.password, &password_hash)? {
-        auth::log_invalid_password(&headers, &login.username);
+        auth::log_invalid_password(&headers, &login.email);
         return Err(AuthError::InvalidCredentials);
     }
-    auth::log_user_login_success(&headers, &user.username);
+    auth::log_user_login_success(&headers, &user.email);
 
     // generate JWT tokens with appropriate expiration
-    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
-    let refresh_token_with_claims = auth::generate_refresh_token(&context.jwt, user.id)?;
+    let access_token = generate_access_token(&context, &user)?;
+    let refresh_token = generate_refresh_token(&context, &user)?;
 
     // store refresh token in database
-    let token_hash = auth::get_token_hash_as_hex(&refresh_token_with_claims.token);
+    let token_hash = auth::get_token_hash_as_hex(&refresh_token.value);
     let new_refresh_token = db::NewRefreshToken {
-        jti: refresh_token_with_claims.claims.jti,
+        jti: refresh_token.claims.jti,
         user_id: user.id,
         token_hash,
-        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token_with_claims.claims.exp)?,
+        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
@@ -109,12 +109,16 @@ pub async fn login(
         "result": "ok",
         "user": {
             "id": user.id,
-            "username": user.username,
+            "email": user.email,
             "tenant_id": user.tenant_id
         }
     });
-    let refresh_token = refresh_token_with_claims.token;
-    let r = auth::create_json_response_with_auth_cookies(&context, &Some(&access_token), &Some(&refresh_token), body)?;
+    let r = auth::create_json_response_with_auth_cookies(
+        &context,
+        &Some(&access_token.value),
+        &Some(&refresh_token.value),
+        body,
+    )?;
     Ok(r)
 }
 
@@ -124,8 +128,8 @@ pub async fn logout(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     // TODO: clarify what to do here in case of various errors.
-    let claims = auth::decode_access_token_from_req(&context, &req)?;
-    auth::log_user_logout(req.headers(), &claims.sub, &claims.username);
+    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)?;
+    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
 
     // revoke all the associated refresh tokens
     let user_id = claims
@@ -150,7 +154,7 @@ pub async fn refresh_access_token(
     // attempt to extract refresh_token from the Cookie header
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
     // decode refresh token and check if it exists in database and is not revoked
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, refresh_token)?;
+    let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
     let token_hash = auth::get_token_hash_as_hex(refresh_token); // verify token hash
     if stored_token.token_hash != token_hash {
@@ -159,7 +163,7 @@ pub async fn refresh_access_token(
 
     // generate new access token for the user
     let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
-    let new_access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
+    let new_access_token = generate_access_token(&context, &user)?;
     auth::log_token_refresh(req.headers(), user.id, &refresh_claims.jti, &refresh_claims.sub);
 
     let body = json!({
@@ -167,11 +171,11 @@ pub async fn refresh_access_token(
         "expires_in": context.settings.jwt.access_token_expiry_minutes * 60,
         "user": {
             "id": user.id,
-            "username": user.username,
+            "email": user.email,
             "tenant_id": user.tenant_id
         }
     });
-    let r = auth::create_json_response_with_auth_cookies(&context, &Some(&new_access_token), &None, body)?;
+    let r = auth::create_json_response_with_auth_cookies(&context, &Some(&new_access_token.value), &None, body)?;
     Ok(r)
 }
 
@@ -183,7 +187,7 @@ pub async fn revoke_refresh_token(
     // attempt to extract refresh_token from the Cookie header
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
     // decode refresh token to get JTI
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
+    let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?; // revoke the token
     auth::log_token_revoke(req.headers(), &refresh_claims.jti, &refresh_claims.sub);
 
@@ -212,6 +216,7 @@ pub async fn google_auth_callback(
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
     let (user_info, redirect_url) = auth::get_google_user_info(&context, &params.code, &params.state).await?;
+
     auth::log_oauth_callback_received("google", &headers, &params.state, &user_info.email);
 
     if !user_info.verified_email {
@@ -219,28 +224,21 @@ pub async fn google_auth_callback(
         return Err(AuthError::InvalidCredentials);
     }
 
-    // check if user already exists
-    let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
-    let user = match existing_user {
-        Ok(user) => Ok(user),
-        Err(core::DbError::RowNotFound) => {
-            Ok(create_sso_user(&context, &user_info, "google", &headers, &params.state).await?)
-        }
-        Err(e) => Err(AuthError::DatabaseOperationFailed(e)),
-    }?;
-
     auth::log_oauth_user_authenticated("google", &headers, &user_info.email, &params.state);
 
+    // insert new user or link existing user if user already exists (matching email)
+    let user = db::create_or_link_sso_user(&context.db, &user_info.email, 0, "google", &user_info.id).await?;
+
     // generate JWT tokens for the user (same as regular login)
-    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
-    let refresh_token_with_claims = auth::generate_refresh_token(&context.jwt, user.id)?;
+    let access_token = generate_access_token(&context, &user)?;
+    let refresh_token = generate_refresh_token(&context, &user)?;
 
     // store refresh token in database
     let new_refresh_token = db::NewRefreshToken {
-        jti: refresh_token_with_claims.claims.jti,
+        jti: refresh_token.claims.jti,
         user_id: user.id,
-        token_hash: auth::get_token_hash_as_hex(&refresh_token_with_claims.token),
-        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token_with_claims.claims.exp)?,
+        token_hash: auth::get_token_hash_as_hex(&refresh_token.value),
+        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
@@ -248,36 +246,29 @@ pub async fn google_auth_callback(
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let response = auth::add_auth_cookies(
         &context,
-        &Some(&access_token),
-        &Some(&refresh_token_with_claims.token),
+        &Some(&access_token.value),
+        &Some(&refresh_token.value),
         response,
     )?;
     Ok(response)
 }
 
-pub async fn create_sso_user(
-    context: &core::ArcContext,
-    user_info: &auth::GoogleUserInfo,
-    provider: &str,
-    headers: &HeaderMap,
-    state: &str,
-) -> Result<db::User, AuthError> {
-    auth::log_oauth_create_new_user(provider, headers, &user_info.email, state);
+fn generate_refresh_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+    Ok(auth::generate_token(
+        &context.jwt,
+        user.id,
+        user.tenant_id,
+        &user.email,
+        auth::TokenType::Refresh,
+    )?)
+}
 
-    // check if email is already in use by a non-SSO user
-    if let Ok(_existing_user) = db::get_user_by_email(&context.db, &user_info.email).await {
-        auth::log_oauth_security_violation("email_already_exists", headers, &user_info.email, state);
-        return Err(AuthError::UserAlreadyExists);
-    }
-
-    let new_user = db::NewUser {
-        username: user_info.email.clone(), // use email as username for SSO users
-        password_hash: None,               // no password for SSO users
-        email: Some(user_info.email.clone()),
-        tenant_id: None, // TODO: !!! how to assign to a tenant???
-        sso_provider: Some(provider.to_string()),
-        sso_id: Some(user_info.id.clone()),
-    };
-
-    db::create_user(&context.db, new_user).await.map_err(AuthError::from)
+fn generate_access_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+    Ok(auth::generate_token(
+        &context.jwt,
+        user.id,
+        user.tenant_id,
+        &user.email,
+        auth::TokenType::Access,
+    )?)
 }

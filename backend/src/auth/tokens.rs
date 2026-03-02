@@ -27,17 +27,18 @@ pub fn get_token_hash_as_hex(token: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub fn decode_access_token_from_req(
+pub fn decode_token_from_req(
     context: &core::ArcContext,
     req: &Request,
-) -> Result<auth::AccessTokenClaims, TokenError> {
+    token_type: auth::TokenType,
+) -> Result<auth::TokenClaims, TokenError> {
     req.headers()
         .get(http::header::COOKIE) // attempt to extract token from the Cookie header first
         .and_then(|header| header.to_str().ok())
         .and_then(|cookie| extract_token_from_cookie(cookie, "access_token"))
         .map(Ok)
         .unwrap_or_else(|| extract_bearer_token(req)) // fallback to Bearer token
-        .and_then(|token| auth::decode_access_token(&context.jwt, token).map_err(TokenError::from))
+        .and_then(|token| auth::decode_token(&context.jwt, token, token_type).map_err(TokenError::from))
 }
 
 fn extract_bearer_token(req: &Request<Body>) -> Result<&str, TokenError> {
