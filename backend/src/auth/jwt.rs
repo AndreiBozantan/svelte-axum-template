@@ -13,6 +13,7 @@ use serde_json::json;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::auth;
 use crate::cfg;
 
 type TryRngError = <rand::rngs::OsRng as rand::TryRngCore>::Error;
@@ -54,10 +55,7 @@ impl From<jwt::errors::Error> for JwtError {
 
 impl IntoResponse for JwtError {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!(
-            error_type = %std::any::type_name::<Self>(),
-            error_subtype = %std::any::type_name_of_val(&self),
-            error_message = %self);
+        auth::log_auth_error(&self);
 
         #[rustfmt::skip]
         #[allow(clippy::match_same_arms)]
@@ -215,7 +213,6 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
         fs::set_permissions(&secret_file_path, perms)?;
     }
 
-    tracing::info!("Generated new JWT secret in {}", secret_file_path.to_string_lossy());
     Ok(new_secret)
 }
 

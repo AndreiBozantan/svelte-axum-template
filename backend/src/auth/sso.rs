@@ -6,6 +6,7 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
+use crate::auth;
 use crate::cfg;
 use crate::core;
 
@@ -95,10 +96,7 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
 
     // in production, ensure HTTPS
     if !config.google_redirect_uri.starts_with("https://") && !config.google_redirect_uri.contains("localhost") {
-        tracing::warn!(
-            "Google OAuth redirect URI should use HTTPS in production: {}",
-            config.google_redirect_uri
-        );
+        auth::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
     }
 
     Ok(())
@@ -149,7 +147,7 @@ pub async fn get_google_auth_url_and_csrf_token(
 
     let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key).map_err(|e| {
-        tracing::error!("Failed to encode OAuth state JWT: {}", e);
+        auth::log_internal_error(&e, "encode_oauth_state");
         SsoError::InvalidConfig("Failed to encode OAuth state JWT".to_string())
     })?;
 
@@ -169,7 +167,7 @@ pub async fn get_google_user_info(
     let token_data =
         jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
             |e| {
-                tracing::error!("Failed to decode OAuth state JWT: {}", e);
+                auth::log_internal_error(&e, "decode_oauth_state");
                 match e.kind() {
                     jsonwebtoken::errors::ErrorKind::ExpiredSignature => SsoError::SessionExpired,
                     _ => SsoError::CsrfValidationFailed,
@@ -178,11 +176,7 @@ pub async fn get_google_user_info(
         )?;
 
     if token_data.claims.csrf_token != state {
-        tracing::warn!(
-            "CSRF token mismatch: expected {}, got {}",
-            token_data.claims.csrf_token,
-            state
-        );
+        auth::log_csrf_mismatch(None, &token_data.claims.csrf_token, state);
         return Err(SsoError::CsrfValidationFailed);
     }
 
@@ -194,7 +188,7 @@ pub async fn get_google_user_info(
         .request_async(&context.http_client)
         .await
         .map_err(|e| {
-            tracing::error!("Failed to exchange authorization code: {}", e);
+            auth::log_internal_error(&e, "oauth_exchange_code");
             SsoError::OAuth2RequestFailed(e)
         })?;
 
@@ -212,7 +206,7 @@ pub async fn get_google_user_info(
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
     if !response.status().is_success() {
-        tracing::error!("Google userinfo API returned status: {}", response.status());
+        auth::log_provider_api_error(response.status(), "google");
         return Err(SsoError::InvalidConfig(
             "Google userinfo API returned error".to_string(),
         ));
@@ -224,16 +218,16 @@ pub async fn get_google_user_info(
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
     // validate user info
-    if user_info.email.is_empty() || user_info.id.is_empty() {
-        tracing::error!("Invalid user info received from Google: missing email or ID");
-        return Err(SsoError::InvalidConfig("Invalid user info from Google".to_string()));
+    if user_info.email.is_empty() {
+        auth::log_invalid_user_info("email", &user_info.email, "google");
+        return Err(SsoError::InvalidConfig("GoogleUserInfo.email is empty".to_string()));
     }
 
-    tracing::info!(
-        "Successfully retrieved user info for: {} ({})",
-        user_info.name,
-        user_info.email
-    );
+    if user_info.id.is_empty() {
+        auth::log_invalid_user_info("id", &user_info.id, "google");
+        return Err(SsoError::InvalidConfig("GoogleUserInfo.id is empty".to_string()));
+    }
+    // In callback received log already.
 
     Ok((user_info, token_data.claims.redirect_url))
 }
@@ -251,7 +245,7 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), S
                 .any(|allowed| host == allowed || host.ends_with(&format!(".{}", allowed)));
 
             if !is_allowed {
-                tracing::warn!("Rejected redirect to unauthorized host: {}", host);
+                auth::log_redirect_violation("unauthorized_host", host);
                 return Err(SsoError::InvalidRedirectUrl);
             }
         }
@@ -260,7 +254,7 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), S
 
     // ensure HTTPS in production (except localhost)
     if parsed_url.scheme() != "https" && !parsed_url.host_str().unwrap_or("").contains("localhost") {
-        tracing::warn!("Rejected non-HTTPS redirect URL in production: {}", url);
+        auth::log_redirect_violation("non_https_redirect_in_prod", url);
         return Err(SsoError::InvalidRedirectUrl);
     }
 

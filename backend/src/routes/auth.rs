@@ -207,10 +207,10 @@ pub async fn google_auth_init(
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, AuthError> {
     let redirect_url = params.get("redirect_url");
-    auth::log_oauth_flow_initiated("google", &headers, &redirect_url);
+    auth::log_oauth_flow_initiated(&headers, &redirect_url, "google");
 
     let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url).await?;
-    auth::log_oauth_redirecting("google", &headers, &auth_url, &"jwt");
+    auth::log_oauth_redirecting(&headers, &auth_url, "google");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
 
@@ -235,7 +235,7 @@ pub async fn google_auth_callback(
         .ok_or(AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed))
         .and_then(|c| {
             c.to_str().map_err(|e| {
-                tracing::warn!(error = %e, "Cookie header contains non-UTF8 bytes");
+                auth::log_internal_error(&e, "cookie_utf8_decode");
                 AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
             })
         })
@@ -250,7 +250,7 @@ pub async fn google_auth_callback(
                     }
                 })
                 .ok_or_else(|| {
-                    tracing::warn!("oauth_state cookie missing from callback request");
+                    auth::log_cookie_error(&headers, "missing_oauth_state");
                     AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
                 })
         })?;
@@ -258,14 +258,14 @@ pub async fn google_auth_callback(
     let (user_info, redirect_url) =
         auth::get_google_user_info(&context, &params.code, &params.state, &oauth_state_cookie).await?;
 
-    auth::log_oauth_callback_received("google", &headers, &params.state, &user_info.email);
+    auth::log_oauth_callback_received(&headers, &params.state, &user_info.email, "google");
 
     if !user_info.verified_email {
-        auth::log_oauth_security_violation("unverified_email", &headers, &user_info.email, &params.state);
+        auth::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
         return Err(AuthError::InvalidCredentials);
     }
 
-    auth::log_oauth_user_authenticated("google", &headers, &user_info.email, &params.state);
+    auth::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
     // insert new user or link existing user if user already exists (matching email)
     let user = db::create_or_link_sso_user(&context.db, &user_info.email, 0, "google", &user_info.id).await?;
