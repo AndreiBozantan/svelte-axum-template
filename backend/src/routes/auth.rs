@@ -18,6 +18,9 @@ pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
 
+    #[error("Internal error: {0}")]
+    RequestHeaderOperationFailed(#[from] axum::http::header::InvalidHeaderValue),
+
     #[error("Database operation failed: {0}")]
     DatabaseOperationFailed(core::DbError),
 
@@ -59,6 +62,7 @@ impl IntoResponse for AuthError {
         let status = match self {
             Self::PasswordHashingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::DatabaseOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RequestHeaderOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
@@ -204,9 +208,20 @@ pub async fn google_auth_init(
 ) -> Result<impl IntoResponse, AuthError> {
     let redirect_url = params.get("redirect_url");
     auth::log_oauth_flow_initiated("google", &headers, &redirect_url);
-    let (auth_url, state) = auth::get_google_auth_url(&context, redirect_url).await?;
-    auth::log_oauth_redirecting("google", &headers, &auth_url, &state);
-    Ok(axum::response::Redirect::to(auth_url.as_str()))
+
+    let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url).await?;
+    auth::log_oauth_redirecting("google", &headers, &auth_url, &"jwt");
+
+    let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
+
+    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=300");
+    let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
+
+    response
+        .headers_mut()
+        .insert(axum::http::header::SET_COOKIE, cookie_val);
+
+    Ok(response)
 }
 
 /// Handler for Google OAuth callback
@@ -215,7 +230,33 @@ pub async fn google_auth_callback(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let (user_info, redirect_url) = auth::get_google_user_info(&context, &params.code, &params.state).await?;
+    let oauth_state_cookie = headers
+        .get(axum::http::header::COOKIE)
+        .ok_or(AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed))
+        .and_then(|c| {
+            c.to_str().map_err(|e| {
+                tracing::warn!(error = %e, "Cookie header contains non-UTF8 bytes");
+                AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
+            })
+        })
+        .and_then(|c| {
+            c.split(';')
+                .find_map(|p| {
+                    let mut parts = p.trim().splitn(2, '=');
+                    if parts.next()? == "oauth_state" {
+                        parts.next()
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| {
+                    tracing::warn!("oauth_state cookie missing from callback request");
+                    AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
+                })
+        })?;
+
+    let (user_info, redirect_url) =
+        auth::get_google_user_info(&context, &params.code, &params.state, &oauth_state_cookie).await?;
 
     auth::log_oauth_callback_received("google", &headers, &params.state, &user_info.email);
 
@@ -244,12 +285,20 @@ pub async fn google_auth_callback(
 
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
-    let response = auth::add_auth_cookies(
+    let mut response = auth::add_auth_cookies(
         &context,
         &Some(&access_token.value),
         &Some(&refresh_token.value),
         response,
     )?;
+
+    // Clear oauth_state cookie by setting Max-Age=0
+    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+    let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
+    response
+        .headers_mut()
+        .append(axum::http::header::SET_COOKIE, cookie_val);
+
     Ok(response)
 }
 

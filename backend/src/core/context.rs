@@ -10,7 +10,6 @@ pub struct Context {
     pub jwt: auth::JwtContext,
     pub settings: cfg::AppSettings,
     pub http_client: reqwest::Client,
-    pub oauth_session_store: auth::OAuthSessionStore,
 }
 
 impl Context {
@@ -26,7 +25,6 @@ impl Context {
             jwt,
             settings,
             http_client,
-            oauth_session_store: auth::create_oauth_session_store(),
         }
         .into()
     }

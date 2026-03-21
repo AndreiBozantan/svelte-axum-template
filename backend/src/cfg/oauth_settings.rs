@@ -17,10 +17,10 @@ pub struct OAuthSettings {
 
     /// Session timeout in minutes for OAuth flow
     #[serde(default = "default_session_timeout")]
-    pub session_timeout_minutes: u64,
+    pub session_timeout_minutes: u32,
 }
 
-fn default_session_timeout() -> u64 {
+fn default_session_timeout() -> u32 {
     10 // 10 minutes default
 }
 

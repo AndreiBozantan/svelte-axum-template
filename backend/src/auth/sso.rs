@@ -1,12 +1,9 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use chrono::{DateTime, Duration, Utc};
+use chrono::Utc;
+use jsonwebtoken;
 use oauth2;
 use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
-use tokio::sync::RwLock;
 use url::Url;
 
 use crate::cfg;
@@ -27,8 +24,8 @@ pub enum SsoError {
     #[error("CSRF token validation failed")]
     CsrfValidationFailed,
 
-    #[error("OAuth session expired: age {age_minutes} minutes")]
-    SessionNotFound { age_minutes: i64 },
+    #[error("OAuth session expired or invalid")]
+    SessionExpired,
 
     #[error("Invalid redirect URL")]
     InvalidRedirectUrl,
@@ -52,18 +49,11 @@ pub struct AuthRequest {
     pub state: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct OAuthSessionEntry {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OAuthStateClaims {
     pub csrf_token: String,
     pub redirect_url: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-// In-memory store for OAuth sessions (in production, use Redis or database)
-pub type OAuthSessionStore = Arc<RwLock<HashMap<String, OAuthSessionEntry>>>;
-
-pub fn create_oauth_session_store() -> OAuthSessionStore {
-    Arc::new(RwLock::new(HashMap::new()))
+    pub exp: i64,
 }
 
 // Type alias to simplify the function signature
@@ -131,7 +121,7 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
     Ok(client)
 }
 
-pub async fn get_google_auth_url(
+pub async fn get_google_auth_url_and_csrf_token(
     context: &core::ArcContext,
     redirect_url: Option<&String>,
 ) -> Result<(Url, String), SsoError> {
@@ -149,40 +139,51 @@ pub async fn get_google_auth_url(
         .add_scope(oauth2::Scope::new("profile".to_string()))
         .url();
 
-    // store session_entry with cleanup of expired entries
-    let state = csrf_token.secret().clone();
-    store_session_entry(context, redirect_url.cloned(), state.clone()).await;
+    let now = Utc::now().timestamp();
+    let timeout_minutes = context.settings.oauth.session_timeout_minutes as i64;
+    let claims = OAuthStateClaims {
+        csrf_token: csrf_token.secret().clone(),
+        redirect_url: redirect_url.cloned(),
+        exp: now + (timeout_minutes * 60),
+    };
 
-    Ok((auth_url, state))
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
+    let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key).map_err(|e| {
+        tracing::error!("Failed to encode OAuth state JWT: {}", e);
+        SsoError::InvalidConfig("Failed to encode OAuth state JWT".to_string())
+    })?;
+
+    Ok((auth_url, state_jwt))
 }
 
 pub async fn get_google_user_info(
     context: &core::ArcContext,
     code: &str,
     state: &str,
+    oauth_state_cookie: &str,
 ) -> Result<(GoogleUserInfo, Option<String>), SsoError> {
-    // validate state parameter (CSRF protection)
-    let session_entry = {
-        let mut store = context.oauth_session_store.write().await;
-        store.remove(state).ok_or(SsoError::CsrfValidationFailed)?
-    };
+    // decode and validate JWT cookie
+    let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+    validation.leeway = 0;
 
-    if session_entry.csrf_token != state {
+    let token_data =
+        jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
+            |e| {
+                tracing::error!("Failed to decode OAuth state JWT: {}", e);
+                match e.kind() {
+                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => SsoError::SessionExpired,
+                    _ => SsoError::CsrfValidationFailed,
+                }
+            },
+        )?;
+
+    if token_data.claims.csrf_token != state {
         tracing::warn!(
             "CSRF token mismatch: expected {}, got {}",
-            session_entry.csrf_token,
+            token_data.claims.csrf_token,
             state
         );
         return Err(SsoError::CsrfValidationFailed);
-    }
-
-    // check session_entry age (configurable timeout)
-    let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
-    let session_entry_age = Utc::now() - session_entry.created_at;
-    if session_entry_age > timeout_minutes {
-        return Err(SsoError::SessionNotFound {
-            age_minutes: session_entry_age.num_minutes(),
-        });
     }
 
     let client = create_google_client(&context.settings.oauth)?;
@@ -234,25 +235,7 @@ pub async fn get_google_user_info(
         user_info.email
     );
 
-    Ok((user_info, session_entry.redirect_url))
-}
-
-async fn store_session_entry(context: &core::ArcContext, redirect_url: Option<String>, state: String) {
-    // store session_entry with cleanup of expired entries
-    let mut session_store = context.oauth_session_store.write().await;
-    let session_entry = OAuthSessionEntry {
-        csrf_token: state.clone(),
-        redirect_url: redirect_url,
-        created_at: Utc::now(),
-    };
-
-    // clean up expired sessions (configurable timeout)
-    let timeout_minutes = Duration::minutes(context.settings.oauth.session_timeout_minutes as i64);
-    let cutoff = Utc::now() - timeout_minutes;
-    session_store.retain(|_, entry| entry.created_at > cutoff);
-
-    // store new session
-    session_store.insert(state, session_entry);
+    Ok((user_info, token_data.claims.redirect_url))
 }
 
 /// validate redirect URL to prevent open redirect attacks
