@@ -46,57 +46,61 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
-    /// Run database migrations
+    /// run database migrations
     Migrate {
         #[command(subcommand)]
         action: MigrateAction,
     },
 
-    /// Create an admin user
+    /// create an admin user
     CreateAdmin {
-        /// Username for the admin user
+        /// email for the admin user
         #[arg(short, long)]
-        username: String,
-
-        /// Email for the admin user (optional)
-        #[arg(short, long)]
-        email: Option<String>,
+        email: String,
     },
 }
 
 #[derive(Subcommand)]
 enum MigrateAction {
-    /// Create a new migration file
+    /// create a new migration file
     Create { name: String },
 
-    /// List all available migrations
+    /// list all available migrations
     List,
 
-    /// Check if there are pending migrations
+    /// check if there are pending migrations
     Status,
 
-    /// Run all pending migrations
+    /// run all pending migrations
     Run,
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(db: &core::DbContext) -> Result<(), CliError> {
+pub async fn run_cli(db: &core::DbContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
-        None => Ok(tracing::info!("CLI command not provided. Use --help for CLI usage.")),
-        Some(CliCommand::Migrate { action }) => exec_migrate_command(action, db).await,
-        Some(CliCommand::CreateAdmin { username, email }) => create_admin(username, email, db).await,
+        None => {
+            tracing::info!("CLI command not provided. Use --help for CLI usage.");
+            Ok(false)
+        }
+        Some(CliCommand::Migrate { action }) => {
+            exec_migrate_command(action, db).await?;
+            Ok(true)
+        }
+        Some(CliCommand::CreateAdmin { email }) => {
+            create_admin(email, db).await?;
+            Ok(true)
+        }
     }
 }
 
 async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
     match action {
-        MigrateAction::Create { name } => migrate_action_create(&name)?,
+        MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
-        MigrateAction::Status => migrate_action_status(db).await?,
-        MigrateAction::Run => migrate_action_run(db).await?,
+        MigrateAction::Status => migrate_action_status(db).await,
+        MigrateAction::Run => migrate_action_run(db).await,
     }
-    std::process::exit(0); // Exit the process since this is a CLI command
 }
 
 fn migrate_action_create(name: &str) -> Result<(), CliError> {
@@ -105,7 +109,7 @@ fn migrate_action_create(name: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-fn migrate_action_list() {
+fn migrate_action_list() -> Result<(), CliError> {
     let migrations = app::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
@@ -115,6 +119,7 @@ fn migrate_action_list() {
             println!("{i}. {migration}");
         }
     }
+    Ok(())
 }
 
 async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
@@ -135,9 +140,9 @@ async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn create_admin(username: String, email: Option<String>, db: &core::DbContext) -> Result<(), CliError> {
-    // Prompt for password securely
-    print!("Enter password for admin user '{username}': ");
+async fn create_admin(email: String, db: &core::DbContext) -> Result<(), CliError> {
+    // prompt for password securely
+    print!("Enter password for admin user '{email}': ");
     io::stdout().flush().unwrap();
 
     let password = rpassword::read_password()?;
@@ -147,8 +152,8 @@ async fn create_admin(username: String, email: Option<String>, db: &core::DbCont
         .then(|| CliError::Other("Password cannot be empty".to_string()))
         .map_or(Ok(()), Err)?;
 
-    // Check if user already exists; if found, return an error
-    match db::get_user_by_name(db, &username).await {
+    // check if user already exists; if found, return an error
+    match db::get_user_by_email(db, &email).await {
         Err(core::DbError::RowNotFound) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
@@ -156,10 +161,9 @@ async fn create_admin(username: String, email: Option<String>, db: &core::DbCont
 
     let password_hash = auth::hash_password(&password)?;
     let new_user = db::NewUser {
-        username,
-        password_hash: Some(password_hash),
         email,
-        tenant_id: Some(1), // Default tenant
+        tenant_id: 0, // default tenant
+        password_hash: Some(password_hash),
         sso_provider: None,
         sso_id: None,
     };

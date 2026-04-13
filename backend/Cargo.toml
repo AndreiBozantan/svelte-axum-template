@@ -44,6 +44,10 @@ toml = { version = "0.9.3" }
 [features]
 sqlite-offline = ["sqlx/sqlite"]
 
+[dev-dependencies]
+axum = { version = "0.8", features = ["tokio", "http1", "http2"] }
+cookie = "0.18.1"
+
 # Important: This tells SQLx to skip compile-time verification of database queries
 [package.metadata.sqlx]
 offline = true

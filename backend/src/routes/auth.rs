@@ -1,39 +1,31 @@
 use axum::Json;
 use axum::body::Body;
+use axum::extract::Request;
 use axum::extract::State;
-use axum::http::{Request, StatusCode};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
-use chrono::DateTime;
+use axum::response::Response;
 use serde::Deserialize;
 use serde_json::json;
-use sha2::Digest;
 use thiserror::Error;
 
 use crate::auth;
 use crate::core;
 use crate::db;
-use crate::services::sso;
 
-#[derive(Deserialize)]
-pub struct Login {
-    pub username: String,
-    pub password: String,
-}
-
-#[derive(Deserialize)]
-pub struct RefreshTokenRequest {
-    refresh_token: String,
-}
-
-#[derive(Deserialize)]
-pub struct RevokeTokenRequest {
-    refresh_token: String,
-}
+/// Default tenant ID assigned to users created via SSO.
+const SSO_DEFAULT_TENANT_ID: i64 = 0;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("Invalid credentials")]
     InvalidCredentials,
+
+    #[error("Internal error: {0}")]
+    RequestHeaderOperationFailed(#[from] axum::http::header::InvalidHeaderValue),
+
+    #[error("Database operation failed: {0}")]
+    DatabaseOperationFailed(core::DbError),
 
     #[error("JWT operation failed: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -42,16 +34,13 @@ pub enum AuthError {
     PasswordHashingFailed(#[from] argon2::password_hash::Error),
 
     #[error("Token expired or invalid")]
-    TokenInvalid,
+    InvalidToken(#[from] auth::TokenError),
 
-    #[error("User not found")]
-    UserNotFound,
+    #[error("User already exists")]
+    UserAlreadyExists,
 
-    #[error("Database operation failed: {0}")]
-    DatabaseOperationFailed(core::DbError),
-
-    #[error("OAuth operation failed: {0}")]
-    OAuthOperationFailed(#[from] sso::Error),
+    #[error("SSO operation failed: {0}")]
+    SsoOperationFailed(#[from] auth::SsoError),
 }
 
 impl From<core::DbError> for AuthError {
@@ -63,216 +52,289 @@ impl From<core::DbError> for AuthError {
     }
 }
 
+#[derive(Deserialize)]
+pub struct Login {
+    pub email: String,
+    pub password: String,
+}
+
 impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
-    fn into_response(self) -> axum::response::Response {
-        tracing::error!(
-            error_type = %std::any::type_name::<Self>(),
-            error_subtype = %std::any::type_name_of_val(&self),
-            error_message = %self);
-
-        let (status, error_message) = match self {
-            Self::PasswordHashingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::JwtOperationFailed(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::UserNotFound => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::TokenInvalid => (StatusCode::UNAUTHORIZED, self.to_string()),
-            Self::OAuthOperationFailed(e) => (StatusCode::UNAUTHORIZED, e.to_string()),
+    fn into_response(self) -> Response {
+        auth::log_auth_error(&self);
+        let status = match self {
+            Self::PasswordHashingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::DatabaseOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::RequestHeaderOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
+            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
+            Self::SsoOperationFailed(_) => StatusCode::UNAUTHORIZED,
+            Self::UserAlreadyExists => StatusCode::CONFLICT,
         };
-
         let body = Json(json!({
             "result": "error",
-            "message": error_message
+            "message": self.to_string(),
         }));
-
         (status, body).into_response()
     }
 }
 
-/// Login route
+/// Handler for logging in using email and password credentials
 pub async fn login(
     State(context): State<core::ArcContext>,
+    headers: HeaderMap,
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Logging in user: {}", login.username);
-
-    // Get user from database
-    let user = db::get_user_by_name(&context.db, &login.username).await?;
-    if !auth::verify_password(&login.password, user.password_hash)? {
-        tracing::warn!("Invalid password for user: {}", login.username);
+    auth::log_user_login(&headers, &login.email);
+    let user = db::get_user_by_email(&context.db, &login.email).await?;
+    let password_hash = user.password_hash.as_ref().ok_or_else(|| {
+        auth::log_missing_password(&headers, &login.email);
+        AuthError::InvalidCredentials
+    })?;
+    if !auth::verify_password(&login.password, password_hash)? {
+        auth::log_invalid_password(&headers, &login.email);
         return Err(AuthError::InvalidCredentials);
     }
+    auth::log_user_login_success(&headers, &user.email);
 
-    // Generate JWT tokens with appropriate expiration
-    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
-    let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
+    // generate JWT tokens with appropriate expiration
+    let access_token = generate_access_token(&context, &user)?;
+    let refresh_token = generate_refresh_token(&context, &user)?;
 
     // store refresh token in database
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
-    let expires_at = DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(AuthError::TokenInvalid)?;
-    let token_hash = get_token_hash_as_hex(&refresh_token);
+    let token_hash = auth::get_token_hash_as_hex(&refresh_token.value);
     let new_refresh_token = db::NewRefreshToken {
-        jti: refresh_claims.jti,
+        jti: refresh_token.claims.jti,
         user_id: user.id,
         token_hash,
-        expires_at: expires_at.naive_utc(),
+        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
-    Ok(Json(json!({
+    let body = json!({
         "result": "ok",
-        "tokens": token_response,
         "user": {
             "id": user.id,
-            "username": user.username,
+            "email": user.email,
             "tenant_id": user.tenant_id
         }
-    })))
+    });
+    let r = auth::create_json_response_with_auth_cookies(
+        &context,
+        Some(&access_token.value),
+        Some(&refresh_token.value),
+        body,
+    )?;
+    Ok(r)
 }
 
-/// Logout route
+/// Handler for logging out
 pub async fn logout(
     State(context): State<core::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let claims = auth::decode_access_token_from_req(&context.jwt, &req)?;
-    tracing::info!(user_id = claims.sub, username = claims.username, "Logout");
+    // TODO: clarify what to do here in case of various errors.
+    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)?;
+    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
 
     // revoke all the associated refresh tokens
-    let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::TokenInvalid)?;
+    let user_id = claims
+        .sub
+        .parse::<i64>()
+        .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
     if let Ok(db_user) = db::get_user_by_id(&context.db, user_id).await {
         let _ = db::revoke_all_refresh_tokens_for_user(&context.db, db_user.id).await;
     }
 
-    Ok(Json(json!({"result": "ok"})))
+    // create cookies to clear the tokens
+    let json = json!({"result": "ok"});
+    let r = auth::create_json_response_with_auth_cookies(&context, None, None, json)?;
+    Ok(r)
 }
 
-/// Route to refresh access token using refresh token
+/// Handler for refreshing access token using refresh token
 pub async fn refresh_access_token(
     State(context): State<core::ArcContext>,
-    Json(request): Json<RefreshTokenRequest>,
+    req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Refreshing access token");
-
-    // Decode refresh token and check if it exists in database and is not revoked
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
+    // attempt to extract refresh_token from the Cookie header
+    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
+    // decode refresh token and check if it exists in the database and is not revoked
+    let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
-
-    // Verify token hash
-    let token_hash = get_token_hash_as_hex(&request.refresh_token);
+    let token_hash = auth::get_token_hash_as_hex(refresh_token); // verify token hash
     if stored_token.token_hash != token_hash {
-        return Err(AuthError::TokenInvalid);
+        return Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid));
     }
 
-    // Generate new access token for the user
+    // generate new access token for the user
     let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
-    let new_access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
+    let new_access_token = generate_access_token(&context, &user)?;
+    auth::log_token_refresh(req.headers(), user.id, &refresh_claims.jti, &refresh_claims.sub);
 
-    Ok(Json(json!({
+    let body = json!({
         "result": "ok",
-        "access_token": new_access_token,
         "expires_in": context.settings.jwt.access_token_expiry_minutes * 60,
         "user": {
             "id": user.id,
-            "username": user.username,
+            "email": user.email,
             "tenant_id": user.tenant_id
         }
-    })))
+    });
+    let r = auth::create_json_response_with_auth_cookies(&context, Some(&new_access_token.value), None, body)?;
+    Ok(r)
 }
 
-/// Route to revoke a refresh token
-pub async fn revoke_token(
+/// Handler for revoking a refresh token
+pub async fn revoke_refresh_token(
     State(context): State<core::ArcContext>,
-    Json(request): Json<RevokeTokenRequest>,
+    req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Revoking refresh token");
-
-    // Decode refresh token to get JTI
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, &request.refresh_token)?;
-
-    // Revoke the token
+    // attempt to extract refresh_token from the Cookie header
+    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
+    // decode refresh token to get JTI
+    let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
-    Ok(Json(json!({"result": "ok"})))
+    auth::log_token_revoke(req.headers(), &refresh_claims.jti, &refresh_claims.sub);
+
+    let body = json!({"result": "ok"});
+    let r = auth::create_json_response_with_auth_cookies(&context, None, None, body)?;
+    Ok(r)
 }
 
 /// Handler for initiating Google OAuth flow
-pub async fn google_auth_init(State(context): State<core::ArcContext>) -> Result<impl IntoResponse, AuthError> {
-    let (auth_url, _csrf_token) = sso::get_google_auth_url(&context.settings.oauth)?;
-    // In production, you should store the CSRF token in a secure session store
-    // For now, we'll rely on the OAuth provider's state validation
-    Ok(axum::response::Redirect::to(auth_url.as_str()))
+pub async fn google_auth_init(
+    State(context): State<core::ArcContext>,
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<impl IntoResponse, AuthError> {
+    let redirect_url = params.get("redirect_url").cloned();
+    auth::log_oauth_flow_initiated(&headers, &redirect_url, "google");
+
+    let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url).await?;
+    auth::log_oauth_redirecting(&headers, &auth_url, "google");
+
+    let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
+
+    let cookie_max_age = context.settings.oauth.session_timeout_minutes * 60;
+    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={cookie_max_age}");
+    let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
+
+    response
+        .headers_mut()
+        .insert(axum::http::header::SET_COOKIE, cookie_val);
+
+    Ok(response)
 }
 
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
     State(context): State<core::ArcContext>,
-    axum::extract::Query(params): axum::extract::Query<sso::AuthRequest>,
+    headers: HeaderMap,
+    axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    tracing::info!("Google OAuth callback received with state: {}", params.state);
-    let user_info = sso::get_google_user_info(&context, &params.code).await?;
-    tracing::info!("Retrieved user info for: {} ({})", user_info.name, user_info.email);
+    let oauth_state_cookie = headers
+        .get(axum::http::header::COOKIE)
+        .ok_or(AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed))
+        .and_then(|c| {
+            c.to_str().map_err(|e| {
+                auth::log_internal_error(&e, "cookie_utf8_decode");
+                AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
+            })
+        })
+        .and_then(|c| {
+            c.split(';')
+                .find_map(|p| {
+                    let mut parts = p.trim().splitn(2, '=');
+                    if parts.next()? == "oauth_state" {
+                        parts.next()
+                    } else {
+                        None
+                    }
+                })
+                .ok_or_else(|| {
+                    auth::log_cookie_error(&headers, "missing_oauth_state");
+                    AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
+                })
+        })?;
 
-    // Check if user already exists
-    let existing_user = db::get_user_by_sso_id(&context.db, "google", &user_info.id).await;
-    let user = match existing_user {
-        Ok(user) => {
-            tracing::info!("Existing SSO user found: {}", user.username);
-            user
-        }
-        Err(core::DbError::RowNotFound) => {
-            tracing::info!("No existing user found, creating new user for: {}", user_info.email);
-            let new_user = db::NewUser {
-                username: user_info.email.clone(), // Use email as username for SSO users
-                password_hash: None,               // No password for SSO users
-                email: Some(user_info.email.clone()),
-                tenant_id: None, // You might want to assign a default tenant
-                sso_provider: Some("google".to_string()),
-                sso_id: Some(user_info.id.clone()),
-            };
-            let user = db::create_user(&context.db, new_user).await?;
-            tracing::info!("Created new SSO user: {}", user.username);
-            user
-        }
-        Err(e) => {
-            tracing::error!("Failed to retrieve or create user: {}", e);
-            return Err(AuthError::DatabaseOperationFailed(e));
-        }
-    };
+    let (user_info, redirect_url) =
+        auth::get_google_user_info(&context, &params.code, &params.state, oauth_state_cookie).await?;
 
-    // TODO: move duplicate code (login function) to a common function
-    // Generate JWT tokens for the user (same as regular login)
-    let access_token = auth::generate_access_token(&context.jwt, user.id, &user.username, user.tenant_id)?;
+    if !user_info.verified_email {
+        auth::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
+        return Err(AuthError::InvalidCredentials);
+    }
 
-    let refresh_token = auth::generate_refresh_token(&context.jwt, user.id)?;
+    auth::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    // Store refresh token in database
-    let refresh_claims = auth::decode_refresh_token(&context.jwt, &refresh_token)?;
-    let expires_at = chrono::DateTime::from_timestamp(refresh_claims.exp, 0).ok_or(auth::JwtError::InvalidToken)?;
-    let token_hash = get_token_hash_as_hex(&refresh_token);
+    // insert new user or link existing user if user already exists (matching email)
+    let user = db::create_or_link_sso_user(
+        &context.db,
+        &user_info.email,
+        SSO_DEFAULT_TENANT_ID,
+        "google",
+        &user_info.id,
+    )
+    .await?;
+
+    // generate JWT tokens for the user (same as regular login)
+    let access_token = generate_access_token(&context, &user)?;
+    let refresh_token = generate_refresh_token(&context, &user)?;
+
+    // guard against open redirects, although redirect_url was validated and signed into the JWT at initiation time
+    // this is cheap defence-in-depth against any future refactor that might separate JWT verification from the redirect step
+    let final_redirect_url = redirect_url
+        .as_deref()
+        .filter(|url| url.starts_with('/') && !url.starts_with("//"))
+        .unwrap_or("/");
+
+    let response = axum::response::Redirect::to(final_redirect_url).into_response();
+    let mut response = auth::add_auth_cookies(
+        &context,
+        Some(&access_token.value),
+        Some(&refresh_token.value),
+        response,
+    )?;
+
+    // clear oauth_state cookie by setting Max-Age=0
+    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+    let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
+    response
+        .headers_mut()
+        .append(axum::http::header::SET_COOKIE, cookie_val);
+
+    // store refresh token in database if everthing went fine
     let new_refresh_token = db::NewRefreshToken {
-        jti: refresh_claims.jti,
+        jti: refresh_token.claims.jti,
         user_id: user.id,
-        token_hash,
-        expires_at: expires_at.naive_utc(),
+        token_hash: auth::get_token_hash_as_hex(&refresh_token.value),
+        expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let jwt_token_response = auth::TokenResponse::new(&context.jwt, access_token, refresh_token);
-
-    // For OAuth flow, redirect to frontend with success status
-    // TODO: In production, consider a more secure approach like server-side session or secure cookies
-    let redirect_url = format!(
-        "http://localhost:5173/login?oauth_success=true&access_token={}&refresh_token={}",
-        jwt_token_response.access_token, jwt_token_response.refresh_token
-    );
-
-    Ok(axum::response::Redirect::to(&redirect_url))
+    Ok(response)
 }
 
-fn get_token_hash_as_hex(token: &str) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(token);
-    format!("{:x}", hasher.finalize())
+fn generate_refresh_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+    Ok(auth::generate_token(
+        &context.jwt,
+        user.id,
+        user.tenant_id,
+        &user.email,
+        auth::TokenType::Refresh,
+        context.jwt.refresh_token_expiry,
+    )?)
+}
+
+fn generate_access_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+    Ok(auth::generate_token(
+        &context.jwt,
+        user.id,
+        user.tenant_id,
+        &user.email,
+        auth::TokenType::Access,
+        context.jwt.access_token_expiry,
+    )?)
 }

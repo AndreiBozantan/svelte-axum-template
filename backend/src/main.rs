@@ -41,10 +41,16 @@ pub mod core {
 
 pub mod auth {
     mod jwt;
+    mod logger;
     mod password;
+    mod sso;
+    mod tokens;
 
     pub use jwt::*;
+    pub use logger::*;
     pub use password::*;
+    pub use sso::*;
+    pub use tokens::*;
 }
 
 pub mod db {
@@ -64,8 +70,10 @@ pub mod routes {
     pub mod health;
 }
 
-pub mod services {
-    pub mod sso;
+pub mod middleware {
+    mod rate_limit;
+
+    pub use rate_limit::*;
 }
 
 pub mod app {

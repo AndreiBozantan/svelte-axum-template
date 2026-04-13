@@ -15,3 +15,10 @@ refresh_token_expiry_days = 128
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = ""   # 🚀 add your actual redirect URI here
+
+# Security: Allowed domains for OAuth redirects (prevents open redirect attacks)
+# 🚀 UPDATE THIS: Add your production domain(s)
+allowed_redirect_domains = ["yourdomain.com", "www.yourdomain.com"]
+
+# Session timeout for OAuth flow (in minutes) - shorter for production
+session_timeout_minutes = 5
