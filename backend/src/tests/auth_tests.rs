@@ -353,7 +353,7 @@ async fn test_decode_access_token_from_req_cookie_success() {
     let ctx = create_test_context(default_config()).await;
     let user_id = 123;
     let email = "test_user";
-    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access).unwrap();
+    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access, 1).unwrap();
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::COOKIE,
@@ -370,7 +370,7 @@ async fn test_decode_access_token_from_req_success() {
     let user_id = 123;
     let email = "test_user";
 
-    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access).unwrap();
+    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access, 1).unwrap();
 
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(

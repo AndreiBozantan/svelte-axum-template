@@ -18,7 +18,7 @@ fn test_generate_access_token_success() {
     let email = "test_user@example.com";
     let tenant_id = 456;
 
-    let token = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access).unwrap();
+    let token = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access, 1).unwrap();
 
     // token should be non-empty and contain JWT structure (header.payload.signature)
     let parts = token.value.split('.');
@@ -30,7 +30,7 @@ fn test_generate_refresh_token_success() {
     let ctx = create_test_context();
     let user_id = 123;
 
-    let refresh_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh).unwrap();
+    let refresh_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh, 1).unwrap();
 
     // refresh token should be non-empty and contain JWT structure
     let parts = refresh_token.value.split('.');
@@ -44,7 +44,7 @@ fn test_decode_access_token_success() {
     let email = "test_user@example.com";
     let tenant_id = 456;
 
-    let token = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access).unwrap();
+    let token = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access, 1).unwrap();
     let claims = decode_token(&ctx, &token.value, TokenType::Access).unwrap();
 
     assert_eq!(claims.sub, user_id.to_string());
@@ -60,7 +60,7 @@ fn test_decode_refresh_token_success() {
     let ctx = create_test_context();
     let user_id = 123;
 
-    let token_with_claims = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh).unwrap();
+    let token_with_claims = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh, 1).unwrap();
     let claims = decode_token(&ctx, &token_with_claims.value, TokenType::Refresh).unwrap();
 
     assert_eq!(claims.sub, user_id.to_string());
@@ -82,7 +82,7 @@ fn test_decode_access_token_wrong_secret() {
 
     let user_id = 123;
     let email = "test_user@example.com";
-    let token = generate_token(&ctx, user_id, 0, email, TokenType::Access).unwrap();
+    let token = generate_token(&ctx, user_id, 0, email, TokenType::Access, 1).unwrap();
     let result = decode_token(&wrong_ctx, &token.value, TokenType::Access);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), JwtError::DecodingFailed(_)));
@@ -141,7 +141,7 @@ fn test_token_expiry() {
     assert!(matches!(result.unwrap_err(), JwtError::TokenExpired));
 
     // test that a valid token still works
-    let valid_token = generate_token(&ctx, user_id, 0, email, TokenType::Access).unwrap();
+    let valid_token = generate_token(&ctx, user_id, 0, email, TokenType::Access, 1).unwrap();
     let claims = decode_token(&ctx, &valid_token.value, TokenType::Access).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
     assert_eq!(claims.email, email);
@@ -179,7 +179,7 @@ fn test_refresh_token_expiry() {
     assert!(matches!(result.unwrap_err(), JwtError::TokenExpired));
 
     // test that a valid refresh token still works
-    let valid_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh).unwrap();
+    let valid_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh, 1).unwrap();
     let claims = decode_token(&ctx, &valid_token.value, TokenType::Refresh).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
 }
@@ -224,7 +224,7 @@ fn test_access_token_used_as_refresh_token() {
     let user_id = 123;
     let email = "test_user@example.com";
 
-    let access_token = generate_token(&ctx, user_id, 0, email, TokenType::Access).unwrap();
+    let access_token = generate_token(&ctx, user_id, 0, email, TokenType::Access, 1).unwrap();
 
     // try to decode access token as refresh token - should fail
     let result = decode_token(&ctx, &access_token.value, TokenType::Refresh);
@@ -237,7 +237,7 @@ fn test_refresh_token_used_as_access_token() {
     let ctx = create_test_context();
     let user_id = 123;
 
-    let refresh_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh).unwrap();
+    let refresh_token = generate_token(&ctx, user_id, 0, "test_user@example.com", TokenType::Refresh, 1).unwrap();
 
     // try to decode refresh token as access token - should fail
     let result = decode_token(&ctx, &refresh_token.value, TokenType::Access);
@@ -251,8 +251,8 @@ fn test_different_tokens_have_different_jwt_ids() {
     let user_id = 123;
     let email = "test_user@example.com";
 
-    let token1 = generate_token(&ctx, user_id, 0, email, TokenType::Access).unwrap();
-    let token2 = generate_token(&ctx, user_id, 0, email, TokenType::Refresh).unwrap();
+    let token1 = generate_token(&ctx, user_id, 0, email, TokenType::Access, 1).unwrap();
+    let token2 = generate_token(&ctx, user_id, 0, email, TokenType::Refresh, 1).unwrap();
 
     let claims1 = decode_token(&ctx, &token1.value, TokenType::Access).unwrap();
     let claims2 = decode_token(&ctx, &token2.value, TokenType::Refresh).unwrap();
@@ -269,12 +269,12 @@ fn test_access_token_contains_correct_tenant_info() {
 
     // test with tenant
     let tenant_id = 456;
-    let token_with_tenant = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access).unwrap();
+    let token_with_tenant = generate_token(&ctx, user_id, tenant_id, email, TokenType::Access, 1).unwrap();
     let claims_with_tenant = decode_token(&ctx, &token_with_tenant.value, TokenType::Access).unwrap();
     assert_eq!(claims_with_tenant.tenant_id, tenant_id);
 
     // test without tenant
-    let token_without_tenant = generate_token(&ctx, user_id, 0, email, TokenType::Access).unwrap();
+    let token_without_tenant = generate_token(&ctx, user_id, 0, email, TokenType::Access, 1).unwrap();
     let claims_without_tenant = decode_token(&ctx, &token_without_tenant.value, TokenType::Access).unwrap();
     assert_eq!(claims_without_tenant.tenant_id, 0);
 }
