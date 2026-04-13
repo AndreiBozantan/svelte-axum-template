@@ -57,7 +57,7 @@ pub fn log_redirect_violation(violation: &str, url: &str) {
     );
 }
 
-pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: &Option<&String>, provider: &str) {
+pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: &Option<String>, provider: &str) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -76,18 +76,6 @@ pub fn log_oauth_redirecting(headers: &axum::http::HeaderMap, auth_url: &url::Ur
         message = "OAuth flow redirecting",
         provider,
         %auth_url,
-    );
-}
-
-pub fn log_oauth_callback_received(headers: &axum::http::HeaderMap, state: &str, email: &str, provider: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        state_hash = hash_state(state),
-        message = "OAuth callback received",
-        provider,
-        email,
     );
 }
 

@@ -13,6 +13,9 @@ use crate::auth;
 use crate::core;
 use crate::db;
 
+/// Default tenant ID assigned to users created via SSO.
+const SSO_DEFAULT_TENANT_ID: i64 = 0;
+
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("Invalid credentials")]
@@ -67,7 +70,7 @@ impl IntoResponse for AuthError {
             Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
             Self::SsoOperationFailed(_) => StatusCode::UNAUTHORIZED,
-            Self::UserAlreadyExists => StatusCode::UNAUTHORIZED,
+            Self::UserAlreadyExists => StatusCode::CONFLICT,
         };
         let body = Json(json!({
             "result": "error",
@@ -89,7 +92,7 @@ pub async fn login(
         auth::log_missing_password(&headers, &login.email);
         AuthError::InvalidCredentials
     })?;
-    if !auth::verify_password(&login.password, &password_hash)? {
+    if !auth::verify_password(&login.password, password_hash)? {
         auth::log_invalid_password(&headers, &login.email);
         return Err(AuthError::InvalidCredentials);
     }
@@ -119,8 +122,8 @@ pub async fn login(
     });
     let r = auth::create_json_response_with_auth_cookies(
         &context,
-        &Some(&access_token.value),
-        &Some(&refresh_token.value),
+        Some(&access_token.value),
+        Some(&refresh_token.value),
         body,
     )?;
     Ok(r)
@@ -146,7 +149,7 @@ pub async fn logout(
 
     // create cookies to clear the tokens
     let json = json!({"result": "ok"});
-    let r = auth::create_json_response_with_auth_cookies(&context, &None, &None, json)?;
+    let r = auth::create_json_response_with_auth_cookies(&context, None, None, json)?;
     Ok(r)
 }
 
@@ -157,7 +160,7 @@ pub async fn refresh_access_token(
 ) -> Result<impl IntoResponse, AuthError> {
     // attempt to extract refresh_token from the Cookie header
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
-    // decode refresh token and check if it exists in database and is not revoked
+    // decode refresh token and check if it exists in the database and is not revoked
     let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
     let token_hash = auth::get_token_hash_as_hex(refresh_token); // verify token hash
@@ -179,7 +182,7 @@ pub async fn refresh_access_token(
             "tenant_id": user.tenant_id
         }
     });
-    let r = auth::create_json_response_with_auth_cookies(&context, &Some(&new_access_token.value), &None, body)?;
+    let r = auth::create_json_response_with_auth_cookies(&context, Some(&new_access_token.value), None, body)?;
     Ok(r)
 }
 
@@ -192,11 +195,11 @@ pub async fn revoke_refresh_token(
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
     // decode refresh token to get JTI
     let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
-    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?; // revoke the token
+    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
     auth::log_token_revoke(req.headers(), &refresh_claims.jti, &refresh_claims.sub);
 
     let body = json!({"result": "ok"});
-    let r = auth::create_json_response_with_auth_cookies(&context, &None, &None, body)?;
+    let r = auth::create_json_response_with_auth_cookies(&context, None, None, body)?;
     Ok(r)
 }
 
@@ -206,7 +209,7 @@ pub async fn google_auth_init(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let redirect_url = params.get("redirect_url");
+    let redirect_url = params.get("redirect_url").cloned();
     auth::log_oauth_flow_initiated(&headers, &redirect_url, "google");
 
     let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url).await?;
@@ -214,7 +217,8 @@ pub async fn google_auth_init(
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
 
-    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=300");
+    let cookie_max_age = context.settings.oauth.session_timeout_minutes * 60;
+    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={cookie_max_age}");
     let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
 
     response
@@ -256,9 +260,7 @@ pub async fn google_auth_callback(
         })?;
 
     let (user_info, redirect_url) =
-        auth::get_google_user_info(&context, &params.code, &params.state, &oauth_state_cookie).await?;
-
-    auth::log_oauth_callback_received(&headers, &params.state, &user_info.email, "google");
+        auth::get_google_user_info(&context, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         auth::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
@@ -268,13 +270,42 @@ pub async fn google_auth_callback(
     auth::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
     // insert new user or link existing user if user already exists (matching email)
-    let user = db::create_or_link_sso_user(&context.db, &user_info.email, 0, "google", &user_info.id).await?;
+    let user = db::create_or_link_sso_user(
+        &context.db,
+        &user_info.email,
+        SSO_DEFAULT_TENANT_ID,
+        "google",
+        &user_info.id,
+    )
+    .await?;
 
     // generate JWT tokens for the user (same as regular login)
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
-    // store refresh token in database
+    // guard against open redirects, although redirect_url was validated and signed into the JWT at initiation time
+    // this is cheap defence-in-depth against any future refactor that might separate JWT verification from the redirect step
+    let final_redirect_url = redirect_url
+        .as_deref()
+        .filter(|url| url.starts_with('/') && !url.starts_with("//"))
+        .unwrap_or("/");
+
+    let response = axum::response::Redirect::to(final_redirect_url).into_response();
+    let mut response = auth::add_auth_cookies(
+        &context,
+        Some(&access_token.value),
+        Some(&refresh_token.value),
+        response,
+    )?;
+
+    // clear oauth_state cookie by setting Max-Age=0
+    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+    let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
+    response
+        .headers_mut()
+        .append(axum::http::header::SET_COOKIE, cookie_val);
+
+    // store refresh token in database if everthing went fine
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_token.claims.jti,
         user_id: user.id,
@@ -282,22 +313,6 @@ pub async fn google_auth_callback(
         expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
-
-    let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
-    let response = axum::response::Redirect::to(final_redirect_url).into_response();
-    let mut response = auth::add_auth_cookies(
-        &context,
-        &Some(&access_token.value),
-        &Some(&refresh_token.value),
-        response,
-    )?;
-
-    // Clear oauth_state cookie by setting Max-Age=0
-    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
-    let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
-    response
-        .headers_mut()
-        .append(axum::http::header::SET_COOKIE, cookie_val);
 
     Ok(response)
 }
@@ -309,6 +324,7 @@ fn generate_refresh_token(context: &core::ArcContext, user: &db::User) -> Result
         user.tenant_id,
         &user.email,
         auth::TokenType::Refresh,
+        context.jwt.refresh_token_expiry,
     )?)
 }
 
@@ -319,5 +335,6 @@ fn generate_access_token(context: &core::ArcContext, user: &db::User) -> Result<
         user.tenant_id,
         &user.email,
         auth::TokenType::Access,
+        context.jwt.access_token_expiry,
     )?)
 }

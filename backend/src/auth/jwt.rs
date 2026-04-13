@@ -92,7 +92,7 @@ pub struct TokenClaims {
     pub exp: i64,              // Expiration time
     pub iat: i64,              // Issued at
     pub jti: String,           // JWT ID (unique identifier)
-    pub token_type: TokenType, // "access"
+    pub token_type: TokenType, // "access" or "refresh"
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -136,7 +136,8 @@ impl JwtContext {
         let encoding_key = jwt::EncodingKey::from_secret(secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(secret.as_ref());
         let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
-        validation.leeway = 0;
+        validation.validate_exp = true; // explicitly enforce expiry so library default changes cannot silently disable it
+        validation.leeway = 5; // small leeway tolerates minor clock skew between distributed instances
 
         Ok(Self {
             encoding_key,
@@ -148,13 +149,14 @@ impl JwtContext {
     }
 }
 
-/// Generate a new access token
+/// Generate a new access or refresh token.
 pub fn generate_token(
     ctx: &JwtContext,
     user_id: i64,
     tenant_id: i64,
     email: &str,
     token_type: TokenType,
+    expiry: i64,
 ) -> Result<TokenWithClaims, JwtError> {
     let now = Utc::now().timestamp();
     let header = jwt::Header::new(jwt::Algorithm::HS256);
@@ -162,7 +164,7 @@ pub fn generate_token(
         sub: user_id.to_string(),
         tenant_id,
         email: email.to_string(),
-        exp: now + ctx.access_token_expiry,
+        exp: now + expiry,
         iat: now,
         jti: Uuid::new_v4().to_string(),
         token_type,

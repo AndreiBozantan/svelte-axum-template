@@ -33,7 +33,7 @@ pub fn decode_token_from_req(
     token_type: auth::TokenType,
 ) -> Result<auth::TokenClaims, TokenError> {
     req.headers()
-        .get(http::header::COOKIE) // attempt to extract token from the Cookie header first
+        .get(http::header::COOKIE) // attempt to extract token from Cookie header first
         .and_then(|header| header.to_str().ok())
         .and_then(|cookie| extract_token_from_cookie(cookie, "access_token"))
         .map(Ok)
@@ -59,10 +59,11 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
         .ok_or(TokenError::TokenInvalid)
 }
 
+/// Attach access and/or refresh token cookies to an existing response.
 pub fn add_auth_cookies(
     context: &core::ArcContext,
-    access_token: &Option<&str>,
-    refresh_token: &Option<&str>,
+    access_token: Option<&str>,
+    refresh_token: Option<&str>,
     response: Response<Body>,
 ) -> Result<Response<Body>, TokenError> {
     let mut response = response;
@@ -80,10 +81,11 @@ pub fn add_auth_cookies(
     Ok(response)
 }
 
+/// Build a JSON response and attach auth cookies in one step.
 pub fn create_json_response_with_auth_cookies(
     context: &core::ArcContext,
-    access_token: &Option<&str>,
-    refresh_token: &Option<&str>,
+    access_token: Option<&str>,
+    refresh_token: Option<&str>,
     json: serde_json::Value,
 ) -> Result<Response<Body>, TokenError> {
     let response = axum::response::Json(json).into_response();
@@ -102,10 +104,7 @@ fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> Optio
 }
 
 fn create_token_cookie(cookie_name: &str, cookie_value: &str, path: &str, max_age: u32) -> String {
-    let max_age = match cookie_value {
-        "" => 0,
-        _ => max_age,
-    };
+    let max_age = if cookie_value.is_empty() { 0 } else { max_age };
     format!(
         "{}={}; HttpOnly; Secure; SameSite=Strict; Path={}; Max-Age={}",
         cookie_name, cookie_value, path, max_age

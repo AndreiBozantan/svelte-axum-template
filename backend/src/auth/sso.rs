@@ -30,6 +30,9 @@ pub enum SsoError {
 
     #[error("Invalid redirect URL")]
     InvalidRedirectUrl,
+
+    #[error("User info returned by provider was invalid")]
+    InvalidUserInfo,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,8 +55,9 @@ pub struct AuthRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthStateClaims {
-    pub csrf_token: String,
+    pub csrf_token_hash: String,
     pub redirect_url: Option<String>,
+    pub iat: i64,
     pub exp: i64,
 }
 
@@ -70,6 +74,16 @@ type GoogleOAuth2Client = oauth2::Client<
     oauth2::EndpointNotSet, // HasRevocationUrl
     oauth2::EndpointSet,    // HasTokenUrl
 >;
+
+/// Constant-time string equality to prevent timing-based CSRF oracle attacks.
+/// This is always processing all the bytes regardless of where the first difference is.
+/// Both inputs must be equal-length hex digests.
+fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
 
 fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     if config.google_client_id.is_empty() {
@@ -89,14 +103,20 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     }
 
     // validate redirect URI format
-    let _: Url = config
+    let parsed: Url = config
         .google_redirect_uri
         .parse()
         .map_err(|_| SsoError::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
 
-    // in production, ensure HTTPS
-    if !config.google_redirect_uri.starts_with("https://") && !config.google_redirect_uri.contains("localhost") {
+    // use exact localhost check to avoid matching attacker-controlled domains like `notlocalhost.evil.com`
+    let host = parsed.host_str().unwrap_or("");
+    let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
+    if parsed.scheme() != "https" && !is_localhost {
+        // in production, ensure HTTPS is used for the redirect URI
         auth::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
+        return Err(SsoError::InvalidConfig(
+            "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
+        ));
     }
 
     Ok(())
@@ -121,10 +141,10 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
 
 pub async fn get_google_auth_url_and_csrf_token(
     context: &core::ArcContext,
-    redirect_url: Option<&String>,
+    redirect_url: Option<String>,
 ) -> Result<(Url, String), SsoError> {
     // validate redirect URL if provided
-    if let Some(ref url) = redirect_url {
+    if let Some(url) = &redirect_url {
         validate_redirect_url(url, &context.settings.oauth)?;
     }
 
@@ -140,8 +160,9 @@ pub async fn get_google_auth_url_and_csrf_token(
     let now = Utc::now().timestamp();
     let timeout_minutes = context.settings.oauth.session_timeout_minutes as i64;
     let claims = OAuthStateClaims {
-        csrf_token: csrf_token.secret().clone(),
-        redirect_url: redirect_url.cloned(),
+        csrf_token_hash: auth::get_token_hash_as_hex(csrf_token.secret()),
+        redirect_url: redirect_url,
+        iat: now,
         exp: now + (timeout_minutes * 60),
     };
 
@@ -162,7 +183,8 @@ pub async fn get_google_user_info(
 ) -> Result<(GoogleUserInfo, Option<String>), SsoError> {
     // decode and validate JWT cookie
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-    validation.leeway = 0;
+    validation.validate_exp = true; // explicitly enforce expiry — do not rely on library default
+    validation.leeway = 5; // small leeway for clock skew tolerance across distributed instances
 
     let token_data =
         jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
@@ -175,8 +197,11 @@ pub async fn get_google_user_info(
             },
         )?;
 
-    if token_data.claims.csrf_token != state {
-        auth::log_csrf_mismatch(None, &token_data.claims.csrf_token, state);
+    // hash the incoming `state` parameter and compare hashes with constant-time
+    // equality to prevent timing-based oracle attacks on the CSRF token
+    let incoming_hash = auth::get_token_hash_as_hex(state);
+    if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
+        auth::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
         return Err(SsoError::CsrfValidationFailed);
     }
 
@@ -192,6 +217,7 @@ pub async fn get_google_user_info(
             SsoError::OAuth2RequestFailed(e)
         })?;
 
+    // CAUTION: access_token must never appear in logs, error messages, or any other human-readable output.
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
 
     // fetch user info from Google
@@ -200,16 +226,14 @@ pub async fn get_google_user_info(
         .http_client
         .get(user_info_url)
         .bearer_auth(access_token)
-        .timeout(std::time::Duration::from_secs(10)) // Add timeout
+        .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
     if !response.status().is_success() {
         auth::log_provider_api_error(response.status(), "google");
-        return Err(SsoError::InvalidConfig(
-            "Google userinfo API returned error".to_string(),
-        ));
+        return Err(SsoError::InvalidConfig("OAuth provider returned an error".to_string()));
     }
 
     let user_info: GoogleUserInfo = response
@@ -217,27 +241,41 @@ pub async fn get_google_user_info(
         .await
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
-    // validate user info
     if user_info.email.is_empty() {
         auth::log_invalid_user_info("email", &user_info.email, "google");
-        return Err(SsoError::InvalidConfig("GoogleUserInfo.email is empty".to_string()));
+        return Err(SsoError::InvalidUserInfo);
+    }
+
+    if !user_info.verified_email {
+        auth::log_invalid_user_info("verified_email", "false", "google");
+        return Err(SsoError::InvalidUserInfo);
     }
 
     if user_info.id.is_empty() {
         auth::log_invalid_user_info("id", &user_info.id, "google");
-        return Err(SsoError::InvalidConfig("GoogleUserInfo.id is empty".to_string()));
+        return Err(SsoError::InvalidUserInfo);
     }
-    // In callback received log already.
 
     Ok((user_info, token_data.claims.redirect_url))
 }
 
-/// validate redirect URL to prevent open redirect attacks
+/// Validate a redirect URL to prevent open redirect attacks.
+/// Validation happens at JWT-creation time so the signed token acts as a
+/// tamper-evident record - no re-validation is needed at callback time.
 fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     let parsed_url: Url = url.parse().map_err(|_| SsoError::InvalidRedirectUrl)?;
 
+    // explicit scheme allowlist instead of implicit denylist - rejects
+    // javascript:, data:, ftp: and any other unexpected schemes up front
+    let scheme = parsed_url.scheme();
+    if scheme != "https" && scheme != "http" {
+        auth::log_redirect_violation("invalid_scheme", url);
+        return Err(SsoError::InvalidRedirectUrl);
+    }
+
     // check against allowed domains from configuration
     match parsed_url.host_str() {
+        None => return Err(SsoError::InvalidRedirectUrl),
         Some(host) => {
             let is_allowed = config
                 .allowed_redirect_domains
@@ -248,14 +286,14 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), S
                 auth::log_redirect_violation("unauthorized_host", host);
                 return Err(SsoError::InvalidRedirectUrl);
             }
-        }
-        None => return Err(SsoError::InvalidRedirectUrl),
-    }
 
-    // ensure HTTPS in production (except localhost)
-    if parsed_url.scheme() != "https" && !parsed_url.host_str().unwrap_or("").contains("localhost") {
-        auth::log_redirect_violation("non_https_redirect_in_prod", url);
-        return Err(SsoError::InvalidRedirectUrl);
+            // exact localhost check, avoid matching attacker-controlled hosts like `notlocalhost.evil.com`
+            let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
+            if scheme != "https" && !is_localhost {
+                auth::log_redirect_violation("non_https_redirect", url);
+                return Err(SsoError::InvalidRedirectUrl);
+            }
+        }
     }
 
     Ok(())
