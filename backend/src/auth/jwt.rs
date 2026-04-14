@@ -7,7 +7,7 @@ use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use jsonwebtoken as jwt;
-use rand::TryRngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
@@ -15,8 +15,6 @@ use uuid::Uuid;
 
 use crate::auth;
 use crate::cfg;
-
-type TryRngError = <rand::rngs::OsRng as rand::TryRngCore>::Error;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -31,7 +29,7 @@ pub enum JwtError {
     FileSystemOperationFailed { #[from] source: std::io::Error },
 
     #[error("Random number generation operation failed")]
-    RngOperationFailed { source: TryRngError },
+    RngOperationFailed { source: rand::rngs::SysError },
 
     #[error("Token has expired")]
     TokenExpired,
@@ -221,7 +219,7 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
 /// Generates a cryptographically secure random secret
 fn generate_secure_secret() -> Result<String, JwtError> {
     let mut bytes = [0u8; 32];
-    rand::rngs::OsRng
+    rand::rngs::SysRng
         .try_fill_bytes(&mut bytes)
         .map_err(|e| JwtError::RngOperationFailed { source: e })?;
     Ok(hex::encode(bytes))
