@@ -37,7 +37,7 @@ axum-test = { version = "20.0" }
 sha2 = { version = "0.11" }
 oauth2 = { version = "5.0", features = ["reqwest"] }
 url = { version = "2.5" }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] } # update to 0.13
+reqwest = { version = "0.13", features = ["json", "rustls"] }
 dotenvy = { version = "0.15" }
 toml = { version = "1.1" }
 

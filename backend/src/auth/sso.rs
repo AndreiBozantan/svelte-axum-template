@@ -208,9 +208,16 @@ pub async fn get_google_user_info(
     let client = create_google_client(&context.settings.oauth)?;
 
     // exchange authorization code for tokens
+    let oauth_client = oauth2::reqwest::ClientBuilder::new()
+        .build()
+        .map_err(|e| {
+            auth::log_internal_error(&e, "create_oauth_client");
+            SsoError::OAuth2RequestFailed(oauth2::RequestTokenError::Other(format!("Failed to create HTTP client: {e}")))
+        })?;
+
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-        .request_async(&context.http_client)
+        .request_async(&oauth_client)
         .await
         .map_err(|e| {
             auth::log_internal_error(&e, "oauth_exchange_code");
