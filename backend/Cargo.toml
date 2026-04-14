@@ -14,39 +14,39 @@ readme = "README.md"
 axum = { version = "0.8", features = ["json", "form", "multipart"] }
 tower = { version = "0.5" }
 tower-http = { version = "0.6", features = ["full"] }
-tokio = { version = "1.36", features = ["full"] }
+tokio = { version = "1.51", features = ["full"] }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version =  "1.0" }
-rust-embed =  { version = "8.7" }
+rust-embed =  { version = "8.11" }
 mime_guess =  { version = "2.0" }
 sqlx = { version = "0.8", features = ["sqlite", "chrono", "runtime-tokio-rustls", "macros", "migrate"] }
-thiserror =  { version = "1.0" }
-clap = { version = "4.4", features = ["derive"] }
+thiserror =  { version = "2.0" }
+clap = { version = "4.6", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 config = { version = "0.15" }
-jsonwebtoken = { version = "9.0" }
-uuid = { version = "1.0", features = ["v4"] }
+jsonwebtoken = { version = "9.3" } # update to 10.3
+uuid = { version = "1.23", features = ["v4"] }
 argon2 = { version = "0.5", features = ["std"] }
-md5 = { version = "0.7" }
+md5 = { version = "0.8" }
 rpassword = { version = "7.4" }
-rand = {version = "0.9" }
+rand = {version = "0.9" } # update to 10.0
 hex = { version = "0.4" }
-axum-test = { version = "17.3" }
-sha2 = { version = "0.10" }
+axum-test = { version = "17.3" } # update to 20.0
+sha2 = { version = "0.10" } # update to 0.11
 oauth2 = { version = "5.0", features = ["reqwest"] }
 url = { version = "2.5" }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] } # update to 0.13
 dotenvy = { version = "0.15" }
-toml = { version = "0.9.3" }
+toml = { version = "1.1" }
 
 [features]
 sqlite-offline = ["sqlx/sqlite"]
 
 [dev-dependencies]
 axum = { version = "0.8", features = ["tokio", "http1", "http2"] }
-cookie = "0.18.1"
+cookie = "0.18"
 
 # Important: This tells SQLx to skip compile-time verification of database queries
 [package.metadata.sqlx]
