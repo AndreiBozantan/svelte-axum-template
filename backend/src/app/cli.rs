@@ -109,6 +109,7 @@ fn migrate_action_create(name: &str) -> Result<(), CliError> {
     Ok(())
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn migrate_action_list() -> Result<(), CliError> {
     let migrations = app::list_migrations();
     if migrations.is_empty() {

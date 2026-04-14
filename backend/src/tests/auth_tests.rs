@@ -62,7 +62,7 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     db::create_user(&ctx.db, user).await.unwrap();
 
     let router = app::create_router(ctx);
-    TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>()).unwrap()
+    TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
 }
 
 async fn login_and_get_tokens(server: &TestServer, email: &str, password: &str) -> (Value, String, String) {
