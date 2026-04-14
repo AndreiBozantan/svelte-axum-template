@@ -13,6 +13,9 @@ use crate::core;
 #[rustfmt::skip]
 #[derive(Debug, Error)]
 pub enum SsoError {
+    #[error("internal error: {0}")]
+    InternalError(String),
+
     #[error("OAuth2 request failed: {0}")]
     OAuth2RequestFailed(#[from] oauth2::RequestTokenError<oauth2::HttpClientError<oauth2::reqwest::Error>, oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>>),
 
@@ -208,12 +211,10 @@ pub async fn get_google_user_info(
     let client = create_google_client(&context.settings.oauth)?;
 
     // exchange authorization code for tokens
-    let oauth_client = oauth2::reqwest::ClientBuilder::new()
-        .build()
-        .map_err(|e| {
-            auth::log_internal_error(&e, "create_oauth_client");
-            SsoError::OAuth2RequestFailed(oauth2::RequestTokenError::Other(format!("Failed to create HTTP client: {e}")))
-        })?;
+    let oauth_client = oauth2::reqwest::ClientBuilder::new().build().map_err(|e| {
+        auth::log_internal_error(&e, "create_oauth_client");
+        SsoError::InternalError(format!("Failed to create HTTP client for OAuth: {e}"))
+    })?;
 
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))

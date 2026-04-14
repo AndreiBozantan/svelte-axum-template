@@ -21,7 +21,7 @@ pub enum TokenError {
     TokenInvalid,
 }
 
-#[must_use] 
+#[must_use]
 pub fn get_token_hash_as_hex(token: &str) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(token);
@@ -105,7 +105,5 @@ fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> Optio
 
 fn create_token_cookie(cookie_name: &str, cookie_value: &str, path: &str, max_age: u32) -> String {
     let max_age = if cookie_value.is_empty() { 0 } else { max_age };
-    format!(
-        "{cookie_name}={cookie_value}; HttpOnly; Secure; SameSite=Strict; Path={path}; Max-Age={max_age}"
-    )
+    format!("{cookie_name}={cookie_value}; HttpOnly; Secure; SameSite=Strict; Path={path}; Max-Age={max_age}")
 }

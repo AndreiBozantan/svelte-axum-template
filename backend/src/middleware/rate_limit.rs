@@ -19,7 +19,7 @@ pub struct RateLimitEntry {
 /// In-memory rate limiter (in production, use Redis)
 pub type RateLimiter = Arc<RwLock<HashMap<String, RateLimitEntry>>>;
 
-#[must_use] 
+#[must_use]
 pub fn create_rate_limiter() -> RateLimiter {
     Arc::new(RwLock::new(HashMap::new()))
 }
