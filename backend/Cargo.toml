@@ -26,7 +26,7 @@ thiserror =  { version = "2.0" }
 clap = { version = "4.6", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 config = { version = "0.15" }
-jsonwebtoken = { version = "9.3" } # update to 10.3
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] } 
 uuid = { version = "1.23", features = ["v4"] }
 argon2 = { version = "0.5", features = ["std"] }
 md5 = { version = "0.8" }
