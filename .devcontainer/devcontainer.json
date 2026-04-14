@@ -1,0 +1,56 @@
+{
+  "name": "Svelaxum Dev Environment",
+  "image": "mcr.microsoft.com/devcontainers/base:bullseye",
+  "containerUser": "vscode",
+
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest",
+      "profile": "default"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+
+  "mounts": [
+      "source=cargo-registry-cache,target=/home/vscode/.cargo/registry,type=volume",
+      "source=svelaxum-node-modules,target=/workspaces/svelaxum/frontend/node_modules,type=volume"
+  ],
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.server.path": "/usr/local/bin/rust-analyzer"
+      },
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "svelte.svelte-vscode"
+      ]
+    }
+  },
+
+  "forwardPorts": [
+    5173,
+    3000
+  ],
+  "portsAttributes": {
+    "5173": {
+      "label": "Frontend",
+      "onAutoForward": "notify"
+    },
+    "3000": {
+      "label": "Backend",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "postCreateCommand": {
+    "rust-analyzer": "rustup component add rust-analyzer && sudo ln -s $(rustup which rust-analyzer) /usr/local/bin/rust-analyzer",
+    "system-deps": "sudo apt-get update && sudo apt-get install -y sqlite3 libssl-dev libsqlite3-dev pkg-config",
+    "cargo": "cargo install cargo-binstall && cargo binstall sqlx-cli --no-confirm && cargo fetch",
+    "gemini": "npm install -g @google/gemini-cli",
+    "npm-install": "sudo chown -R vscode:vscode /workspaces/svelaxum/frontend/node_modules && npm install"
+  }
+}

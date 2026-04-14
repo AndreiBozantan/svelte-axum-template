@@ -8,19 +8,19 @@
     "clean": "node -e \"targets=['.sqlx','node_modules','target','frontend/dist','frontend/node_modules'];fs=require('fs');targets.forEach(p=>{try{if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});console.log('\\x1b[32m','removed:',p,'\\x1b[0m')}else{console.log('\\x1b[33m','missing:',p,'\\x1b[0m')}}catch(e){console.error('\\x1b[31m','error!!:','t','('+e.message+')','\\x1b[0m')}})\"",
     "reset": "npm run clean && npm run db:drop",
 
-    "cargo:install": "cargo install sqlx-cli && cargo install cargo-watch",
+    "cargo:install": "cargo install cargo-binstall && cargo binstall sqlx-cli --no-confirm && cargo binstall cargo-watch --no-confirm",
     "db:drop": "cargo sqlx database drop -y --database-url sqlite:db.sqlite",
     "db:create": "cargo sqlx database create --database-url sqlite:db.sqlite",
     "db:migrate": "cargo sqlx migrate run --database-url sqlite:db.sqlite --source migrations",
     "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:db.sqlite",
-    "db:init": "npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
+    "db:init": "export DATABASE_URL=sqlite:db.sqlite && npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
 
     "build:backend": "npm run db:init && cargo build --release",
     "build:frontend": "cd frontend && npm install && npm run build",
     "build": "npm run build:frontend && npm run build:backend",
 
     "dev:init": "npm install && npm run build:frontend && npm run db:init && npm run dev:init:admin",
-    "dev:init:admin": "cargo run -- create-admin --username admin --email admin@localhost",
+    "dev:init:admin": "cargo run -- create-admin --email a@b.cc",
     "dev:backend": "cargo watch --ignore db.sqlite --watch backend/src --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd frontend && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && open http://localhost:5173",
