@@ -139,7 +139,7 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
     Ok(client)
 }
 
-pub async fn get_google_auth_url_and_csrf_token(
+pub fn get_google_auth_url_and_csrf_token(
     context: &core::ArcContext,
     redirect_url: Option<String>,
 ) -> Result<(Url, String), SsoError> {
@@ -158,12 +158,12 @@ pub async fn get_google_auth_url_and_csrf_token(
         .url();
 
     let now = Utc::now().timestamp();
-    let timeout_minutes = context.settings.oauth.session_timeout_minutes as i64;
+    let timeout_minutes = i64::from(context.settings.oauth.session_timeout_minutes);
     let claims = OAuthStateClaims {
         csrf_token_hash: auth::get_token_hash_as_hex(csrf_token.secret()),
-        redirect_url: redirect_url,
         iat: now,
         exp: now + (timeout_minutes * 60),
+        redirect_url,
     };
 
     let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
@@ -287,7 +287,7 @@ fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), S
             let is_allowed = config
                 .allowed_redirect_domains
                 .iter()
-                .any(|allowed| host == allowed || host.ends_with(&format!(".{}", allowed)));
+                .any(|allowed| host == allowed || host.ends_with(&format!(".{allowed}")));
 
             if !is_allowed {
                 auth::log_redirect_violation("unauthorized_host", host);

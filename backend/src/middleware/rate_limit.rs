@@ -19,23 +19,13 @@ pub struct RateLimitEntry {
 /// In-memory rate limiter (in production, use Redis)
 pub type RateLimiter = Arc<RwLock<HashMap<String, RateLimitEntry>>>;
 
+#[must_use] 
 pub fn create_rate_limiter() -> RateLimiter {
     Arc::new(RwLock::new(HashMap::new()))
 }
 
 /// Rate limiting middleware for OAuth endpoints
 pub async fn oauth_rate_limit_middleware(req: Request, next: Next) -> Result<Response, StatusCode> {
-    // apply rate limiting to all auth endpoints
-    if !req.uri().path().contains("/auth/") {
-        return Ok(next.run(req).await);
-    }
-
-    let client_ip = req
-        .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|ConnectInfo(a)| a.ip().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-
     // rate limit: 100 requests per minute per IP for auth endpoints
     // TODO: make this configurable
     const MAX_REQUESTS: u32 = 100;
@@ -44,6 +34,17 @@ pub async fn oauth_rate_limit_middleware(req: Request, next: Next) -> Result<Res
     // this would be better stored in the app state, but for now using a simple approach
     // in production, use a proper rate limiting service like Redis
     static RATE_LIMITER: std::sync::OnceLock<RateLimiter> = std::sync::OnceLock::new();
+
+    // apply rate limiting to all auth endpoints
+    if !req.uri().path().contains("/auth/") {
+        return Ok(next.run(req).await);
+    }
+
+    let client_ip = req
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map_or_else(|| "unknown".to_string(), |ConnectInfo(a)| a.ip().to_string());
+
     let rate_limiter = RATE_LIMITER.get_or_init(create_rate_limiter);
 
     let now = Instant::now();

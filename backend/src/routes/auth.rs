@@ -207,12 +207,12 @@ pub async fn revoke_refresh_token(
 pub async fn google_auth_init(
     State(context): State<core::ArcContext>,
     headers: HeaderMap,
-    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, AuthError> {
     let redirect_url = params.get("redirect_url").cloned();
     auth::log_oauth_flow_initiated(&headers, &redirect_url, "google");
 
-    let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url).await?;
+    let (auth_url, state_jwt) = auth::get_google_auth_url_and_csrf_token(&context, redirect_url)?;
     auth::log_oauth_redirecting(&headers, &auth_url, "google");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();

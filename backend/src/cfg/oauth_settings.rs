@@ -20,7 +20,7 @@ pub struct OAuthSettings {
     pub session_timeout_minutes: u32,
 }
 
-fn default_session_timeout() -> u32 {
+const fn default_session_timeout() -> u32 {
     10 // 10 minutes default
 }
 
