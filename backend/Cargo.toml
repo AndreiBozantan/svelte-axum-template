@@ -33,7 +33,7 @@ md5 = { version = "0.8" }
 rpassword = { version = "7.4" }
 rand = {version = "0.10" }
 hex = { version = "0.4" }
-axum-test = { version = "17.3" } # update to 20.0
+axum-test = { version = "20.0" }
 sha2 = { version = "0.10" } # update to 0.11
 oauth2 = { version = "5.0", features = ["reqwest"] }
 url = { version = "2.5" }
