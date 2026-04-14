@@ -246,5 +246,5 @@ fn extract_user_agent(headers: &axum::http::HeaderMap) -> Option<String> {
 fn hash_state(state: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(state.as_bytes());
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }

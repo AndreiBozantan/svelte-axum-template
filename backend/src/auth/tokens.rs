@@ -24,7 +24,7 @@ pub enum TokenError {
 pub fn get_token_hash_as_hex(token: &str) -> String {
     let mut hasher = sha2::Sha256::new();
     hasher.update(token);
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 pub fn decode_token_from_req(
