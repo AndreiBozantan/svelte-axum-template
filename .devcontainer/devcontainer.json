@@ -2,6 +2,10 @@
   "name": "Svelaxum Dev Environment",
   "image": "mcr.microsoft.com/devcontainers/base:bullseye",
   "containerUser": "vscode",
+  "runArgs": [
+    "--cpus=8",           // limit to 8 CPU cores
+    "--memory=24g"        // limit to 24GB of RAM
+  ],
 
   "features": {
     "ghcr.io/devcontainers/features/rust:1": {
@@ -49,7 +53,7 @@
   "postCreateCommand": {
     "rust-analyzer": "rustup component add rust-analyzer && sudo ln -s $(rustup which rust-analyzer) /usr/local/bin/rust-analyzer",
     "system-deps": "sudo apt-get update && sudo apt-get install -y sqlite3 libssl-dev libsqlite3-dev pkg-config",
-    "cargo": "cargo install cargo-binstall && cargo binstall sqlx-cli --no-confirm && cargo fetch",
+    "cargo": "cargo install cargo-binstall && cargo binstall sqlx-cli --no-confirm && cargo binstall cargo-watch --no-confirm && cargo fetch",
     "gemini": "npm install -g @google/gemini-cli",
     "npm-install": "sudo chown -R vscode:vscode /workspaces/svelaxum/frontend/node_modules && npm install"
   }
