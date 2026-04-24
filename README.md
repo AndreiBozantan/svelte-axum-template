@@ -39,6 +39,17 @@ Execute `npm run build` in the project root folder, to build the frontend and ba
 Optionally, you can execute `npm run clean` before the build, to remove all previous build artifacts, including the `node_modules` folders, so that the build starts from a clean state.
 After running the clean command, you have to run `npm run dev:init` once, to reinitialize the project before running in dev mode.
 
+# Embedded Assets & Updates
+The frontend static files are embedded directly into the Rust binary at **compile time** using the `rust-embed` crate.
+
+### How to update embedded files
+Whenever you make changes to the frontend code and want them to be reflected in the backend server (the one running on port `3000`), you must:
+1.  **Build the frontend**: `cd frontend && npm run build`
+2.  **Recompile/Restart the backend**: `cargo run` (or `cargo build`)
+
+### Debug vs Release Mode
+- **Embedding works in both modes**: Whether you use `cargo run` (debug) or `cargo build --release`, the files currently sitting in `frontend/dist` will be baked into the resulting executable.
+- **Development Workflow**: During active development (`npm run dev`), you typically don't need to worry about embedding. The Vite dev server (port `5173`) serves the frontend with hot-reloading and proxies API requests to the backend. You only need to build/embed when preparing for a production-like test or final deployment.
 
 # Backend - Rust Axum
 - located in `./backend`
@@ -50,13 +61,15 @@ After running the clean command, you have to run `npm run dev:init` once, to rei
 Run `cargo run` from inside the repo root folder to start the backend server independently from the frontend.
 
 ## Backend Configuration
-The backend can be configured using TOML files in the `./config` directory:
-- `default.toml` - Default configuration
-- `development.toml` - Development-specific overrides
-- `production.toml` - Production configuration example
+The backend can be configured using TOML files in the project root directory:
+- `configs.default.toml` - Default configuration
+- `configs.development.toml` - Development-specific overrides
+- `configs.production.toml` - Production configuration example
+- `configs.local.toml` - Local overrides (git-ignored)
 
-### Database Migration Control
-You can run the database migrations by using the `migrate` command in the backend.
+
+## Database Migration Control
+You can run the database migrations by using the `migrate` command provided by the backend.
 It will run all pending migrations from the `migrations` directory, or the embedded migrations if the directory does not exist.
 
 ```bash
@@ -69,34 +82,13 @@ cargo sqlx migrate run # run this in development
 When deploying to production, do not copy the migrations directory to the production server. You should use the embedded migrations instead, which are included in the binary.
 
 # Frontend - Svelte
-- Located in `./frontend`
-- navbar with login and logout
-- secure page that shows session information once logged in
-- api fetch example, log in not required
+- Located in `./frontend`.
+- Includes a navbar with login and logout.
+- Secure page that shows session information once logged in.
+- API fetch example, login is required.
 
 Run `npm run dev` from inside the `./frontend` directory to start serving the frontend.
 
-
-# Version History
-
-## Version 0.7.2
-- update frontend to use Svelte 5
-- use npm scripts for the build process
-- add support for running the app in dev mode, with hot reloading
-
-## Version 0.7.1
-- load config from toml files and env variables, see [pr#6](https://github.com/AndreiBozantan/svelte-axum-template/pull/6)
-- some cleanup of the backend code
-
-## Version 0.7
-- update to use Rust edition 2024, see [pr#3](https://github.com/AndreiBozantan/svelte-axum-template/pull/3)
-
-## Version 0.6
-- add sqlite database example with `sqlx`, see [pr#2](https://github.com/AndreiBozantan/svelte-axum-template/pull/2)
-
-## Version 0.5
-- embedding static files into the binary using `cargo-embed-file` see [pr#1](https://github.com/AndreiBozantan/svelte-axum-template/pull/1)
-- updated to `axum` 0.8.4
 
 # OAuth2 SSO Setup (Google)
 
@@ -104,18 +96,37 @@ This template includes Google OAuth2 SSO integration. To set it up:
 
 ## 1. Create Google OAuth2 Credentials
 
-1. Go to the [Google Cloud Console](https://console.developers.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Google+ API (for user info)
-4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
-5. Choose "Web application"
-6. Set the authorized redirect URI to: `http://localhost:3000/auth/oauth/google/callback`
+1.  **Google Cloud Console**: Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  **Create Project**: Click the project dropdown in the top bar and select "New Project". Give it a name and click "Create".
+3.  **Configure Google Auth Platform** (formerly OAuth consent screen):
+    *   Navigate to **APIs & Services > Google Auth platform**.
+    *   **Branding**: Click **Get Started** or the **Branding** tab. Fill in the required App Information (App name, user support email, developer contact info) and click **Save and Continue**.
+    *   **Audience**: Go to the **Audience** tab (or step). Select **External** as the User Type. If you are using a personal `@gmail.com` account, this may be selected by default as "Internal" is restricted to Workspace users.
+    *   **Scopes**: You can skip or add `openid`, `https://www.googleapis.com/auth/userinfo.email`, and `https://www.googleapis.com/auth/userinfo.profile`.
+4.  **Create Credentials**:
+    *   Navigate to the **Clients** tab (or **APIs & Services > Credentials**).
+    *   Click **+ Create Credentials** at the top and select **OAuth client ID**.
+    *   Select **Web application** as the Application type.
+    *   **Authorized JavaScript origins**: Add `http://localhost:5173` (for the Svelte dev server).
+    *   **Authorized redirect URIs**: Add `http://localhost:3000/api/auth/oauth/google/callback`.
+    *   Click **Create**.
+5.  **Get Your Keys**: A dialog will appear showing your **Client ID** and **Client Secret**. Copy these for the next step.
 
 ## 2. Configure the Backend
 
 ⚠️ **IMPORTANT SECURITY NOTE**: Never commit OAuth secrets to git!
 
-Create `local.toml` (git-ignored) based on `default.toml` in the `./backend/config` directory and add your Google OAuth credentials.
+1.  Create a file named `configs.local.toml` in the **project root directory** (this file is already in `.gitignore`).
+2.  Copy the `[oauth]` section from `configs.default.toml` into your `configs.local.toml`.
+3.  Paste your credentials:
+
+```toml
+[oauth]
+google_client_id = "your-client-id-here"
+google_client_secret = "your-client-secret-here"
+```
+
+Alternatively, you can use environment variables: `APP_OAUTH_GOOGLE_CLIENT_ID` and `APP_OAUTH_GOOGLE_CLIENT_SECRET`.
 
 ## 3. Using OAuth2 Login
 

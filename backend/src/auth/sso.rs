@@ -88,7 +88,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
+pub fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     if config.google_client_id.is_empty() {
         return Err(SsoError::InvalidConfig(
             "Google Client ID is not configured".to_string(),
@@ -123,6 +123,19 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     }
 
     Ok(())
+}
+
+/// Validates OAuth configuration and logs warnings for incomplete setup.
+pub fn check_oauth_config(config: &cfg::OAuthSettings) {
+    if let Err(e) = validate_google_config(config) {
+        if config.google_client_id.is_empty() && config.google_client_secret.is_empty() {
+            tracing::warn!("Google SSO is not configured (Google Client ID and Secret are missing). Google login will not work.");
+        } else {
+            tracing::warn!("Google SSO configuration is invalid: {}. Google login will fail.", e);
+        }
+    } else {
+        tracing::info!("Google SSO is correctly configured.");
+    }
 }
 
 fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Client, SsoError> {

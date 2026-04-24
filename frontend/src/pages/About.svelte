@@ -1,40 +1,21 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { appState } from "../AppState.svelte";
-    import { getApi } from "../lib/fetch";
-
-    let response = $state("Loading...");
-
-    onMount(async () => {
-        try {
-            const data = await getApi();
-            response = JSON.stringify(data, null, 2);
-        } catch (e) {
-            response = `Error: ${e}`;
-        }
-    });
 </script>
 
 <div class="page">
     <div class="content-container">
         <div class="content-grid">
+
             <section class="info-section">
                 <div class="info-card">
                     <div class="info-item">
-                        <div class="info-header">Secure Area</div>
-                        <div class="status-badge success">Authenticated</div>
+                        <div class="info-header">About</div>
                     </div>
-                    
-                    <div class="info-item">
-                        <div class="info-label">Logged in as</div>
-                        <div class="info-value">
-                            <span class="user-name">{appState.user}</span>
-                        </div>
-                    </div>
-
                     <div class="info-item-block">
-                        <div class="info-label">API Response</div>
-                        <pre class="response-box">{response}</pre>
+                        <p>Svelaxum is a modern full-stack template built with <strong>Svelte 5</strong> and <strong>Axum</strong>. This project is designed to provide a solid foundation for building fast, scalable, and type-safe web applications.</p>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Version</div>
+                        <div class="info-value">v1.0.0-beta</div>
                     </div>
                 </div>
             </section>
@@ -56,6 +37,23 @@
         max-width: 800px;
     }
 
+    header {
+        margin-bottom: 40px;
+        text-align: left;
+    }
+
+    header h1 {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 8px;
+    }
+
+    header p {
+        color: #64748b;
+        font-size: 1.1rem;
+    }
+
     .content-grid {
         display: flex;
         flex-direction: column;
@@ -66,6 +64,25 @@
         display: grid;
         grid-template-columns: 1fr;
         gap: 30px;
+    }
+
+    @media (max-width: 768px) {
+        .info-section {
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+    }
+
+    .section-header h3 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 4px;
+    }
+
+    .section-header p {
+        font-size: 0.9rem;
+        color: #94a3b8;
     }
 
     .info-card {
@@ -88,6 +105,17 @@
         border-bottom: 1px solid #f1f5f9;
     }
 
+    .info-item-block h4 {
+        margin-bottom: 12px;
+        color: #1e293b;
+    }
+
+    .info-item-block p {
+        color: #64748b;
+        line-height: 1.6;
+        font-size: 0.95rem;
+    }
+
     .info-item:last-child, .info-item-block:last-child {
         border-bottom: none;
     }
@@ -100,7 +128,6 @@
 
     .info-label {
         color: #1e293b;
-        font-weight: 500;
     }
 
     .info-value {
@@ -111,7 +138,7 @@
 
     .user-name {
         color: #64748b;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
     }
 
     .status-badge {
@@ -128,16 +155,8 @@
         color: #166534;
     }
 
-    .response-box {
-        margin-top: 12px;
-        padding: 16px;
-        background-color: #f1f5f9;
-        border-radius: 8px;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-        font-size: 0.85rem;
-        color: #334155;
-        overflow-x: auto;
-        white-space: pre-wrap;
-        word-break: break-all;
+    .warning {
+        background-color: #fef9c3;
+        color: #854d0e;
     }
 </style>

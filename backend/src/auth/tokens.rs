@@ -59,7 +59,6 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
         .ok_or(TokenError::TokenInvalid)
 }
 
-/// Attach access and/or refresh token cookies to an existing response.
 pub fn add_auth_cookies(
     context: &core::ArcContext,
     access_token: Option<&str>,
@@ -68,16 +67,19 @@ pub fn add_auth_cookies(
 ) -> Result<Response<Body>, TokenError> {
     let mut response = response;
     let headers = response.headers_mut();
-    if let Some(at) = access_token {
-        let access_max_age = context.settings.jwt.access_token_expiry_minutes * 60;
-        let access_cookie = create_token_cookie("access_token", at, "/", access_max_age);
-        headers.append(reqwest::header::SET_COOKIE, access_cookie.parse()?);
-    }
-    if let Some(rt) = refresh_token {
-        let refresh_max_age = context.settings.jwt.refresh_token_expiry_days * 60 * 60 * 24;
-        let refresh_cookie = create_token_cookie("refresh_token", rt, "/api/auth/refresh", refresh_max_age);
-        headers.append(reqwest::header::SET_COOKIE, refresh_cookie.parse()?);
-    }
+    
+    // access token (default to empty string with Max-Age=0 to clear it if None)
+    let at_val = access_token.unwrap_or("");
+    let access_max_age = context.settings.jwt.access_token_expiry_minutes * 60;
+    let access_cookie = create_token_cookie("access_token", at_val, "/", access_max_age);
+    headers.append(reqwest::header::SET_COOKIE, access_cookie.parse()?);
+    
+    // refresh token (default to empty string with Max-Age=0 to clear it if None)
+    let rt_val = refresh_token.unwrap_or("");
+    let refresh_max_age = context.settings.jwt.refresh_token_expiry_days * 60 * 60 * 24;
+    let refresh_cookie = create_token_cookie("refresh_token", rt_val, "/api/auth/refresh", refresh_max_age);
+    headers.append(reqwest::header::SET_COOKIE, refresh_cookie.parse()?);
+    
     Ok(response)
 }
 

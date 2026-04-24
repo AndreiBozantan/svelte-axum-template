@@ -186,6 +186,33 @@ pub async fn refresh_access_token(
     Ok(r)
 }
 
+/// Handler for checking session status
+pub async fn session(
+    State(context): State<core::ArcContext>,
+    req: Request<Body>,
+) -> Result<impl IntoResponse, AuthError> {
+    match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
+        Ok(claims) => {
+            let user_id = claims.sub.parse::<i64>().map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
+            let user = db::get_user_by_id(&context.db, user_id).await?;
+            Ok(Json(json!({
+                "result": "ok",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "tenant_id": user.tenant_id
+                }
+            })))
+        }
+        Err(_) => {
+            Ok(Json(json!({
+                "result": "error",
+                "message": "Not authenticated"
+            })))
+        }
+    }
+}
+
 /// Handler for revoking a refresh token
 pub async fn revoke_refresh_token(
     State(context): State<core::ArcContext>,
@@ -283,12 +310,9 @@ pub async fn google_auth_callback(
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
-    // guard against open redirects, although redirect_url was validated and signed into the JWT at initiation time
-    // this is cheap defence-in-depth against any future refactor that might separate JWT verification from the redirect step
-    let final_redirect_url = redirect_url
-        .as_deref()
-        .filter(|url| url.starts_with('/') && !url.starts_with("//"))
-        .unwrap_or("/");
+    // redirect back to the original URL or root
+    // redirect_url was already validated and signed into the JWT at initiation time
+    let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
 
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = auth::add_auth_cookies(

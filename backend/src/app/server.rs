@@ -76,6 +76,8 @@ async fn run_app() -> Result<(), AppError> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    auth::check_oauth_config(&settings.oauth);
+
     let http_client = create_http_client()?;
     let db = create_db_context(&settings.database).await?;
     let jwt_secret = auth::get_jwt_secret()?;

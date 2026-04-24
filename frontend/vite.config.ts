@@ -6,12 +6,13 @@ export default defineConfig({
   plugins: [svelte()],
   server: {
     port: 5173,
+    host: true,
+    strictPort: true,
+    // proxy API requests to the backend during development
     proxy: {
-      // Proxy API requests to the backend during development
-      '/': {
+      '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
-        secure: false
       },
     }
   }

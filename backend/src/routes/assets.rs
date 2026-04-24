@@ -1,6 +1,7 @@
 use axum::body::Body;
+use axum::extract::State;
 use axum::http;
-use axum::http::Uri;
+use axum::http::Request;
 use axum::http::header;
 use axum::http::response::Builder as ResponseBuilder;
 use axum::response::IntoResponse;
@@ -10,6 +11,9 @@ use chrono::{TimeZone, Utc};
 use rust_embed::EmbeddedFile;
 use rust_embed::RustEmbed;
 use thiserror::Error;
+
+use crate::auth;
+use crate::core;
 
 #[derive(RustEmbed)]
 #[folder = "../frontend/dist"]
@@ -42,7 +46,11 @@ impl IntoResponse for AssetError {
     }
 }
 
-pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
+pub async fn static_handler(
+    State(context): State<core::ArcContext>,
+    req: Request<Body>,
+) -> Result<Response, AssetError> {
+    let uri = req.uri().clone();
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
     let asset = Assets::get(path_str);
@@ -50,11 +58,41 @@ pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     let asset = asset
         .or_else(|| Assets::get(path_str))
         .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
-    let builder = match path_str {
-        "index.html" => create_no_cache_response_builder(),
-        _ => create_asset_response_builder(&asset, path_str),
-    };
-    Ok(builder.body(Body::from(asset.data.to_vec()))?)
+
+    if path_str == "index.html" {
+        let mut html = String::from_utf8_lossy(&asset.data).to_string();
+
+        // attempt to get session info to inject
+        if let Ok(claims) = auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
+            let initial_state = serde_json::json!({
+                "user": {
+                    "id": claims.sub, 
+                    "email": claims.email,
+                    "tenant_id": claims.tenant_id
+                }
+            });
+
+            if let Ok(state_json) = serde_json::to_string(&initial_state) {
+                let script = format!(
+                    "<script>window.__INITIAL_STATE__ = {state_json};</script>"
+                );
+                // inject before </head> or <body>
+                if let Some(pos) = html.find("</head>") {
+                    html.insert_str(pos, &script);
+                } else if let Some(pos) = html.find("<body>") {
+                    html.insert_str(pos + 6, &script);
+                } else {
+                    html.push_str(&script);
+                }
+            }
+        }
+
+        let builder = create_no_cache_response_builder();
+        return Ok(builder.body(Body::from(html))?.into_response());
+    }
+
+    let builder = create_asset_response_builder(&asset, path_str);
+    Ok(builder.body(Body::from(asset.data.to_vec()))?.into_response())
 }
 
 fn create_no_cache_response_builder() -> ResponseBuilder {

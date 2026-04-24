@@ -1,6 +1,6 @@
 <script lang="ts">
     import { appState } from "../AppState.svelte";
-    import { getLogout } from "../ts/auth";
+    import { getLogout } from "../lib/auth";
     import { onMount } from "svelte";
 
     onMount(getLogout);
