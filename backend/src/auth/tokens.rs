@@ -12,7 +12,7 @@ use crate::core;
 #[derive(Debug, Error)]
 pub enum TokenError {
     #[error("Invalid header value: {0}")]
-    InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
+    InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 
     #[error("JWT operation failed: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -33,11 +33,8 @@ pub fn decode_token_from_req(
     req: &Request,
     token_type: auth::TokenType,
 ) -> Result<auth::TokenClaims, TokenError> {
-    req.headers()
-        .get(http::header::COOKIE) // attempt to extract token from Cookie header first
-        .and_then(|header| header.to_str().ok())
-        .and_then(|cookie| extract_token_from_cookie(cookie, "access_token"))
-        .map_or_else(|| extract_bearer_token(req), Ok) // fallback to Bearer token
+    get_cookie_value_from_headers(req.headers(), "access_token")
+        .map_or_else(|| extract_bearer_token(req), Ok) // fallback to Authorization: Bearer for API clients
         .and_then(|token| auth::decode_token(&context.jwt, token, token_type).map_err(TokenError::from))
 }
 
@@ -52,14 +49,9 @@ fn extract_bearer_token(req: &Request<Body>) -> Result<&str, TokenError> {
 }
 
 pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenError> {
-    req.headers()
-        .get(reqwest::header::COOKIE)
-        .and_then(|header| header.to_str().ok())
-        .and_then(|cookie_str| extract_token_from_cookie(cookie_str, "refresh_token"))
-        .ok_or(TokenError::TokenInvalid)
+    get_cookie_value_from_headers(req.headers(), "refresh_token").ok_or(TokenError::TokenInvalid)
 }
 
-/// Attach access and/or refresh token cookies to an existing response.
 pub fn add_auth_cookies(
     context: &core::ArcContext,
     access_token: Option<&str>,
@@ -68,16 +60,19 @@ pub fn add_auth_cookies(
 ) -> Result<Response<Body>, TokenError> {
     let mut response = response;
     let headers = response.headers_mut();
-    if let Some(at) = access_token {
-        let access_max_age = context.settings.jwt.access_token_expiry_minutes * 60;
-        let access_cookie = create_token_cookie("access_token", at, "/", access_max_age);
-        headers.append(reqwest::header::SET_COOKIE, access_cookie.parse()?);
-    }
-    if let Some(rt) = refresh_token {
-        let refresh_max_age = context.settings.jwt.refresh_token_expiry_days * 60 * 60 * 24;
-        let refresh_cookie = create_token_cookie("refresh_token", rt, "/api/auth/refresh", refresh_max_age);
-        headers.append(reqwest::header::SET_COOKIE, refresh_cookie.parse()?);
-    }
+
+    // access token (default to empty string with Max-Age=0 to clear it if None)
+    let at_val = access_token.unwrap_or("");
+    let access_max_age = context.settings.jwt.access_token_expiry_minutes * 60;
+    let access_cookie = create_token_cookie("access_token", at_val, "/", access_max_age);
+    headers.append(http::header::SET_COOKIE, access_cookie.parse()?);
+
+    // refresh token (default to empty string with Max-Age=0 to clear it if None)
+    let rt_val = refresh_token.unwrap_or("");
+    let refresh_max_age = context.settings.jwt.refresh_token_expiry_days * 60 * 60 * 24;
+    let refresh_cookie = create_token_cookie("refresh_token", rt_val, "/api/auth/refresh", refresh_max_age);
+    headers.append(http::header::SET_COOKIE, refresh_cookie.parse()?);
+
     Ok(response)
 }
 
@@ -92,7 +87,15 @@ pub fn create_json_response_with_auth_cookies(
     add_auth_cookies(context, access_token, refresh_token, response)
 }
 
-fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> Option<&'a str> {
+pub fn get_cookie_value_from_headers<'a>(headers: &'a http::HeaderMap, name: &str) -> Option<&'a str> {
+    headers
+        .get(http::header::COOKIE)
+        .and_then(|header| header.to_str().ok())
+        .and_then(|cookie_str| extract_token_from_cookie(cookie_str, name))
+}
+
+#[must_use]
+pub fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> Option<&'a str> {
     cookie_str.split(';').find_map(|cookie| {
         let mut parts = cookie.trim().splitn(2, '=');
         if parts.next()? == token_name {

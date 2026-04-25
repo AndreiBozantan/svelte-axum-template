@@ -18,6 +18,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
     let auth_routes = Router::new()
         .route("/login", post(routes::auth::login)) // sets username in session and returns JWT
         .route("/logout", get(routes::auth::logout)) // deletes username in session and revokes tokens
+        .route("/user_info", get(routes::auth::user_info)) // check session status
         .route("/refresh", post(routes::auth::refresh_access_token)) // refresh access token
         .route("/refresh/revoke", post(routes::auth::revoke_refresh_token)) // revoke refresh token
         .route("/oauth/google", get(routes::auth::google_auth_init)) // initiate Google OAuth
@@ -27,14 +28,14 @@ pub fn create_router(context: core::ArcContext) -> Router {
 
     // protected API routes that need ArcContext and auth middleware
     let protected_api_routes = Router::new()
-        .route("/", get(routes::api::handler))
+        .route("/test", get(routes::api::test_handler))
         .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware))
         .with_state(context.clone());
 
     // public API routes
     let public_routes = Router::new()
         .route("/health", get(routes::health::health_check)) // health check endpoint
-        .with_state(context);
+        .with_state(context.clone());
 
     let api_router = Router::new()
         .nest("/auth", auth_routes)
@@ -50,30 +51,23 @@ pub fn create_router(context: core::ArcContext) -> Router {
     // combine all routes
     Router::new()
         .nest("/api", api_router)
+        .route("/user_info.js", get(routes::user_info::user_info_handler))
         .fallback(routes::assets::static_handler) // serve static assets
+        .with_state(context)
         .layer(TraceLayer::new_for_http()) // add http request tracing for all routes
-}
-
+    }
 async fn auth_middleware(
     State(context): State<core::ArcContext>,
     req: Request<Body>,
     next: axum::middleware::Next,
-) -> Response {
-    match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
-        Ok(claims) => {
-            tracing::debug!(
-                user_id = claims.sub,
-                email = claims.email,
-                tenant_id = ?claims.tenant_id,
-                "Authenticated user accessing API"
-            );
-            next.run(req).await
-        }
-        Err(e) => {
-            tracing::warn!("Unauthorized access attempt: {}", e);
-            let mut response = Response::new(axum::body::Body::from("Unauthorized"));
-            *response.status_mut() = axum::http::StatusCode::UNAUTHORIZED;
-            response
-        }
-    }
+) -> Result<Response, auth::AuthError> {
+    let claims =
+        auth::decode_token_from_req(&context, &req, auth::TokenType::Access).map_err(auth::log_auth_rejection)?;
+    tracing::debug!(
+        user_id = claims.sub,
+        email = claims.email,
+        tenant_id = ?claims.tenant_id,
+        "Authenticated user accessing API"
+    );
+    Ok(next.run(req).await)
 }
