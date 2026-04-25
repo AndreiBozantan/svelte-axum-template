@@ -1,75 +1,90 @@
 <script lang="ts">
     import { appState } from "./AppState.svelte";
-    import { getSession } from "./ts/auth";
-    import NavBar from "./component/Navbar.svelte";
+    import Sidebar from "./component/Sidebar.svelte";
+    import About from "./pages/About.svelte";
+    import Welcome from "./pages/Welcome.svelte";
     import LogIn from "./pages/Login.svelte";
     import LogOut from "./pages/Logout.svelte";
-    import Secure from "./pages/Secure.svelte";
-    import Apicheck from "./pages/Apicheck.svelte";
+    import SecureApi from "./pages/SecureApi.svelte";
+    import Settings from "./pages/Settings.svelte";
     import { onMount } from "svelte";
 
-    let menu = $state(1);
-
-    // check if logged in
     onMount(async () => {
-        try {
-            // Simulate a delay for initialization
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            await getSession();
+        // await new Promise((resolve) => setTimeout(resolve, 900));
+
+        appState.stopLoading();
+    });
+
+    // Simple mapping of string IDs to components
+    const pageMap: Record<string, any> = {
+        'welcome': { component: Welcome, public: false },
+        'secure': { component: SecureApi, public: false },
+        'about': { component: About, public: true },
+        'settings': { component: Settings, public: false },
+        'login': { component: LogIn, public: true },
+        'logout': { component: LogOut, public: false },
+    };
+
+    // Auto-redirect logic
+    $effect(() => {
+        const active = pageMap[appState.activePage];
+        
+        // If logged out and on a protected page, go to About
+        if (active && !active.public && !appState.isLoggedIn) {
+            appState.setActivePage('about');
         }
-        finally {
-            appState.stopLoading(); // Mark initialization as complete
+        
+        // If just logged in and on Login page, go to Welcome
+        if (appState.isLoggedIn && appState.activePage === 'login') {
+            appState.setActivePage('welcome');
         }
     });
 
-    const menuItems = $derived(appState.isLoggedIn ?
-        [
-            { label: "About", id: 1 },
-            { label: "Secure", id: 3 },
-            { label: "API Check", id: 5 },
-            { label: "Logout", id: 4 },
-        ]
-        :
-        [
-            { label: "About", id: 1 },
-            { label: "API Check", id: 5 },
-            { label: "Login", id: 2 },
-        ]);
+    const CurrentPage = $derived(pageMap[appState.activePage]);
 </script>
 
-<!-- MENU BAR ON TOP -->
-<NavBar navItems={menuItems} bind:menu />
+<div class="app-layout">
+    <Sidebar />
 
-<!-- PAGE LOADING -->
-{#if menu === 1}
-    <div>
-        <container>
-            {#if appState.isLoggedIn}
-                <h4>Logged In as {appState.user}</h4>
-            {:else}
-                <h4>Requires Login</h4>
-            {/if}
-            <p>ABOUT</p>
-        </container>
-    </div>
-{:else if menu === 2}
-    <LogIn />
-{:else if menu === 3}
-    <Secure />
-{:else if menu === 4}
-    <LogOut />
-{:else if menu === 5}
-    <Apicheck />
-{:else}
-    <h2>Page Not Found or Completed Yet</h2>
-{/if}
+    <main class="content">
+        {#if CurrentPage}
+            <CurrentPage.component />
+        {:else}
+            <div class="page">
+                <h2>Page Not Found (ID: {appState.activePage})</h2>
+            </div>
+        {/if}
+    </main>
+</div>
 
 <style>
-    div {
-        margin: 25px;
+    :global(body) {
+        margin: 0;
+        padding: 0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: #fffaf5;
+        color: #1e293b;
+    }
+
+    .app-layout {
+        display: flex;
+        min-height: 100vh;
+    }
+
+    .content {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        text-align: center;
+        overflow-y: auto;
+        margin-left: 72px; /* Narrow sidebar width */
+    }
+
+    @media only screen and (max-width: 768px) {
+        .app-layout {
+            flex-direction: column;
+        }
+        .content {
+            margin-left: 0;
+        }
     }
 </style>

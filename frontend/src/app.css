@@ -5,8 +5,8 @@ html, body {
 }
 
 body {
-    background-color: #353535;
-    color: #f4f4f4;
+    color: #353535;
+    background-color: #f4f4f4;
     margin: 0;
     padding: 8px;
     box-sizing: border-box;
@@ -62,3 +62,119 @@ button:not(:disabled):active {
 button:focus {
     border-color: #666;
 }
+
+/* --- Shared Page Layout Styles --- */
+
+.page {
+    padding: 60px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background-color: #f8fafc;
+    min-height: 100vh;
+}
+
+.content-container {
+    width: 100%;
+    max-width: 800px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* Header Sections */
+.page-header-block {
+    padding: 24px;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 32px;
+    background-color: #eefdfd;
+    /* background: linear-gradient(to bottom, #eefdfd, #fbfdfb); */
+}
+
+.section-header-block {
+    padding: 16px 24px;
+    border-bottom: none;
+    background-color: #fbfdfb;
+    /* background: linear-gradient(to bottom, #fbfdfb, #ffffff); */
+}
+
+/* Typography */
+.page-main-header {
+    margin: 0;
+    color: #10b981; 
+    font-size: 1.1rem;
+    font-variant: small-caps;
+    font-weight: 700;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; 
+    letter-spacing: 0.2em;
+    text-transform: lowercase;
+}
+
+.page-sub-header {
+    margin: 0;
+    color: #10a081; 
+    font-variant: small-caps;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; 
+    letter-spacing: 0.15em;
+    text-transform: lowercase;
+}
+
+.header-desc {
+    margin: 12px 0 0 0;
+    color: #64748b;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+/* Data & Form Rows */
+.content-group {
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.content-group:last-child {
+    border-bottom: none;
+}
+
+.group-body {
+    padding: 8px 0;
+}
+
+.item-row, .item-block {
+    padding: 20px 24px;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-label { 
+    color: #1e293b; 
+    font-weight: 500; 
+}
+
+/* Buttons */
+.btn-primary { 
+    background: #10b981; 
+    color: white; 
+    border: none; 
+    padding: 12px 24px; 
+    border-radius: 8px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    transition: 0.2s;
+    font-size: 1rem;
+    display: inline-block;
+}
+
+.btn-primary:hover:not(:disabled) { background: #059669; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+/* --- Migrated from global.css --- */
+.mono {
+    font-family: 'Courier New', Courier, monospace;
+}
+
