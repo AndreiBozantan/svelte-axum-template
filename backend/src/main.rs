@@ -40,12 +40,14 @@ pub mod core {
 }
 
 pub mod auth {
+    mod error;
     mod jwt;
     mod logger;
     mod password;
     mod sso;
     mod tokens;
 
+    pub use error::*;
     pub use jwt::*;
     pub use logger::*;
     pub use password::*;
@@ -68,6 +70,7 @@ pub mod routes {
     pub mod assets;
     pub mod auth;
     pub mod health;
+    pub mod user_info;
 }
 
 pub mod middleware {

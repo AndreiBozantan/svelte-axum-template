@@ -51,16 +51,19 @@ pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
         .or_else(|| Assets::get(path_str))
         .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
     let builder = match path_str {
-        "index.html" => create_no_cache_response_builder(),
+        "index.html" => create_index_response_builder(&asset),
         _ => create_asset_response_builder(&asset, path_str),
     };
-    Ok(builder.body(Body::from(asset.data.to_vec()))?)
+    Ok(builder.body(Body::from(asset.data.to_vec()))?.into_response())
 }
 
-fn create_no_cache_response_builder() -> ResponseBuilder {
+fn create_index_response_builder(asset: &EmbeddedFile) -> ResponseBuilder {
+    let etag = hex::encode(asset.metadata.sha256_hash());
     Response::builder()
         .header(header::CONTENT_TYPE, "text/html")
-        .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+        // no-cache means "must revalidate with server", but allows 304 Not Modified if ETag matches
+        .header(header::CACHE_CONTROL, "no-cache")
+        .header(header::ETAG, etag)
 }
 
 fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBuilder {

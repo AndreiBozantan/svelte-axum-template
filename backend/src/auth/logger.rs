@@ -10,17 +10,8 @@ pub fn log_internal_error(error: &dyn std::error::Error, context: &str) {
     );
 }
 
-pub fn log_auth_error(error: &dyn std::error::Error) {
-    tracing::error!(
-        event_type = "auth",
-        error_type = std::any::type_name_of_val(error),
-        error_message = %error,
-        message = "Authentication error occurred"
-    );
-}
-
 pub fn log_invalid_config(field_name: &str, value: &str) {
-    tracing::warn!(
+    tracing::error!(
         event_type = "auth",
         field_name,
         value,
@@ -29,7 +20,7 @@ pub fn log_invalid_config(field_name: &str, value: &str) {
 }
 
 pub fn log_provider_api_error(status: axum::http::StatusCode, provider: &str) {
-    tracing::error!(
+    tracing::warn!(
         event_type = "auth",
         error_type = "provider_api",
         provider,
@@ -44,7 +35,7 @@ pub fn log_invalid_user_info(field_name: &str, value: &str, provider: &str) {
         field_name,
         value,
         provider,
-        message = "Invalid user info",
+        message = "Invalid user info from provider",
     );
 }
 
@@ -55,6 +46,35 @@ pub fn log_redirect_violation(violation: &str, url: &str) {
         url,
         message = "Redirect URL validation failed"
     );
+}
+
+pub fn log_oauth_security_violation(
+    headers: &axum::http::HeaderMap,
+    state: &str,
+    email: &str,
+    violation_type: &str,
+    provider: &str,
+) {
+    tracing::warn!(
+        event_type = "auth",
+        client_ip = extract_client_ip(headers),
+        user_agent = extract_user_agent(headers),
+        state_hash = hash_state(state),
+        message = "OAuth security violation detected",
+        violation_type,
+        email,
+        provider,
+    );
+}
+
+pub fn log_auth_rejection<E: std::fmt::Display>(error: E) -> E {
+    tracing::info!(
+        event_type = "auth",
+        error_type = std::any::type_name::<E>(),
+        error_message = %error,
+        message = "Authentication rejection"
+    );
+    error
 }
 
 pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: &Option<String>, provider: &str) {
@@ -79,25 +99,6 @@ pub fn log_oauth_redirecting(headers: &axum::http::HeaderMap, auth_url: &url::Ur
     );
 }
 
-pub fn log_oauth_security_violation(
-    headers: &axum::http::HeaderMap,
-    state: &str,
-    email: &str,
-    violation_type: &str,
-    provider: &str,
-) {
-    tracing::warn!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        state_hash = hash_state(state),
-        message = "OAuth security violation detected",
-        violation_type,
-        email,
-        provider,
-    );
-}
-
 pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str, email: &str, provider: &str) {
     tracing::info!(
         event_type = "auth",
@@ -111,7 +112,7 @@ pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str
 }
 
 pub fn log_oauth_rate_limit_exceeded(headers: &axum::http::HeaderMap, endpoint: &str) {
-    tracing::warn!(
+    tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
@@ -120,7 +121,7 @@ pub fn log_oauth_rate_limit_exceeded(headers: &axum::http::HeaderMap, endpoint: 
     );
 }
 
-pub fn log_user_login(headers: &axum::http::HeaderMap, email: &str) {
+pub fn log_user_login_attempt(headers: &axum::http::HeaderMap, email: &str) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -141,7 +142,7 @@ pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
 }
 
 pub fn log_missing_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::warn!(
+    tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
@@ -151,7 +152,7 @@ pub fn log_missing_password(headers: &axum::http::HeaderMap, email: &str) {
 }
 
 pub fn log_invalid_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::warn!(
+    tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
@@ -194,8 +195,17 @@ pub fn log_token_revoke(headers: &axum::http::HeaderMap, jti: &str, subject: &st
     );
 }
 
+pub fn log_signture_expired(headers: &axum::http::HeaderMap) {
+    tracing::info!(
+        event_type = "auth",
+        client_ip = extract_client_ip(headers),
+        user_agent = extract_user_agent(headers),
+        message = "OAuth state token expired"
+    );
+}
+
 pub fn log_csrf_mismatch(headers: Option<&axum::http::HeaderMap>, expected: &str, got: &str) {
-    tracing::warn!(
+    tracing::info!(
         event_type = "auth",
         client_ip = headers.map_or_else(|| "unknown".to_string(), extract_client_ip),
         user_agent = headers.and_then(extract_user_agent),
@@ -206,7 +216,7 @@ pub fn log_csrf_mismatch(headers: Option<&axum::http::HeaderMap>, expected: &str
 }
 
 pub fn log_cookie_error(headers: &axum::http::HeaderMap, reason: &str) {
-    tracing::warn!(
+    tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),

@@ -2,82 +2,22 @@ use axum::Json;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
-use axum::response::Response;
 use serde::Deserialize;
 use serde_json::json;
-use thiserror::Error;
 
-use crate::auth;
+use crate::auth::{self, AuthError};
 use crate::core;
 use crate::db;
 
 /// Default tenant ID assigned to users created via SSO.
 const SSO_DEFAULT_TENANT_ID: i64 = 0;
 
-#[derive(Debug, Error)]
-pub enum AuthError {
-    #[error("Invalid credentials")]
-    InvalidCredentials,
-
-    #[error("Internal error: {0}")]
-    RequestHeaderOperationFailed(#[from] axum::http::header::InvalidHeaderValue),
-
-    #[error("Database operation failed: {0}")]
-    DatabaseOperationFailed(core::DbError),
-
-    #[error("JWT operation failed: {0}")]
-    JwtOperationFailed(#[from] auth::JwtError),
-
-    #[error("Password hashing failed: {0}")]
-    PasswordHashingFailed(#[from] argon2::password_hash::Error),
-
-    #[error("Token expired or invalid")]
-    InvalidToken(#[from] auth::TokenError),
-
-    #[error("User already exists")]
-    UserAlreadyExists,
-
-    #[error("SSO operation failed: {0}")]
-    SsoOperationFailed(#[from] auth::SsoError),
-}
-
-impl From<core::DbError> for AuthError {
-    fn from(db_error: core::DbError) -> Self {
-        match db_error {
-            core::DbError::RowNotFound => Self::InvalidCredentials,
-            other => Self::DatabaseOperationFailed(other),
-        }
-    }
-}
-
 #[derive(Deserialize)]
 pub struct Login {
     pub email: String,
     pub password: String,
-}
-
-impl IntoResponse for AuthError {
-    #[allow(clippy::match_same_arms)]
-    fn into_response(self) -> Response {
-        auth::log_auth_error(&self);
-        let status = match self {
-            Self::PasswordHashingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::DatabaseOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::RequestHeaderOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
-            Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
-            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
-            Self::SsoOperationFailed(_) => StatusCode::UNAUTHORIZED,
-            Self::UserAlreadyExists => StatusCode::CONFLICT,
-        };
-        let body = Json(json!({
-            "result": "error",
-            "message": self.to_string(),
-        }));
-        (status, body).into_response()
-    }
 }
 
 /// Handler for logging in using email and password credentials
@@ -86,7 +26,7 @@ pub async fn login(
     headers: HeaderMap,
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
-    auth::log_user_login(&headers, &login.email);
+    auth::log_user_login_attempt(&headers, &login.email);
     let user = db::get_user_by_email(&context.db, &login.email).await?;
     let password_hash = user.password_hash.as_ref().ok_or_else(|| {
         auth::log_missing_password(&headers, &login.email);
@@ -186,6 +126,34 @@ pub async fn refresh_access_token(
     Ok(r)
 }
 
+/// Handler for checking user info based on access token
+pub async fn user_info(
+    State(context): State<core::ArcContext>,
+    req: Request<Body>,
+) -> Result<impl IntoResponse, AuthError> {
+    match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
+        Ok(claims) => {
+            let user_id = claims
+                .sub
+                .parse::<i64>()
+                .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
+            let user = db::get_user_by_id(&context.db, user_id).await?;
+            Ok(Json(json!({
+                "result": "ok",
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "tenant_id": user.tenant_id
+                }
+            })))
+        }
+        Err(_) => Ok(Json(json!({
+            "result": "error",
+            "message": "Not authenticated"
+        }))),
+    }
+}
+
 /// Handler for revoking a refresh token
 pub async fn revoke_refresh_token(
     State(context): State<core::ArcContext>,
@@ -234,33 +202,13 @@ pub async fn google_auth_callback(
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
-    let oauth_state_cookie = headers
-        .get(axum::http::header::COOKIE)
-        .ok_or(AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed))
-        .and_then(|c| {
-            c.to_str().map_err(|e| {
-                auth::log_internal_error(&e, "cookie_utf8_decode");
-                AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
-            })
-        })
-        .and_then(|c| {
-            c.split(';')
-                .find_map(|p| {
-                    let mut parts = p.trim().splitn(2, '=');
-                    if parts.next()? == "oauth_state" {
-                        parts.next()
-                    } else {
-                        None
-                    }
-                })
-                .ok_or_else(|| {
-                    auth::log_cookie_error(&headers, "missing_oauth_state");
-                    AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
-                })
-        })?;
+    let oauth_state_cookie = auth::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
+        auth::log_cookie_error(&headers, "missing_oauth_state");
+        AuthError::SsoOperationFailed(auth::SsoError::CsrfValidationFailed)
+    })?;
 
     let (user_info, redirect_url) =
-        auth::get_google_user_info(&context, &params.code, &params.state, oauth_state_cookie).await?;
+        auth::get_google_user_info(&context, &headers, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         auth::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
@@ -283,12 +231,9 @@ pub async fn google_auth_callback(
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
-    // guard against open redirects, although redirect_url was validated and signed into the JWT at initiation time
-    // this is cheap defence-in-depth against any future refactor that might separate JWT verification from the redirect step
-    let final_redirect_url = redirect_url
-        .as_deref()
-        .filter(|url| url.starts_with('/') && !url.starts_with("//"))
-        .unwrap_or("/");
+    // redirect back to the original URL or root
+    // redirect_url was already validated and signed into the JWT at initiation time
+    let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
 
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = auth::add_auth_cookies(

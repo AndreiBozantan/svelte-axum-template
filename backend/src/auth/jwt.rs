@@ -1,7 +1,7 @@
 use std::fs;
 
 use axum::Json;
-use axum::http;
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use chrono::DateTime;
 use chrono::NaiveDateTime;
@@ -53,19 +53,21 @@ impl From<jwt::errors::Error> for JwtError {
 
 impl IntoResponse for JwtError {
     fn into_response(self) -> axum::response::Response {
-        auth::log_auth_error(&self);
-
         #[rustfmt::skip]
         #[allow(clippy::match_same_arms)]
         let (status, error_message) = match self {
-            Self::RngOperationFailed { source: _ } => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::FileSystemOperationFailed { source: _ } => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::EncodingFailed(_) => (http::StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
-            Self::DecodingFailed(_) => (http::StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
-            Self::TokenExpired => (http::StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
-            Self::InvalidToken => (http::StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
+            Self::RngOperationFailed { source: _ } => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::FileSystemOperationFailed { source: _ } => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::EncodingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            Self::DecodingFailed(_) => (StatusCode::UNAUTHORIZED, "Invalid or missing authentication token".to_string()),
+            Self::TokenExpired => (StatusCode::UNAUTHORIZED, "Authentication token has expired".to_string()),
+            Self::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid authentication token".to_string()),
         };
-
+        if status == StatusCode::INTERNAL_SERVER_ERROR {
+            auth::log_internal_error(&self, "jwt");
+        } else {
+            auth::log_auth_rejection(&self);
+        }
         let body = Json(json!({
             "result": "error",
             "message": error_message

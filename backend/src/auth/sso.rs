@@ -65,12 +65,7 @@ pub struct OAuthStateClaims {
 }
 
 // Type alias to simplify the function signature
-type GoogleOAuth2Client = oauth2::Client<
-    oauth2::StandardErrorResponse<oauth2::basic::BasicErrorResponseType>,
-    oauth2::StandardTokenResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>,
-    oauth2::StandardTokenIntrospectionResponse<oauth2::EmptyExtraTokenFields, oauth2::basic::BasicTokenType>,
-    oauth2::StandardRevocableToken,
-    oauth2::StandardErrorResponse<oauth2::RevocationErrorResponseType>,
+type GoogleOAuth2Client = oauth2::basic::BasicClient<
     oauth2::EndpointSet,    // HasAuthUrl
     oauth2::EndpointNotSet, // HasDeviceAuthUrl
     oauth2::EndpointNotSet, // HasIntrospectionUrl
@@ -88,7 +83,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
+pub fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     if config.google_client_id.is_empty() {
         return Err(SsoError::InvalidConfig(
             "Google Client ID is not configured".to_string(),
@@ -123,6 +118,13 @@ fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
     }
 
     Ok(())
+}
+
+/// Validates OAuth configuration and logs a warning if setup is incomplete.
+pub fn check_oauth_config(config: &cfg::OAuthSettings) {
+    if let Err(e) = validate_google_config(config) {
+        tracing::warn!("Google OAuth config is incomplete. {e}");
+    }
 }
 
 fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Client, SsoError> {
@@ -180,6 +182,7 @@ pub fn get_google_auth_url_and_csrf_token(
 
 pub async fn get_google_user_info(
     context: &core::ArcContext,
+    headers: &axum::http::HeaderMap,
     code: &str,
     state: &str,
     oauth_state_cookie: &str,
@@ -192,10 +195,12 @@ pub async fn get_google_user_info(
     let token_data =
         jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
             |e| {
-                auth::log_internal_error(&e, "decode_oauth_state");
-                match e.kind() {
-                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => SsoError::SessionExpired,
-                    _ => SsoError::CsrfValidationFailed,
+                if matches!(e.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature) {
+                    auth::log_signture_expired(headers);
+                    SsoError::SessionExpired
+                } else {
+                    auth::log_internal_error(&e, "decode_oauth_state");
+                    SsoError::CsrfValidationFailed
                 }
             },
         )?;
