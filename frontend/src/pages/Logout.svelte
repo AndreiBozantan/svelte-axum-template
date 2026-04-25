@@ -1,19 +1,22 @@
 <script lang="ts">
     import { appState } from "../AppState.svelte";
-    import { getLogout } from "../ts/auth";
+    import { api } from "../lib/api";
     import { onMount } from "svelte";
 
-    onMount(getLogout);
+    onMount(async () => {
+        const res = await api.logout();
+        appState.setAuth(res);
+    });
 </script>
 
 <div>
-    <container>
+    <div class="logout-container">
         {#if appState.isLoggedIn}
             You are still logged in as {appState.user}.
         {:else}
             You are now logged out.
         {/if}
-    </container>
+    </div>
 </div>
 
 <style>
@@ -23,5 +26,14 @@
         flex-direction: column;
         align-items: center;
         text-align: center;
+    }
+
+    .logout-container {
+        width: 300px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        border-radius: 8px;
+        background: white;
     }
 </style>
