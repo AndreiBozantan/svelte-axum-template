@@ -22,7 +22,10 @@
     // npm package cache
     "source=svelaxum-npm-cache,target=/home/vscode/.npm,type=volume",
     // VS Code Server, extensions, and CodeLLDB
-    "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume"
+    "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume",
+    // Zsh history and other data files (e.g. for plugins like zsh-autosuggestions)
+    "source=svelaxum-zsh-history,target=/home/vscode/.zsh_data,type=volume"
+
   ],
 
   "forwardPorts": [
