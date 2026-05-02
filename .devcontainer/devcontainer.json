@@ -53,7 +53,8 @@
         "rust-lang.rust-analyzer",
         "vadimcn.vscode-lldb",
         "svelte.svelte-vscode",
-        "semgrep.semgrep"
+        "semgrep.semgrep",
+        "alexcvzz.vscode-sqlite"
       ]
     }
   },
