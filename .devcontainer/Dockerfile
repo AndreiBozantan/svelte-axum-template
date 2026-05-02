@@ -55,10 +55,15 @@ RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000,gid=1000 \
 
 # Install cargo-binstall and then sqlx-cli and cargo-watch using cargo-binstall.
 # This is a faster alternative to cargo install.
-RUN curl -L --proto '=https' --tlsv1.2 -sSf \
-    https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
- && cargo binstall sqlx-cli --no-confirm \
- && cargo binstall cargo-watch --no-confirm
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN ARCH=$(uname -m) \
+ && curl -L --proto '=https' --tlsv1.2 -sSf \
+    "https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-${ARCH}-unknown-linux-musl.tgz" \
+    | tar -xz -C ~/.cargo/bin
+ 
+RUN cargo binstall cargo-watch --no-confirm
+RUN cargo binstall sqlx-cli --no-confirm
+
 
 # Prepare volume mount points
 # Create every directory that will be backed by a named Docker volume.
