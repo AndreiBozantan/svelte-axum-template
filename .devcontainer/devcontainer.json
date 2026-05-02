@@ -1,39 +1,32 @@
 {
-  "name": "Svelaxum Dev Environment",
-  "image": "mcr.microsoft.com/devcontainers/base:bullseye",
-  "containerUser": "vscode",
+  "name": "Svelaxum",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+
   "runArgs": [
-    "--cpus=8",           // limit to 8 CPU cores
-    "--memory=24g"        // limit to 24GB of RAM
-  ],
+    "--cpus=8",
+    "--memory=16g"
+  ] ,
 
-  "features": {
-    "ghcr.io/devcontainers/features/rust:1": {
-      "version": "latest",
-      "profile": "default"
-    },
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "lts"
-    }
-  },
-
+  // Run everything as the non-root vscode user.
+  "containerUser": "vscode",
+  "remoteUser": "vscode",
+ 
+  // Named volumes persist across container rebuilds, avoiding re-downloads.
+  // Rename the svelaxum- prefix if you clone this config for another project.
   "mounts": [
-      "source=cargo-registry-cache,target=/home/vscode/.cargo/registry,type=volume",
-      "source=svelaxum-node-modules,target=/workspaces/svelaxum/frontend/node_modules,type=volume"
-  ],
+    // Cargo registry: crate source tarballs and git-sourced checkouts
+    "source=svelaxum-cargo-registry,target=/home/vscode/.cargo/registry,type=volume",
+    "source=svelaxum-cargo-git,target=/home/vscode/.cargo/git,type=volume",
+    // npm package cache
+    "source=svelaxum-npm-cache,target=/home/vscode/.npm,type=volume",
+    // VS Code Server, extensions, and CodeLLDB
+    "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume",
+    // Zsh history and other data files (e.g. for plugins like zsh-autosuggestions)
+    "source=svelaxum-zsh-history,target=/home/vscode/.zsh_data,type=volume"
 
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "rust-analyzer.check.command": "clippy",
-        "rust-analyzer.server.path": "/usr/local/bin/rust-analyzer"
-      },
-      "extensions": [
-        "rust-lang.rust-analyzer",
-        "svelte.svelte-vscode"
-      ]
-    }
-  },
+  ],
 
   "forwardPorts": [
     5173,
@@ -42,19 +35,28 @@
   "portsAttributes": {
     "5173": {
       "label": "Frontend",
-      "onAutoForward": "notify"
+      "onAutoForward": "openBrowser"
     },
     "3000": {
       "label": "Backend",
-      "onAutoForward": "notify"
+      "onAutoForward": "silent"
+    }
+  },
+ 
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "rust-analyzer.server.path": "/home/vscode/.cargo/bin/rust-analyzer",
+        "rust-analyzer.check.command": "clippy"
+      },
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "svelte.svelte-vscode",
+        "semgrep.semgrep"
+      ]
     }
   },
 
-  "postCreateCommand": {
-    "rust-analyzer": "rustup component add rust-analyzer && sudo ln -s $(rustup which rust-analyzer) /usr/local/bin/rust-analyzer",
-    "system-deps": "sudo apt-get update && sudo apt-get install -y sqlite3 libssl-dev libsqlite3-dev pkg-config",
-    "cargo": "cargo install cargo-binstall && cargo binstall sqlx-cli --no-confirm && cargo binstall cargo-watch --no-confirm && cargo fetch",
-    "gemini": "npm install -g @google/gemini-cli",
-    "npm-install": "sudo chown -R vscode:vscode /workspaces/svelaxum/frontend/node_modules && npm install"
-  }
+  "postCreateCommand": "npm install && cargo fetch"
 }
