@@ -458,8 +458,6 @@
     .confirm-action-btn:hover { background: #be123c; }
     .confirm-action-btn.animating { transform: scale(1.05); background: #be123c; }
 
-    .tooltip.hidden { display: none !important; }
-
     button:hover .tooltip { 
         opacity: 1; 
         transform: translateY(-50%) scale(1); 
@@ -471,7 +469,6 @@
     }
 
     .footer-content { display: flex; flex-direction: column; width: 100%; gap: 4px; }
-    .footer-group { display: flex; flex-direction: column; gap: 4px; }
 
     .logout-wrapper { position: relative; width: 100%; padding: 0 8px; box-sizing: border-box; }
     .logout:hover, .logout.active { color: #e11d48; background-color: #fff1f2; }
@@ -484,7 +481,6 @@
         .sidebar-nav { padding: 8px; }
         .sidebar-nav ul { flex-direction: row; justify-content: space-around; width: 100%; }
         .sidebar-footer { border-top: none; padding: 8px; flex: 1; display: flex; justify-content: flex-end; }
-        .footer-group { flex-direction: row; }
-        .tooltip, .logout-confirm-popup { display: none; }
+        .tooltip { display: none; }
     }
 </style>
