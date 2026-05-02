@@ -28,7 +28,6 @@
     "svelte-fa": "4.0"
   },
   "overrides": {
-    "postcss": "^8.5.10",
-     "//postcss": "CVE-2026-41305: XSS fix, forced override of Vite's transitive dependency"
+    "postcss": "^8.5.10"
   }
 }
