@@ -144,7 +144,7 @@ async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
 async fn create_admin(email: String, db: &core::DbContext) -> Result<(), CliError> {
     // prompt for password securely
     print!("Enter password for admin user '{email}': ");
-    io::stdout().flush().unwrap();
+    io::stdout().flush()?;
 
     let password = rpassword::read_password()?;
     password
