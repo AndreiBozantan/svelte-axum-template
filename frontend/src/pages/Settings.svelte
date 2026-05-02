@@ -77,14 +77,7 @@
         color: #64748b;
     }
 
-    .options {
-        display: flex;
-        gap: 8px;
-        background: #f1f5f9;
-        padding: 4px;
-        border-radius: 8px;
-    }
-
+    /*
     button {
         padding: 6px 12px;
         border: none;
@@ -107,6 +100,7 @@
         color: #10b981;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     }
+    */
 
     /* Switch styling */
     .switch {
