@@ -58,5 +58,5 @@
     }
   },
 
-  "postCreateCommand": "npm install && cargo fetch"
+  "postCreateCommand": "bash ./.devcontainer/setup-zsh.sh && npm install && cargo fetch"
 }
