@@ -1,0 +1,34 @@
+# syntax=docker/dockerfile:1
+
+# ── Reuse the devcontainer as the build environment ───────────────────────────
+FROM svelaxum-dev AS builder
+WORKDIR /build
+COPY --chown=vscode:vscode . .
+
+# Frontend
+RUN npm ci && cd frontend && npm ci && npm run build
+
+# Backend (sqlx offline mode requires .sqlx/ committed to the repo)
+ENV SQLX_OFFLINE=true
+RUN --mount=type=cache,target=/home/vscode/.cargo/registry,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/vscode/.cargo/git,uid=1000,gid=1000 \
+    --mount=type=cache,target=/build/target,uid=1000,gid=1000 \
+    cargo build --release \
+    # Copy binary out of target before the cache mount disappears
+    && cp target/release/svelaxum /build/svelaxum
+
+# ── Minimal runtime ───────────────────────────────────────────────────────────
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates libsqlite3-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r app && useradd -r -g app -s /sbin/nologin app \
+    && mkdir -p /data && chown app:app /data
+
+COPY --from=builder /build/svelaxum /usr/local/bin/svelaxum
+
+USER app
+WORKDIR /data
+EXPOSE 3000
+VOLUME ["/data"]
+CMD ["svelaxum"]

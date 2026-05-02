@@ -49,6 +49,12 @@ pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<core
         .max_connections(db_config.max_connections)
         .connect_with(options)
         .await?;
+    if db_config.store_temp_tables_in_memory {
+        // store temporary tables in memory for better performance
+        sqlx::query("PRAGMA temp_store = MEMORY")
+            .execute(&pool)
+            .await?;
+    }
     Ok(pool)
 }
 

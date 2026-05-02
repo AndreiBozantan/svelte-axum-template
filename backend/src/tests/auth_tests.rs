@@ -32,6 +32,7 @@ async fn create_test_context(config: cfg::AppSettings) -> core::ArcContext {
     let db_config = cfg::DatabaseSettings {
         url: "sqlite::memory:".to_string(),
         max_connections: 5,
+        store_temp_tables_in_memory: true,
     };
     let db = app::create_db_context(&db_config).await.unwrap();
     app::run_migrations(&db).await.unwrap();
