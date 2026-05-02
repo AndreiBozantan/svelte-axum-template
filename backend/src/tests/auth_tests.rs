@@ -156,7 +156,7 @@ async fn test_refresh_token_invalid() {
 #[tokio::test]
 async fn test_protected_route_without_token() {
     let server = create_test_server(default_config()).await;
-    let response = server.get("/api").await;
+    let response = server.get("/api/test").await;
     response.assert_status(StatusCode::UNAUTHORIZED);
 }
 
@@ -165,7 +165,7 @@ async fn test_protected_route_with_invalid_token() {
     let server = create_test_server(default_config()).await;
 
     let response = server
-        .get("/api")
+        .get("/api/test")
         .add_header(header::AUTHORIZATION, "Bearer invalid_token")
         .await;
 
@@ -279,7 +279,7 @@ async fn test_protected_route_with_valid_token() {
 
     // access protected route
     let api_response = server
-        .get("/api")
+        .get("/api/test")
         .add_cookie(cookie::Cookie::new("access_token", access_token.clone()))
         .await;
 
@@ -309,7 +309,7 @@ async fn test_access_token_expiry() {
 
     // test that a valid token works
     let response_valid = server
-        .get("/api")
+        .get("/api/test")
         .add_cookie(cookie::Cookie::new("access_token", valid_access_token.clone()))
         .await;
     response_valid.assert_status(StatusCode::OK);
@@ -341,7 +341,7 @@ async fn test_access_token_expiry() {
 
     // test that expired token is rejected
     let response_expired = server
-        .get("/api")
+        .get("/api/test")
         .add_cookie(cookie::Cookie::new("access_token", expired_token))
         .await;
 
