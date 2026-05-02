@@ -42,24 +42,33 @@ class Api {
 
     // Auth methods
     async getUserInfo(): Promise<AuthResponse> {
-        const res = await fetch('/api/auth/user_info', { credentials: 'same-origin' });
+        const options: RequestInit = { credentials: 'same-origin' };
+        const res = await fetch('/api/auth/user_info', options);
         return await this.handleResponse(res);
     }
 
     async login(email: string, password: string): Promise<AuthResponse> {
-        const res = await fetch("/api/auth/login", {
+        const options: RequestInit = {
             method: "POST",
             headers: {
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({ email, password }),
-        });
+            credentials: 'same-origin'
+        };
+        // semgrep rule is flagging this as potential SSRF, due to the email and string input in the body. 
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
+        const res = await fetch("/api/auth/login", options); 
         return await this.handleResponse(res);
     }
 
     async logout(): Promise<AuthResponse> {
-        const res = await fetch("/api/auth/logout", { credentials: 'same-origin' });
+        const options: RequestInit = {
+            method: "POST",
+            credentials: 'same-origin'
+        };
+        const res = await fetch("/api/auth/logout", options);
         return await this.handleResponse(res);
     }
 }

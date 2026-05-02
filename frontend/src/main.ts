@@ -8,7 +8,7 @@ async function bootstrap() {
     try {
         // Try to get the initial user_info data (user, theme, etc.)
         // This is preloaded in index.html for maximum performance
-        const userInfoPath = "/user_info.js";
+        const userInfoPath = "/user_info.js"; // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_username
         const { initialUserInfo } = await import(/* @vite-ignore */ userInfoPath)
             .catch(() => ({ initialUserInfo: null })) as any;
 

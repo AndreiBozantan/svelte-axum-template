@@ -13,18 +13,21 @@
     "start": "npm run dev"
   },
   "devDependencies": {
-    "@sveltejs/vite-plugin-svelte": "^7.0",
-    "@tsconfig/svelte": "^5.0",
-    "svelte": "^5.55",
-    "svelte-check": "^4.4",
-    "svelte-preprocess": "^6.0",
-    "tslib": "^2.8",
-    "typescript": "^5.8",
-    "vite": "^8.0"
+    "@sveltejs/vite-plugin-svelte": "7.0",
+    "@tsconfig/svelte": "5.0",
+    "svelte": "5.55",
+    "svelte-check": "4.4",
+    "svelte-preprocess": "6.0",
+    "tslib": "2.8",
+    "typescript": "5.8",
+    "vite": "8.0"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-svg-core": "^7.2",
-    "@fortawesome/free-solid-svg-icons": "^6.2",
-    "svelte-fa": "^4.0"
+    "@fortawesome/fontawesome-svg-core": "7.2",
+    "@fortawesome/free-solid-svg-icons": "6.2",
+    "svelte-fa": "4.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   }
 }
