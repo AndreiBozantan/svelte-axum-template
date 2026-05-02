@@ -11,12 +11,6 @@ async fn main() {
     app::run().await;
 }
 
-#[cfg(test)]
-mod tests {
-    mod auth_tests;
-    mod jwt_tests;
-}
-
 pub mod cfg {
     mod app_settings;
     mod database_settings;
@@ -89,4 +83,11 @@ pub mod app {
     pub use migrations::*;
     pub use router::*;
     pub use server::*;
+}
+
+#[cfg(test)]
+mod tests {
+    mod auth_tests;
+    mod jwt_tests;
+    mod password_tests;
 }
