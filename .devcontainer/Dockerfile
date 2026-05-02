@@ -27,7 +27,8 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
 # Copy uv (Python package manager)
-COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 \
+    /uv /usr/local/bin/uv
 
 # Install Gemini CLI 
 RUN npm install -g @google/gemini-cli
@@ -51,6 +52,13 @@ ENV RUSTUP_HOME="/home/vscode/.rustup" \
 # uid/gid=1000 matches the vscode user so the cache is writable.
 RUN --mount=type=cache,target=/home/vscode/.cache/uv,uid=1000,gid=1000 \
     uv tool install semgrep
+
+# Install cargo-binstall and then sqlx-cli and cargo-watch using cargo-binstall.
+# This is a faster alternative to cargo install.
+RUN curl -L --proto '=https' --tlsv1.2 -sSf \
+    https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash \
+ && cargo binstall sqlx-cli --no-confirm \
+ && cargo binstall cargo-watch --no-confirm
 
 # Prepare volume mount points
 # Create every directory that will be backed by a named Docker volume.
