@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -67,7 +68,7 @@ pub async fn check_pending_migrations(db: &DbContext) -> Result<bool, MigrationE
     Ok(available_migrations.len() > applied_migrations.len())
 }
 
-/// Create a new migration file with the current timestamp
+/// Create a new migration file with a versioned name and template content.
 pub fn create_migration(name: &str) -> Result<String, MigrationError> {
     // Create migrations directory if it doesn't exist
     let migrations_path = Path::new("migrations");
@@ -75,15 +76,36 @@ pub fn create_migration(name: &str) -> Result<String, MigrationError> {
         std::fs::create_dir_all(migrations_path)?;
     }
 
-    // Generate a timestamp in the format YYYYMMDD_HHMMSS
-    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S").to_string();
+    // Determine the max version using flat iterator combinators
+    let max_version = fs::read_dir(migrations_path)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .filter_map(|path| path.file_name()?.to_str().map(String::from))
+        .filter(|name| name.len() > 2)
+        .filter_map(|name| name.get(0..2)?.parse::<u32>().ok())
+        .max()
+        .unwrap_or(0);
+
+    // Increment and format the version string
+    let next_version = max_version + 1;
+    let version_string = format!("{next_version:02}");
+
+    // Generate date and time for the file content
+    let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    
+    // Construct filename and path
     let normalized_name = name.replace(' ', "_").to_lowercase();
-    let filename = format!("{timestamp}_{normalized_name}.sql");
+    let filename = format!("{version_string}_{normalized_name}.sql");
     let filepath = migrations_path.join(&filename);
 
     // Create the migration file with template content
     let mut file = File::create(&filepath)?;
     writeln!(file, "-- Migration: {name}")?;
+    writeln!(file, "-- Created at: {timestamp}")?;
     writeln!(file, "--")?;
     writeln!(file, "-- Add migration script here")?;
 
