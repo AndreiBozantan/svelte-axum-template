@@ -1,0 +1,22 @@
+# Rust build artifacts — the biggest offender, can be many GB
+target/
+
+# Node dependencies — rebuilt inside the container anyway
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Dev database
+db.sqlite
+db.sqlite-wal
+db.sqlite-shm
+
+# Git history
+.git/
+
+# Devcontainer stuff not needed for prod build
+.devcontainer/
+
+# Misc
+*.tar.gz
+*.log

@@ -6,6 +6,7 @@ log_directives = "debug,tower_http=debug,axum=debug"
 [database]
 url = "sqlite:db.sqlite"
 max_connections = 5
+store_temp_tables_in_memory = true
 
 [jwt]
 access_token_expiry_minutes = 16
