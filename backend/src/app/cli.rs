@@ -163,6 +163,7 @@ async fn create_admin(email: String, db: &core::DbContext) -> Result<(), CliErro
     let password_hash = auth::hash_password(&password)?;
     let new_user = db::NewUser {
         email,
+        status: db::UserStatus::Active,
         tenant_id: 0, // default tenant
         password_hash: Some(password_hash),
         sso_provider: None,
