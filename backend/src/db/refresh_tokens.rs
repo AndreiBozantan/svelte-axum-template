@@ -20,6 +20,7 @@ pub struct RefreshToken {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewRefreshToken {
     pub jti: String,
+    pub tenant_id: i64,
     pub user_id: i64,
     pub token_hash: String,
     pub expires_at: NaiveDateTime,
@@ -28,10 +29,11 @@ pub struct NewRefreshToken {
 pub async fn create_refresh_token(db: &DbContext, new_refresh_token: NewRefreshToken) -> Result<(), DbError> {
     sqlx::query!(
         r#"
-        INSERT INTO refresh_tokens (jti, user_id, token_hash, issued_at, expires_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
+        INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
         "#,
         new_refresh_token.jti,
+        new_refresh_token.tenant_id,
         new_refresh_token.user_id,
         new_refresh_token.token_hash,
         new_refresh_token.expires_at
@@ -55,7 +57,7 @@ pub async fn revoke_refresh_token(db: &DbContext, jti: &str) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn get_refresh_token_by_jti(db: &DbContext, jti: &str) -> Result<RefreshToken, DbError> {
+pub async fn get_refresh_token_by_jti(db: &DbContext,tenant_id: i64, jti: &str) -> Result<RefreshToken, DbError> {
     let token = sqlx::query_as!(
         RefreshToken,
         r#"
@@ -68,8 +70,9 @@ pub async fn get_refresh_token_by_jti(db: &DbContext, jti: &str) -> Result<Refre
             expires_at "expires_at!",
             revoked_at
         FROM refresh_tokens
-        WHERE jti = ? AND revoked_at IS NULL
+        WHERE tenant_id = ? AND jti = ? AND revoked_at IS NULL
         "#,
+        tenant_id,
         jti
     )
     .fetch_one(db)
@@ -77,16 +80,17 @@ pub async fn get_refresh_token_by_jti(db: &DbContext, jti: &str) -> Result<Refre
     Ok(token)
 }
 
-pub async fn revoke_all_refresh_tokens_for_user(db: &DbContext, user_id: i64) -> Result<SqliteQueryResult, DbError> {
+pub async fn revoke_all_refresh_tokens_for_user(db: &DbContext, tenant_id: i64, user_id: i64) -> Result<SqliteQueryResult, DbError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"
         UPDATE refresh_tokens
         SET revoked_at = ?
-        WHERE user_id = ? AND revoked_at IS NULL
+        WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL
         "#,
         now,
-        user_id
+        tenant_id,
+        user_id,
     )
     .execute(db)
     .await?;
