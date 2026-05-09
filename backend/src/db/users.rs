@@ -1,13 +1,23 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{self, FromRow, Type};
 
 use crate::core::{DbContext, DbError};
+
+#[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
+pub enum UserStatus {
+    Onboarding,
+    Active,
+    Suspended,
+    Archieved, // Note: Matches your SQL typo 'archieved'
+}
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
     pub id: i64,
     pub tenant_id: i64,
+    pub status: UserStatus,
     pub email: String,
     pub password_hash: Option<String>, // Nullable for SSO users
     pub sso_provider: Option<String>,
@@ -19,6 +29,7 @@ pub struct User {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewUser {
     pub tenant_id: i64,
+    pub status: UserStatus,
     pub email: String,
     pub password_hash: Option<String>, // Nullable for SSO users
     pub sso_provider: Option<String>,
@@ -29,11 +40,12 @@ pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbEr
     let user = sqlx::query_as!(
         User,
         r#"
-        INSERT INTO users (tenant_id, email, password_hash, sso_provider, sso_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO users (tenant_id, status, email, password_hash, sso_provider, sso_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING
             id as "id!",
             tenant_id as "tenant_id!",
+            status as "status: UserStatus",
             email as "email!",
             password_hash,
             sso_provider,
@@ -42,6 +54,7 @@ pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbEr
             updated_at as "updated_at!"
         "#,
         new_user.tenant_id,
+        new_user.status,
         new_user.email,
         new_user.password_hash,
         new_user.sso_provider,
@@ -59,6 +72,7 @@ pub async fn get_user_by_id(db: &DbContext, id: i64) -> Result<User, DbError> {
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            status "status: UserStatus",
             email "email!",
             password_hash,
             sso_provider,
@@ -82,6 +96,7 @@ pub async fn get_user_by_email(db: &DbContext, email: &str) -> Result<User, DbEr
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            status "status: UserStatus",
             email "email!",
             password_hash,
             sso_provider,
@@ -105,6 +120,7 @@ pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            status "status: UserStatus",
             email "email!",
             password_hash,
             sso_provider,
@@ -132,8 +148,8 @@ pub async fn create_or_link_sso_user(
     let user = sqlx::query_as!(
         User,
         r#"
-        INSERT INTO users (tenant_id, email, sso_provider, sso_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO users (tenant_id, status, email, sso_provider, sso_id, created_at, updated_at)
+        VALUES (?, 'active', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (email) DO UPDATE SET
             sso_provider = excluded.sso_provider,
             sso_id = excluded.sso_id,
@@ -141,6 +157,7 @@ pub async fn create_or_link_sso_user(
         RETURNING
             id "id!",
             tenant_id "tenant_id!",
+            status "status: UserStatus",
             email "email!",
             password_hash,
             sso_provider,
