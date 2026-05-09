@@ -55,6 +55,7 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
     let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
     let user = db::NewUser {
         tenant_id: 0,
+        status: db::UserStatus::Active,
         email: "test@example.com".to_string(),
         password_hash: Some(password_hash),
         sso_provider: None,

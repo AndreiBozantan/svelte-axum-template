@@ -46,6 +46,7 @@ pub async fn login(
     let token_hash = auth::get_token_hash_as_hex(&refresh_token.value);
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_token.claims.jti,
+        tenant_id: user.tenant_id,
         user_id: user.id,
         token_hash,
         expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
@@ -84,7 +85,7 @@ pub async fn logout(
         .parse::<i64>()
         .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
     if let Ok(db_user) = db::get_user_by_id(&context.db, user_id).await {
-        let _ = db::revoke_all_refresh_tokens_for_user(&context.db, db_user.id).await;
+        let _ = db::revoke_all_refresh_tokens_for_user(&context.db, db_user.tenant_id, db_user.id).await;
     }
 
     // create cookies to clear the tokens
@@ -102,7 +103,7 @@ pub async fn refresh_access_token(
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
     // decode refresh token and check if it exists in the database and is not revoked
     let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
-    let stored_token = db::get_refresh_token_by_jti(&context.db, &refresh_claims.jti).await?;
+    let stored_token = db::get_refresh_token_by_jti(&context.db, refresh_claims.tenant_id, &refresh_claims.jti).await?;
     let token_hash = auth::get_token_hash_as_hex(refresh_token); // verify token hash
     if stored_token.token_hash != token_hash {
         return Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid));
@@ -253,6 +254,7 @@ pub async fn google_auth_callback(
     // store refresh token in database if everthing went fine
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_token.claims.jti,
+        tenant_id: user.tenant_id,
         user_id: user.id,
         token_hash: auth::get_token_hash_as_hex(&refresh_token.value),
         expires_at: auth::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,

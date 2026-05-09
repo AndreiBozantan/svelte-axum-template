@@ -10,7 +10,7 @@ pub enum UserStatus {
     Onboarding,
     Active,
     Suspended,
-    Archieved, // Note: Matches your SQL typo 'archieved'
+    Archived,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
