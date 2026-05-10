@@ -9,7 +9,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-
     "start": "npm run dev"
   },
   "devDependencies": {
@@ -24,8 +23,9 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "7.2",
-    "@fortawesome/free-solid-svg-icons": "6.2",
-    "svelte-fa": "4.0"
+    "@fortawesome/free-solid-svg-icons": "7.2",
+    "svelte-fa": "4.0",
+    "svelte-spa-router": "5.1"
   },
   "overrides": {
     "postcss": "^8.5.10"

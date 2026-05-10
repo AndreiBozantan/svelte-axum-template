@@ -4,7 +4,7 @@
     import { 
         faSignOutAlt, faCog, faIdCard, 
         faHome, faCheckCircle, faInfoCircle, faSignInAlt,
-        faUserShield, faUser
+        faUserShield, faUser, faFolderPlus
     } from '@fortawesome/free-solid-svg-icons';
 
     // Top navigation items (always visible if permitted)
@@ -28,6 +28,8 @@
 
     // Bottom navigation items logic
     const handleMenuSelection = (id: string): void => {
+        const path = id === 'welcome' ? '/' : '/' + id;
+        history.pushState(null, '', path);
         appState.setActivePage(id);
     };
 
@@ -37,7 +39,8 @@
         setTimeout(() => {
             isConfirmAnimating = false;
             showLogoutConfirm = false;
-            handleMenuSelection('logout');
+            history.pushState(null, '', '/logout');
+            appState.setActivePage('logout');
         }, 150);
     }
 
@@ -48,6 +51,9 @@
             setTimeout(() => {
                 isConfirmAnimating = false;
             }, 150);
+        } else {
+            history.pushState(null, '', '/logout');
+            appState.setActivePage('logout');
         }
     }
 
@@ -111,15 +117,16 @@
         <ul>
             {#each topItems as item}
                 <li class:active={appState.activePage === item.id}>
-                    <button 
-                        onclick={() => handleMenuSelection(item.id)}
+                    <a 
+                        href={item.id === 'welcome' ? '/' : '/' + item.id}
+                        class="nav-link"
                         onmouseenter={() => showLogoutConfirm = false}
                     >
                         <span class="nav-icon">
                             <Fa icon={item.icon} />
                         </span>
                         <span class="tooltip">{item.label}</span>
-                    </button>
+                    </a>
                 </li>
             {/each}
         </ul>
@@ -128,27 +135,27 @@
     <div class="sidebar-footer">
         <div class="footer-content">
             <!-- Login Button (Visible when logged out) -->
-            <button 
+            <a 
+                href="/login"
                 class="footer-btn login" 
                 class:active={appState.activePage === 'login'}
                 hidden={appState.isLoggedIn}
-                onclick={() => handleMenuSelection('login')}
             >
                 <span class="footer-icon"><Fa icon={faSignInAlt} /></span>
                 <span class="tooltip">Login</span>
-            </button>
+            </a>
 
             <!-- Settings Button (Visible when logged in) -->
-            <button 
+            <a 
+                href="/settings"
                 class="footer-btn" 
                 class:active={appState.activePage === 'settings'}
                 hidden={!appState.isLoggedIn}
-                onclick={() => handleMenuSelection('settings')}
                 onmouseenter={() => showLogoutConfirm = false}
             >
                 <span class="footer-icon"><Fa icon={faCog} /></span>
                 <span class="tooltip">settings</span>
-            </button>
+            </a>
             
             <!-- Logout Wrapper (Visible when logged in) -->
             <div class="logout-wrapper" hidden={!appState.isLoggedIn}>
@@ -322,7 +329,7 @@
 
     .sidebar-nav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
 
-    .sidebar-nav button, .footer-btn {
+    .sidebar-nav .nav-link, .footer-btn {
         width: 100%;
         height: 48px;
         display: flex;
@@ -337,6 +344,7 @@
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
         box-sizing: border-box;
+        text-decoration: none;
     }
 
     .nav-icon, .footer-icon { 
@@ -346,12 +354,12 @@
         font-size: 20px; 
     }
 
-    .sidebar-nav li button:hover, .footer-btn:hover { 
+    .sidebar-nav li .nav-link:hover, .footer-btn:hover { 
         background-color: #eefdfd; 
         color: #0f172a; 
     }
 
-    .sidebar-nav li.active button, .footer-btn.active { 
+    .sidebar-nav li.active .nav-link, .footer-btn.active { 
         background-color: #eefdfd; 
         color: #059669; 
     }
@@ -458,7 +466,7 @@
     .confirm-action-btn:hover { background: #be123c; }
     .confirm-action-btn.animating { transform: scale(1.05); background: #be123c; }
 
-    button:hover .tooltip { 
+    a:hover .tooltip { 
         opacity: 1; 
         transform: translateY(-50%) scale(1); 
     }
