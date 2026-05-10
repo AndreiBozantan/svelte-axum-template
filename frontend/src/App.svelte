@@ -45,16 +45,19 @@
     $effect(() => {
         const active = pageMap[appState.activePage];
         
-        // If logged out and on a protected page, go to About
+        // If logged out and on a protected page, redirect to login
         if (active && !active.public && !appState.isLoggedIn) {
-            history.pushState(null, '', '/about');
-            appState.setActivePage('about');
+            appState.setIntendedPage(appState.activePage);
+            history.pushState(null, '', '/login');
+            appState.setActivePage('login');
         }
         
         // If just logged in and on Login page, go to Welcome
         if (appState.isLoggedIn && appState.activePage === 'login') {
-            history.pushState(null, '', '/');
-            appState.setActivePage('welcome');
+            const target = appState.intendedPage || 'welcome';
+            history.pushState(null, '', '/' + (target === 'welcome' ? '' : target));
+            appState.setActivePage(target);
+            appState.setIntendedPage(null);
         }
     });
 
