@@ -1,6 +1,6 @@
 <script lang="ts">
     import { appState } from "./AppState.svelte";
-    import Sidebar from "./component/Sidebar.svelte";
+    import Sidebar from "./components/Sidebar.svelte";
     import About from "./pages/About.svelte";
     import Welcome from "./pages/Welcome.svelte";
     import LogIn from "./pages/Login.svelte";
@@ -13,6 +13,22 @@
         // await new Promise((resolve) => setTimeout(resolve, 900));
 
         appState.stopLoading();
+
+        // Set initial page from URL
+        const path = window.location.pathname;
+        let initialPage = 'welcome';
+        if (path === '/') initialPage = 'welcome';
+        else if (path.startsWith('/')) initialPage = path.slice(1);
+        appState.setActivePage(initialPage);
+
+        // Listen to browser back/forward
+        window.addEventListener('popstate', () => {
+            const currentPath = window.location.pathname;
+            let page = 'welcome';
+            if (currentPath === '/') page = 'welcome';
+            else page = currentPath.slice(1);
+            appState.setActivePage(page);
+        });
     });
 
     // Simple mapping of string IDs to components
@@ -29,14 +45,19 @@
     $effect(() => {
         const active = pageMap[appState.activePage];
         
-        // If logged out and on a protected page, go to About
+        // If logged out and on a protected page, redirect to login
         if (active && !active.public && !appState.isLoggedIn) {
-            appState.setActivePage('about');
+            appState.setIntendedPage(appState.activePage);
+            history.pushState(null, '', '/login');
+            appState.setActivePage('login');
         }
         
         // If just logged in and on Login page, go to Welcome
         if (appState.isLoggedIn && appState.activePage === 'login') {
-            appState.setActivePage('welcome');
+            const target = appState.intendedPage || 'welcome';
+            history.pushState(null, '', '/' + (target === 'welcome' ? '' : target));
+            appState.setActivePage(target);
+            appState.setIntendedPage(null);
         }
     });
 

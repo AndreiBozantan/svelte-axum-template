@@ -8,6 +8,9 @@ class AppState {
     activePage = $state<string>('about'); // Default to 'about'
     setActivePage(id: string) { this.activePage = id; }
 
+    intendedPage = $state<string | null>(null);
+    setIntendedPage(page: string | null) { this.intendedPage = page; }
+
     user =  $state<string>('');
     userId = $state<number>(-1);
     isLoggedIn = $derived(this.user !== '' && this.user != null);

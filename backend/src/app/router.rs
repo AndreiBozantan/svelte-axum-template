@@ -17,7 +17,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
     // create auth routes with rate limiting for OAuth endpoints
     let auth_routes = Router::new()
         .route("/login", post(routes::auth::login)) // sets username in session and returns JWT
-        .route("/logout", get(routes::auth::logout)) // deletes username in session and revokes tokens
+        .route("/logout", post(routes::auth::logout)) // deletes username in session and revokes tokens
         .route("/user_info", get(routes::auth::user_info)) // check session status
         .route("/refresh", post(routes::auth::refresh_access_token)) // refresh access token
         .route("/refresh/revoke", post(routes::auth::revoke_refresh_token)) // revoke refresh token
