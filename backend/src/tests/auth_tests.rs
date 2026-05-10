@@ -257,7 +257,7 @@ async fn test_logout_success() {
 
     // logout
     let logout_response = server
-        .get("/api/auth/logout")
+        .post("/api/auth/logout")
         .add_cookie(cookie::Cookie::new("access_token", access_token.clone()))
         .await;
 
