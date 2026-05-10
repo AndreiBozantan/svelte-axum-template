@@ -29,7 +29,7 @@ pub async fn oauth_rate_limit_middleware(req: Request, next: Next) -> Result<Res
     // rate limit: 100 requests per minute per IP for auth endpoints
     // TODO: make this configurable
     const MAX_REQUESTS: u32 = 100;
-    const WINDOW_DURATION: Duration = Duration::from_secs(60);
+    const WINDOW_DURATION: Duration = Duration::from_mins(1);
 
     // this would be better stored in the app state, but for now using a simple approach
     // in production, use a proper rate limiting service like Redis

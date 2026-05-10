@@ -50,14 +50,10 @@ pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<core
         .connect_with(options)
         .await?;
     // enable WAL mode for better concurrency
-    sqlx::query("PRAGMA journal_mode = WAL")
-        .execute(&pool)
-        .await?;
+    sqlx::query("PRAGMA journal_mode = WAL").execute(&pool).await?;
     if db_config.store_temp_tables_in_memory {
         // store temporary tables in memory for better performance
-        sqlx::query("PRAGMA temp_store = MEMORY")
-            .execute(&pool)
-            .await?;
+        sqlx::query("PRAGMA temp_store = MEMORY").execute(&pool).await?;
     }
     Ok(pool)
 }
