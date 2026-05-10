@@ -1,18 +1,10 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
-    import { Fa } from 'svelte-fa';
-    import { 
-        faSignOutAlt, faCog, faIdCard, 
-        faHome, faCheckCircle, faInfoCircle, faSignInAlt,
-        faUserShield, faUser, faFolderPlus
-    } from '@fortawesome/free-solid-svg-icons';
+    import type { PageDefinition } from './AppPages.svelte';
+    import { Pages } from './AppPages.svelte';
+    import { AppState } from "./AppState.svelte";
 
-    // Top navigation items (always visible if permitted)
-    const topItems = $derived([
-        { id: 'welcome', label: "home", icon: faHome, visible: appState.isLoggedIn },
-        { id: 'secure', label: "secure api", icon: faCheckCircle, visible: appState.isLoggedIn },
-        { id: 'about', label: "about", icon: faInfoCircle, visible: true },
-    ].filter(i => i.visible));
+    import { Fa } from 'svelte-fa';
+    import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
 
     let showLogoutConfirm = $state(false);
     let isConfirmAnimating = $state(false);
@@ -20,18 +12,25 @@
     let popupElement = $state<HTMLElement | null>(null);
     let logoutButton = $state<HTMLElement | null>(null);
 
+    function getPagePath(id: string) {
+        return id === 'welcome' ? '/' : `/${id}`;
+    }
+
+    function topItems() : PageDefinition[] {
+        return Pages.filter((item) => item.navPosition === 'top' && item.visible());
+    }
+
+    function footerLinks(): PageDefinition[] {
+        return Pages.filter(
+            (item) => item.navPosition === 'footer' && item.visible() && item.id !== 'logout'
+        );
+    }
+
     function pickRandomHover() {
         // Pick a random number between 1 and 5, ensuring it's different from the last one if possible
         const next = Math.floor(Math.random() * 5) + 1;
         logoHoverType = next === logoHoverType ? (next % 5) + 1 : next;
     }
-
-    // Bottom navigation items logic
-    const handleMenuSelection = (id: string): void => {
-        const path = id === 'welcome' ? '/' : '/' + id;
-        history.pushState(null, '', path);
-        appState.setActivePage(id);
-    };
 
     function confirmLogout() {
         isConfirmAnimating = true;
@@ -40,7 +39,7 @@
             isConfirmAnimating = false;
             showLogoutConfirm = false;
             history.pushState(null, '', '/logout');
-            appState.setActivePage('logout');
+            AppState.setActivePage('logout');
         }, 150);
     }
 
@@ -53,7 +52,7 @@
             }, 150);
         } else {
             history.pushState(null, '', '/logout');
-            appState.setActivePage('logout');
+            AppState.setActivePage('logout');
         }
     }
 
@@ -101,7 +100,7 @@
         >
             <div 
                 class="logo-icon-box" 
-                class:loading={appState.isLoading}
+                class:loading={AppState.isLoading}
                 class:hover-v1={logoHoverType === 1}
                 class:hover-v2={logoHoverType === 2}
                 class:hover-v3={logoHoverType === 3}
@@ -115,10 +114,10 @@
 
     <nav class="sidebar-nav">
         <ul>
-            {#each topItems as item}
-                <li class:active={appState.activePage === item.id}>
+            {#each topItems() as item}
+                <li class:active={AppState.activePage === item.id}>
                     <a 
-                        href={item.id === 'welcome' ? '/' : '/' + item.id}
+                        href={getPagePath(item.id)}
                         class="nav-link"
                         onmouseenter={() => showLogoutConfirm = false}
                     >
@@ -134,31 +133,20 @@
 
     <div class="sidebar-footer">
         <div class="footer-content">
-            <!-- Login Button (Visible when logged out) -->
-            <a 
-                href="/login"
-                class="footer-btn login" 
-                class:active={appState.activePage === 'login'}
-                hidden={appState.isLoggedIn}
-            >
-                <span class="footer-icon"><Fa icon={faSignInAlt} /></span>
-                <span class="tooltip">Login</span>
-            </a>
-
-            <!-- Settings Button (Visible when logged in) -->
-            <a 
-                href="/settings"
-                class="footer-btn" 
-                class:active={appState.activePage === 'settings'}
-                hidden={!appState.isLoggedIn}
-                onmouseenter={() => showLogoutConfirm = false}
-            >
-                <span class="footer-icon"><Fa icon={faCog} /></span>
-                <span class="tooltip">settings</span>
-            </a>
+            {#each footerLinks() as item}
+                <a 
+                    href={getPagePath(item.id)}
+                    class="footer-btn"
+                    class:active={AppState.activePage === item.id}
+                    onmouseenter={() => showLogoutConfirm = false}
+                >
+                    <span class="footer-icon"><Fa icon={item.icon} /></span>
+                    <span class="tooltip">{item.label}</span>
+                </a>
+            {/each}
             
             <!-- Logout Wrapper (Visible when logged in) -->
-            <div class="logout-wrapper" hidden={!appState.isLoggedIn}>
+            <div class="logout-wrapper" hidden={!AppState.isLoggedIn}>
                 <button 
                     bind:this={logoutButton}
                     class="footer-btn logout" 
@@ -177,10 +165,10 @@
                     hidden={!showLogoutConfirm}
                 >
                     <div class="popup-user-header">
-                        <span class="role-icon" class:admin={appState.isAdmin}>
-                            <Fa icon={appState.isAdmin ? faUserShield : faUser} />
+                        <span class="role-icon" class:admin={AppState.isAdmin}>
+                            <Fa icon={AppState.isAdmin ? faUserShield : faUser} />
                         </span>
-                        <span class="confirm-user-email">{appState.user}</span>
+                        <span class="confirm-user-email">{AppState.user}</span>
                     </div>
                     <button 
                         class="confirm-action-btn" 

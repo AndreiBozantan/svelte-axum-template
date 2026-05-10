@@ -1,6 +1,6 @@
 import type { AuthResponse } from './lib/types';
 
-class AppState {
+class AppStateDef {
     isLoading = $state<boolean>(true);
     startLoading() { this.isLoading = true; }
     stopLoading() { this.isLoading = false; }
@@ -34,4 +34,4 @@ class AppState {
     }
 }
 
-export const appState = new AppState();
+export const AppState = new AppStateDef();

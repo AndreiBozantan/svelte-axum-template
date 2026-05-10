@@ -1,25 +1,23 @@
 <script lang="ts">
-    import { appState } from "./AppState.svelte";
-    import Sidebar from "./components/Sidebar.svelte";
-    import About from "./pages/About.svelte";
-    import Welcome from "./pages/Welcome.svelte";
-    import LogIn from "./pages/Login.svelte";
-    import LogOut from "./pages/Logout.svelte";
-    import SecureApi from "./pages/SecureApi.svelte";
-    import Settings from "./pages/Settings.svelte";
     import { onMount } from "svelte";
+    import { AppState } from "./AppState.svelte";
+    import { Pages } from "./AppPages.svelte";
+    import AppSidebar from "./AppSidebar.svelte";
+
+    const pageMap = Object.fromEntries(Pages.map((item) => [item.id, item]));
+    const getActivePage = () => pageMap[AppState.activePage];
 
     onMount(async () => {
         // await new Promise((resolve) => setTimeout(resolve, 900));
 
-        appState.stopLoading();
+        AppState.stopLoading();
 
         // Set initial page from URL
         const path = window.location.pathname;
         let initialPage = 'welcome';
         if (path === '/') initialPage = 'welcome';
         else if (path.startsWith('/')) initialPage = path.slice(1);
-        appState.setActivePage(initialPage);
+        AppState.setActivePage(initialPage);
 
         // Listen to browser back/forward
         window.addEventListener('popstate', () => {
@@ -27,52 +25,43 @@
             let page = 'welcome';
             if (currentPath === '/') page = 'welcome';
             else page = currentPath.slice(1);
-            appState.setActivePage(page);
+            AppState.setActivePage(page);
         });
     });
 
-    // Simple mapping of string IDs to components
-    const pageMap: Record<string, any> = {
-        'welcome': { component: Welcome, public: false },
-        'secure': { component: SecureApi, public: false },
-        'about': { component: About, public: true },
-        'settings': { component: Settings, public: false },
-        'login': { component: LogIn, public: true },
-        'logout': { component: LogOut, public: false },
-    };
 
     // Auto-redirect logic
     $effect(() => {
-        const active = pageMap[appState.activePage];
+        const active = getActivePage();
         
         // If logged out and on a protected page, redirect to login
-        if (active && !active.public && !appState.isLoggedIn) {
-            appState.setIntendedPage(appState.activePage);
+        if (active && !active.public && !AppState.isLoggedIn) {
+            AppState.setIntendedPage(AppState.activePage);
             history.pushState(null, '', '/login');
-            appState.setActivePage('login');
+            AppState.setActivePage('login');
         }
         
         // If just logged in and on Login page, go to Welcome
-        if (appState.isLoggedIn && appState.activePage === 'login') {
-            const target = appState.intendedPage || 'welcome';
+        if (AppState.isLoggedIn && AppState.activePage === 'login') {
+            const target = AppState.intendedPage || 'welcome';
             history.pushState(null, '', '/' + (target === 'welcome' ? '' : target));
-            appState.setActivePage(target);
-            appState.setIntendedPage(null);
+            AppState.setActivePage(target);
+            AppState.setIntendedPage(null);
         }
     });
 
-    const CurrentPage = $derived(pageMap[appState.activePage]);
+    const CurrentPage = $derived(getActivePage());
 </script>
 
 <div class="app-layout">
-    <Sidebar />
+    <AppSidebar />
 
     <main class="content">
         {#if CurrentPage}
             <CurrentPage.component />
         {:else}
             <div class="page">
-                <h2>Page Not Found (ID: {appState.activePage})</h2>
+                <h2>Page Not Found (ID: {AppState.activePage})</h2>
             </div>
         {/if}
     </main>

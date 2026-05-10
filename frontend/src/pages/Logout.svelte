@@ -1,18 +1,18 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
+    import { AppState } from "../AppState.svelte";
     import { api } from "../lib/api";
     import { onMount } from "svelte";
 
     onMount(async () => {
         const res = await api.logout();
-        appState.setAuth(res);
+        AppState.setAuth(res);
     });
 </script>
 
 <div>
     <div class="logout-container">
-        {#if appState.isLoggedIn}
-            You are still logged in as {appState.user}.
+        {#if AppState.isLoggedIn}
+            You are still logged in as {AppState.user}.
         {:else}
             You are now logged out.
         {/if}

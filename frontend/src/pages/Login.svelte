@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
+    import { AppState } from "../AppState.svelte";
     import { api } from "../lib/api";
     import { onMount, tick } from "svelte";
 
@@ -10,7 +10,7 @@
     let emailInput: HTMLInputElement | undefined = $state();
 
     onMount(async () => {
-        if (!appState.isLoggedIn) {
+        if (!AppState.isLoggedIn) {
             await tick();
             emailInput?.focus();
         }
@@ -24,9 +24,9 @@
             const loginResponse = await api.login(email, password);
             if (loginResponse.result === "error") {
                 errorMessage = loginResponse.message || "Invalid credentials";
-                appState.setAuth(loginResponse);
+                AppState.setAuth(loginResponse);
             } else {
-                appState.setAuth(loginResponse);
+                AppState.setAuth(loginResponse);
             }
         } catch (error) {
             errorMessage = "An unexpected error occurred. Please try again.";
