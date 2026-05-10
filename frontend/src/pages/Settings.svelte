@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
+    import { AppState } from "../AppState.svelte";
     
     // Dummy state for new settings
     let darkMode = $state(false);

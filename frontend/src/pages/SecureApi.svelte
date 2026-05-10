@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
+    import { AppState } from "../AppState.svelte";
     import { api } from "../lib/api";
 
     let response = $state("");
 
     async function handleApiCheck(): Promise<void> {
-        appState.startLoading();
+        AppState.startLoading();
         response = "";
         try {
             const data = await api.getTest();
@@ -13,7 +13,7 @@
         } catch (e) {
             response = `Error: ${e}`;
         } finally {
-            appState.stopLoading();
+            AppState.stopLoading();
         }
     }
 </script>
@@ -30,8 +30,8 @@
         <div class="content-group">
             <div class="group-body">
                 <div class="item-block">
-                    <button class="btn-primary" onclick={handleApiCheck} disabled={appState.isLoading}>
-                        {appState.isLoading ? "Calling API..." : "Call Protected /api"}
+                    <button class="btn-primary" onclick={handleApiCheck} disabled={AppState.isLoading}>
+                        {AppState.isLoading ? "Calling API..." : "Call Protected /api"}
                     </button>
 
                     {#if response}

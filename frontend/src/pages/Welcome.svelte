@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { appState } from "../AppState.svelte";
+    import { AppState } from "../AppState.svelte";
 </script>
 
 <div class="page">
@@ -7,7 +7,7 @@
         <!-- Page Header Group -->
         <div class="page-header-block">
             <h1 class="page-main-header">welcome</h1>
-            <p class="header-desc">You are successfully logged in as <strong>{appState.user}</strong>.</p>
+            <p class="header-desc">You are successfully logged in as <strong>{AppState.user}</strong>.</p>
         </div>
 
         <!-- Main Content Group -->

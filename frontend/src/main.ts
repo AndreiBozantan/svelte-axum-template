@@ -1,8 +1,10 @@
 import './app.css'
-import App from './App.svelte'
+
 import { mount } from 'svelte'
-import { appState } from './AppState.svelte'
 import { api } from './lib/api'
+import { AppState } from './AppState.svelte'
+
+import App from './App.svelte'
 
 async function bootstrap() {
     try {
@@ -16,7 +18,7 @@ async function bootstrap() {
             ? initialUserInfo 
             : await api.getUserInfo();
         
-        appState.setAuth(userInfo);
+        AppState.setAuth(userInfo);
     } catch (error) {
         console.error("Bootstrap failed:", error);
     }
