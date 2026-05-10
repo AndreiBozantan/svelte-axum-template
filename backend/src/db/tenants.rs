@@ -9,7 +9,7 @@ use crate::core::{DbContext, DbError};
 pub enum TenantStatus {
     Active,
     Suspended,
-    Archived, 
+    Archived,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

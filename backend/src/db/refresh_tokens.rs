@@ -57,7 +57,7 @@ pub async fn revoke_refresh_token(db: &DbContext, jti: &str) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn get_refresh_token_by_jti(db: &DbContext,tenant_id: i64, jti: &str) -> Result<RefreshToken, DbError> {
+pub async fn get_refresh_token_by_jti(db: &DbContext, tenant_id: i64, jti: &str) -> Result<RefreshToken, DbError> {
     let token = sqlx::query_as!(
         RefreshToken,
         r#"
@@ -80,7 +80,11 @@ pub async fn get_refresh_token_by_jti(db: &DbContext,tenant_id: i64, jti: &str) 
     Ok(token)
 }
 
-pub async fn revoke_all_refresh_tokens_for_user(db: &DbContext, tenant_id: i64, user_id: i64) -> Result<SqliteQueryResult, DbError> {
+pub async fn revoke_all_refresh_tokens_for_user(
+    db: &DbContext,
+    tenant_id: i64,
+    user_id: i64,
+) -> Result<SqliteQueryResult, DbError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"

@@ -1,7 +1,10 @@
 use axum::Router;
 use axum::body::Body;
+use axum::extract::FromRequestParts;
 use axum::extract::State;
 use axum::http::Request;
+use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::Response;
 use axum::routing::get;
 use axum::routing::post;
@@ -55,19 +58,43 @@ pub fn create_router(context: core::ArcContext) -> Router {
         .fallback(routes::assets::static_handler) // serve static assets
         .with_state(context)
         .layer(TraceLayer::new_for_http()) // add http request tracing for all routes
-    }
+}
+
 async fn auth_middleware(
     State(context): State<core::ArcContext>,
-    req: Request<Body>,
+    mut req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Result<Response, auth::AuthError> {
     let claims =
         auth::decode_token_from_req(&context, &req, auth::TokenType::Access).map_err(auth::log_auth_rejection)?;
+
     tracing::debug!(
         user_id = claims.sub,
         email = claims.email,
         tenant_id = ?claims.tenant_id,
         "Authenticated user accessing API"
     );
+
+    req.extensions_mut().insert(claims);
     Ok(next.run(req).await)
+}
+
+// axum extractor — works only on routes behind auth_middleware
+impl<S> FromRequestParts<S> for auth::TokenClaims
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, axum::Json<serde_json::Value>);
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts.extensions.get().cloned().ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                axum::Json(serde_json::json!({
+                    "result": "error",
+                    "message": "missing auth claims"
+                })),
+            )
+        })
+    }
 }

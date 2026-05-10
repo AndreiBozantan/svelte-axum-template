@@ -96,7 +96,7 @@ pub fn create_migration(name: &str) -> Result<String, MigrationError> {
 
     // Generate date and time for the file content
     let timestamp = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    
+
     // Construct filename and path
     let normalized_name = name.replace(' ', "_").to_lowercase();
     let filename = format!("{version_string}_{normalized_name}.sql");

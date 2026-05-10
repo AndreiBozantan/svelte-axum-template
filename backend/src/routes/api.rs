@@ -10,5 +10,5 @@ pub async fn test_handler(State(_context): State<core::ArcContext>) -> impl Into
     std::thread::sleep(std::time::Duration::from_millis(1200));
     tracing::info!("Seeking api data");
     let time = chrono::Utc::now().to_rfc3339();
-    Json(json!({"result": "ok", "message": format!("You've reached the backend API by using a valid token at {time}.")}))
+    Json(json!({"result": "ok", "message": format!("Successful API request at {time}.")}))
 }

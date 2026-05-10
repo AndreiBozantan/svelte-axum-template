@@ -84,7 +84,7 @@ pub enum TokenType {
     Refresh,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TokenClaims {
     pub sub: String,           // Subject (user ID)
     pub tenant_id: i64,        // Tenant ID if applicable
