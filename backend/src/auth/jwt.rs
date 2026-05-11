@@ -95,6 +95,12 @@ pub struct TokenClaims {
     pub token_type: TokenType, // "access" or "refresh"
 }
 
+impl TokenClaims {
+    pub fn user_id(&self) -> Result<i64, JwtError> {
+        self.sub.parse::<i64>().map_err(|_| JwtError::InvalidToken)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TokenWithClaims {
     pub value: String,
