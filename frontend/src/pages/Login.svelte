@@ -36,7 +36,7 @@
     }
 
     function handleGoogleLogin() {
-        const redirectUrl = encodeURIComponent(window.location.origin);
+        const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
         window.location.href = `/api/auth/oauth/google?redirect_url=${redirectUrl}`;
     }
 </script>

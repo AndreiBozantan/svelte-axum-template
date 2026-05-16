@@ -150,7 +150,7 @@ pub fn get_google_auth_url_and_csrf_token(
 ) -> Result<(Url, String), SsoError> {
     // validate redirect URL if provided
     if let Some(url) = &redirect_url {
-        validate_redirect_url(url, &context.settings.oauth)?;
+        validate_redirect_path(url)?;
     }
 
     // generate CSRF token and create OAuth session
@@ -272,42 +272,14 @@ pub async fn get_google_user_info(
     Ok((user_info, token_data.claims.redirect_url))
 }
 
-/// Validate a redirect URL to prevent open redirect attacks.
+/// Validate a redirect path to prevent open redirect attacks.
+/// This allows only relative paths within the same domain.
+/// Disallows any absolute URLs or protocol-relative URLs.
 /// Validation happens at JWT-creation time so the signed token acts as a
 /// tamper-evident record - no re-validation is needed at callback time.
-fn validate_redirect_url(url: &str, config: &cfg::OAuthSettings) -> Result<(), SsoError> {
-    let parsed_url: Url = url.parse().map_err(|_| SsoError::InvalidRedirectUrl)?;
-
-    // explicit scheme allowlist instead of implicit denylist - rejects
-    // javascript:, data:, ftp: and any other unexpected schemes up front
-    let scheme = parsed_url.scheme();
-    if scheme != "https" && scheme != "http" {
-        auth::log_redirect_violation("invalid_scheme", url);
+fn validate_redirect_path(p: &str) -> Result<(), SsoError> {
+    if !p.starts_with('/') || p.starts_with("//") || p.contains("://") {
         return Err(SsoError::InvalidRedirectUrl);
     }
-
-    // check against allowed domains from configuration
-    match parsed_url.host_str() {
-        None => return Err(SsoError::InvalidRedirectUrl),
-        Some(host) => {
-            let is_allowed = config
-                .allowed_redirect_domains
-                .iter()
-                .any(|allowed| host == allowed || host.ends_with(&format!(".{allowed}")));
-
-            if !is_allowed {
-                auth::log_redirect_violation("unauthorized_host", host);
-                return Err(SsoError::InvalidRedirectUrl);
-            }
-
-            // exact localhost check, avoid matching attacker-controlled hosts like `notlocalhost.evil.com`
-            let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
-            if scheme != "https" && !is_localhost {
-                auth::log_redirect_violation("non_https_redirect", url);
-                return Err(SsoError::InvalidRedirectUrl);
-            }
-        }
-    }
-
     Ok(())
 }
