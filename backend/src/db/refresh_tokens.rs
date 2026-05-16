@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use sqlx::sqlite::SqliteQueryResult;
 
-use crate::common::{DbContext, DbError};
+use crate::db::{SqlContext, SqlError};
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct RefreshToken {
@@ -26,7 +26,7 @@ pub struct NewRefreshToken {
     pub expires_at: NaiveDateTime,
 }
 
-pub async fn create_refresh_token(db: &DbContext, new_refresh_token: NewRefreshToken) -> Result<(), DbError> {
+pub async fn create_refresh_token(db: &SqlContext, new_refresh_token: NewRefreshToken) -> Result<(), SqlError> {
     sqlx::query!(
         r#"
         INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
@@ -43,7 +43,7 @@ pub async fn create_refresh_token(db: &DbContext, new_refresh_token: NewRefreshT
     Ok(())
 }
 
-pub async fn revoke_refresh_token(db: &DbContext, jti: &str) -> Result<(), DbError> {
+pub async fn revoke_refresh_token(db: &SqlContext, jti: &str) -> Result<(), SqlError> {
     sqlx::query!(
         r#"
         UPDATE refresh_tokens
@@ -57,7 +57,7 @@ pub async fn revoke_refresh_token(db: &DbContext, jti: &str) -> Result<(), DbErr
     Ok(())
 }
 
-pub async fn get_refresh_token_by_jti(db: &DbContext, tenant_id: i64, jti: &str) -> Result<RefreshToken, DbError> {
+pub async fn get_refresh_token_by_jti(db: &SqlContext, tenant_id: i64, jti: &str) -> Result<RefreshToken, SqlError> {
     let token = sqlx::query_as!(
         RefreshToken,
         r#"
@@ -81,10 +81,10 @@ pub async fn get_refresh_token_by_jti(db: &DbContext, tenant_id: i64, jti: &str)
 }
 
 pub async fn revoke_all_refresh_tokens_for_user(
-    db: &DbContext,
+    db: &SqlContext,
     tenant_id: i64,
     user_id: i64,
-) -> Result<SqliteQueryResult, DbError> {
+) -> Result<SqliteQueryResult, SqlError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"
@@ -103,7 +103,7 @@ pub async fn revoke_all_refresh_tokens_for_user(
 
 /// Cleanup expired refresh tokens
 /// TODO: add a way to use this (e.g. command in CLI and scheduled task in server or a background task)
-async fn _cleanup_expired(db: &DbContext) -> Result<SqliteQueryResult, DbError> {
+async fn _cleanup_expired(db: &SqlContext) -> Result<SqliteQueryResult, SqlError> {
     let now = Utc::now().naive_utc();
     let result = sqlx::query!(
         r#"

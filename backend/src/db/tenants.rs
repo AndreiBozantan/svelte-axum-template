@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{self, FromRow, Type};
 
-use crate::common::{DbContext, DbError};
+use crate::db::{SqlContext, SqlError};
 
 #[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
@@ -29,7 +29,7 @@ pub struct NewTenant {
     pub description: Option<String>,
 }
 
-pub async fn get_tenant_by_id(db: &DbContext, id: i64) -> Result<Tenant, DbError> {
+pub async fn get_tenant_by_id(db: &SqlContext, id: i64) -> Result<Tenant, SqlError> {
     let tenant = sqlx::query_as!(
         Tenant,
         r#"

@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{self, FromRow, Type};
 
-use crate::common::{DbContext, DbError};
+use crate::db::{SqlContext, SqlError};
 
 #[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
@@ -36,7 +36,7 @@ pub struct NewUser {
     pub sso_id: Option<String>,
 }
 
-pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbError> {
+pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -65,7 +65,7 @@ pub async fn create_user(db: &DbContext, new_user: NewUser) -> Result<User, DbEr
     Ok(user)
 }
 
-pub async fn get_user_by_id(db: &DbContext, id: i64) -> Result<User, DbError> {
+pub async fn get_user_by_id(db: &SqlContext, id: i64) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -89,7 +89,7 @@ pub async fn get_user_by_id(db: &DbContext, id: i64) -> Result<User, DbError> {
     Ok(user)
 }
 
-pub async fn get_user_by_email(db: &DbContext, email: &str) -> Result<User, DbError> {
+pub async fn get_user_by_email(db: &SqlContext, email: &str) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -113,7 +113,7 @@ pub async fn get_user_by_email(db: &DbContext, email: &str) -> Result<User, DbEr
     Ok(user)
 }
 
-pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str) -> Result<User, DbError> {
+pub async fn get_user_by_sso_id(db: &SqlContext, sso_provider: &str, sso_id: &str) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
         r#"
@@ -139,12 +139,12 @@ pub async fn get_user_by_sso_id(db: &DbContext, sso_provider: &str, sso_id: &str
 }
 
 pub async fn create_or_link_sso_user(
-    db: &DbContext,
+    db: &SqlContext,
     email: &str,
     tenant_id: i64,
     sso_provider: &str,
     sso_id: &str,
-) -> Result<User, DbError> {
+) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
         r#"

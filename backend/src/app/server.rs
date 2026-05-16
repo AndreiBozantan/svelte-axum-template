@@ -10,6 +10,7 @@ use crate::app;
 use crate::auth;
 use crate::cfg;
 use crate::common;
+use crate::db;
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -18,7 +19,7 @@ pub enum AppError {
     ConfigLoadingFailed(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] common::DbError),
+    DatabaseOperationFailed(#[from] db::SqlError),
 
     #[error("JWT error: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -39,7 +40,7 @@ pub enum AppError {
     HttpClientCreationFailed(#[from] reqwest::Error),
 }
 
-pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<common::DbContext, common::DbError> {
+pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<db::SqlContext, db::SqlError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
