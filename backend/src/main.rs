@@ -56,8 +56,8 @@ pub mod db {
     pub use tenants::*;
     pub use users::*;
 
-    pub type DbContext = sqlx::SqlitePool;
-    pub type DbError = sqlx::Error;
+    pub type SqlContext = sqlx::SqlitePool;
+    pub type SqlError = sqlx::Error;
 }
 
 pub mod routes {

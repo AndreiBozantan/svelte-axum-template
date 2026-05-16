@@ -6,7 +6,7 @@ pub type ArcContext = std::sync::Arc<Context>;
 
 #[derive(Clone)]
 pub struct Context {
-    pub db: db::DbContext,
+    pub db: db::SqlContext,
     pub jwt: auth::JwtContext,
     pub settings: cfg::AppSettings,
     pub http_client: reqwest::Client,
@@ -15,7 +15,7 @@ pub struct Context {
 impl Context {
     #[must_use]
     pub fn new(
-        db: db::DbContext,
+        db: db::SqlContext,
         jwt: auth::JwtContext,
         http_client: reqwest::Client,
         settings: cfg::AppSettings,

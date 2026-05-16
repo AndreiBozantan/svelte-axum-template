@@ -16,7 +16,7 @@ pub enum AuthError {
     RequestHeaderOperationFailed(#[from] axum::http::header::InvalidHeaderValue),
 
     #[error("Database operation failed: {0}")]
-    DatabaseOperationFailed(db::DbError),
+    DatabaseOperationFailed(db::SqlError),
 
     #[error("JWT operation failed: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -34,10 +34,10 @@ pub enum AuthError {
     SsoOperationFailed(#[from] auth::SsoError),
 }
 
-impl From<db::DbError> for AuthError {
-    fn from(db_error: db::DbError) -> Self {
+impl From<db::SqlError> for AuthError {
+    fn from(db_error: db::SqlError) -> Self {
         match db_error {
-            db::DbError::RowNotFound => Self::InvalidCredentials,
+            db::SqlError::RowNotFound => Self::InvalidCredentials,
             other => Self::DatabaseOperationFailed(other),
         }
     }

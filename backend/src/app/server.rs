@@ -19,7 +19,7 @@ pub enum AppError {
     ConfigLoadingFailed(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] db::DbError),
+    DatabaseOperationFailed(#[from] db::SqlError),
 
     #[error("JWT error: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -40,7 +40,7 @@ pub enum AppError {
     HttpClientCreationFailed(#[from] reqwest::Error),
 }
 
-pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<db::DbContext, db::DbError> {
+pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<db::SqlContext, db::SqlError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
