@@ -9,7 +9,7 @@ use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
 use crate::app;
-use crate::common::DbContext;
+use crate::db::DbContext;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]

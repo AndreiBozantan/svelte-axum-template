@@ -1,12 +1,12 @@
 use crate::auth;
 use crate::cfg;
-use crate::common;
+use crate::db;
 
 pub type ArcContext = std::sync::Arc<Context>;
 
 #[derive(Clone)]
 pub struct Context {
-    pub db: common::DbContext,
+    pub db: db::DbContext,
     pub jwt: auth::JwtContext,
     pub settings: cfg::AppSettings,
     pub http_client: reqwest::Client,
@@ -15,7 +15,7 @@ pub struct Context {
 impl Context {
     #[must_use]
     pub fn new(
-        db: common::DbContext,
+        db: db::DbContext,
         jwt: auth::JwtContext,
         http_client: reqwest::Client,
         settings: cfg::AppSettings,

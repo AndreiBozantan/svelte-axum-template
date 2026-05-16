@@ -27,10 +27,8 @@ pub mod cfg {
 
 pub mod common {
     mod context;
-    mod dbtypes;
 
     pub use context::*;
-    pub use dbtypes::*;
 }
 
 pub mod auth {
@@ -57,6 +55,9 @@ pub mod db {
     pub use refresh_tokens::*;
     pub use tenants::*;
     pub use users::*;
+
+    pub type DbContext = sqlx::SqlitePool;
+    pub type DbError = sqlx::Error;
 }
 
 pub mod routes {
