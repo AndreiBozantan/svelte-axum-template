@@ -5,7 +5,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::auth;
-use crate::core;
+use crate::common;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -16,7 +16,7 @@ pub enum AuthError {
     RequestHeaderOperationFailed(#[from] axum::http::header::InvalidHeaderValue),
 
     #[error("Database operation failed: {0}")]
-    DatabaseOperationFailed(core::DbError),
+    DatabaseOperationFailed(common::DbError),
 
     #[error("JWT operation failed: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -34,10 +34,10 @@ pub enum AuthError {
     SsoOperationFailed(#[from] auth::SsoError),
 }
 
-impl From<core::DbError> for AuthError {
-    fn from(db_error: core::DbError) -> Self {
+impl From<common::DbError> for AuthError {
+    fn from(db_error: common::DbError) -> Self {
         match db_error {
-            core::DbError::RowNotFound => Self::InvalidCredentials,
+            common::DbError::RowNotFound => Self::InvalidCredentials,
             other => Self::DatabaseOperationFailed(other),
         }
     }

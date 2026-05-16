@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::auth;
 use crate::cfg;
-use crate::core;
+use crate::common;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -145,7 +145,7 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
 }
 
 pub fn get_google_auth_url_and_csrf_token(
-    context: &core::ArcContext,
+    context: &common::ArcContext,
     redirect_url: Option<String>,
 ) -> Result<(Url, String), SsoError> {
     // validate redirect URL if provided
@@ -181,7 +181,7 @@ pub fn get_google_auth_url_and_csrf_token(
 }
 
 pub async fn get_google_user_info(
-    context: &core::ArcContext,
+    context: &common::ArcContext,
     headers: &axum::http::HeaderMap,
     code: &str,
     state: &str,

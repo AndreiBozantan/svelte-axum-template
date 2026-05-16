@@ -11,7 +11,7 @@ use serde_json::json;
 use crate::app;
 use crate::auth;
 use crate::cfg;
-use crate::core;
+use crate::common;
 use crate::db;
 
 const TEST_USER_EMAIL: &str = "test@example.com";
@@ -27,7 +27,7 @@ fn default_config() -> cfg::AppSettings {
     }
 }
 
-async fn create_test_context(config: cfg::AppSettings) -> core::ArcContext {
+async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
     // use a temporary in-memory SQLite database for testing
     let db_config = cfg::DatabaseSettings {
         url: "sqlite::memory:".to_string(),
@@ -45,7 +45,7 @@ async fn create_test_context(config: cfg::AppSettings) -> core::ArcContext {
         .build()
         .expect("Failed to create HTTP client");
 
-    core::Context::new(db, jwt, http_client, config)
+    common::Context::new(db, jwt, http_client, config)
 }
 
 async fn create_test_server(config: cfg::AppSettings) -> TestServer {

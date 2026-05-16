@@ -8,7 +8,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::auth::{self, AuthError};
-use crate::core;
+use crate::common;
 use crate::db;
 
 /// Default tenant ID assigned to users created via SSO.
@@ -22,7 +22,7 @@ pub struct Login {
 
 /// Handler for logging in using email and password credentials
 pub async fn login(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     headers: HeaderMap,
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
@@ -72,7 +72,7 @@ pub async fn login(
 
 /// Handler for logging out
 pub async fn logout(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     try_revoke_refresh_token(&context, req).await?;
@@ -81,7 +81,7 @@ pub async fn logout(
     Ok(r)
 }
 
-async fn try_revoke_refresh_token(context: &core::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
+async fn try_revoke_refresh_token(context: &common::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
     let claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
     db::revoke_refresh_token(&context.db, &claims.jti).await?;
@@ -91,7 +91,7 @@ async fn try_revoke_refresh_token(context: &core::ArcContext, req: Request<Body>
 
 /// Handler for refreshing tokens
 pub async fn refresh(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     // attempt to extract and decode the refresh_token from the Cookie header
@@ -154,7 +154,7 @@ pub async fn refresh(
 
 /// Handler for checking user info based on access token
 pub async fn user_info(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
@@ -179,7 +179,7 @@ pub async fn user_info(
 
 /// Handler for initiating Google OAuth flow
 pub async fn google_auth_init(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, AuthError> {
@@ -204,7 +204,7 @@ pub async fn google_auth_init(
 
 /// Handler for Google OAuth callback
 pub async fn google_auth_callback(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<auth::AuthRequest>,
 ) -> Result<impl IntoResponse, AuthError> {
@@ -269,7 +269,7 @@ pub async fn google_auth_callback(
     Ok(response)
 }
 
-fn generate_refresh_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+fn generate_refresh_token(context: &common::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
     Ok(auth::generate_token(
         &context.jwt,
         user.id,
@@ -280,7 +280,7 @@ fn generate_refresh_token(context: &core::ArcContext, user: &db::User) -> Result
     )?)
 }
 
-fn generate_access_token(context: &core::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
+fn generate_access_token(context: &common::ArcContext, user: &db::User) -> Result<auth::TokenWithClaims, AuthError> {
     Ok(auth::generate_token(
         &context.jwt,
         user.id,

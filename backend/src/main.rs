@@ -25,7 +25,7 @@ pub mod cfg {
     pub use server_settings::*;
 }
 
-pub mod core {
+pub mod common {
     mod context;
     mod dbtypes;
 

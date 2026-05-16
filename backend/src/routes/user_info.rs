@@ -6,11 +6,11 @@ use axum::response::Response;
 use serde_json::json;
 
 use crate::auth;
-use crate::core;
+use crate::common;
 
 /// Handler for providing the initial user info for the frontend as a JS script
 pub async fn user_info_handler(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     req: Request<Body>,
 ) -> Result<Response, StatusCode> {
     let state = match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
