@@ -17,14 +17,14 @@ use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: common::ArcContext) -> Router {
-    // create auth routes 
+    // create auth routes
     let auth = Router::new()
         .route("/login", post(routes::auth::login))
         .route("/logout", post(routes::auth::logout))
         .route("/user_info", get(routes::auth::user_info))
         .route("/refresh", post(routes::auth::refresh));
 
-    // create oauth routes with rate limiting 
+    // create oauth routes with rate limiting
     let oauth = Router::new()
         .route("/google", get(routes::auth::google_auth_init))
         .route("/google/callback", get(routes::auth::google_auth_callback))
@@ -36,8 +36,7 @@ pub fn create_router(context: common::ArcContext) -> Router {
         .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
 
     // public API routes
-    let public = Router::new()
-        .route("/health", get(routes::health::health_check));
+    let public = Router::new().route("/health", get(routes::health::health_check));
 
     let api = Router::new()
         .nest("/auth", auth)

@@ -5,7 +5,6 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::auth;
-use crate::common;
 use crate::db;
 
 #[derive(Debug, Error)]
