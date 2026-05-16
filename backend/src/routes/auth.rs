@@ -173,10 +173,7 @@ pub async fn user_info(
                 }
             })))
         }
-        Err(_) => Ok(Json(json!({
-            "result": "error",
-            "message": "Not authenticated"
-        }))),
+        Err(_) => Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid))
     }
 }
 
