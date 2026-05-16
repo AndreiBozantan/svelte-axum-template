@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_sso_provider_id ON users(sso_provider, sso_id);
+CREATE UNIQUE INDEX users_email_case_insensitive ON users(LOWER(email));
 -- create a default tenant, for new users who sign up without specifying a tenant (e.g., via SSO) or 
 -- for system users that don't belong to any specific tenant
 INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)

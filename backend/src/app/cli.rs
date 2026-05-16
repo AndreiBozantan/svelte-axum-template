@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 
 use crate::app;
 use crate::auth;
+use crate::common;
 use crate::db;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
@@ -153,6 +154,7 @@ async fn create_admin(email: String, db: &db::SqlContext) -> Result<(), CliError
         .map_or(Ok(()), Err)?;
 
     // check if user already exists; if found, return an error
+    let email = common::normalize_email(&email);
     match db::get_user_by_email(db, &email).await {
         Err(db::SqlError::RowNotFound) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
