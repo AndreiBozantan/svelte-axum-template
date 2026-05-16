@@ -70,7 +70,7 @@ pub async fn get_refresh_token_by_jti(db: &DbContext, tenant_id: i64, jti: &str)
             expires_at "expires_at!",
             revoked_at
         FROM refresh_tokens
-        WHERE tenant_id = ? AND jti = ? AND revoked_at IS NULL
+        WHERE tenant_id = ? AND jti = ?
         "#,
         tenant_id,
         jti

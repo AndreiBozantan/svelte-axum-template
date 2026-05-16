@@ -13,7 +13,7 @@ impl Default for JwtSettings {
     fn default() -> Self {
         Self {
             access_token_expiry_minutes: 16,
-            refresh_token_expiry_days: 128,
+            refresh_token_expiry_days: 30,
         }
     }
 }

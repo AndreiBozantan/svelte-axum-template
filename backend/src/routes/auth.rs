@@ -75,43 +75,61 @@ pub async fn logout(
     State(context): State<core::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
-    // TODO: clarify what to do here in case of various errors.
-    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)?;
-    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
-
-    // revoke all the associated refresh tokens
-    let user_id = claims
-        .sub
-        .parse::<i64>()
-        .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
-    if let Ok(db_user) = db::get_user_by_id(&context.db, user_id).await {
-        let _ = db::revoke_all_refresh_tokens_for_user(&context.db, db_user.tenant_id, db_user.id).await;
-    }
-
-    // create cookies to clear the tokens
+    try_revoke_refresh_token(&context, req).await?;
     let json = json!({"result": "ok"});
     let r = auth::create_json_response_with_auth_cookies(&context, None, None, json)?;
     Ok(r)
 }
 
-/// Handler for refreshing access token using refresh token
-pub async fn refresh_access_token(
+async fn try_revoke_refresh_token(context: &core::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
+    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
+    let claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
+    db::revoke_refresh_token(&context.db, &claims.jti).await?;
+    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
+    Ok(())
+}
+
+/// Handler for refreshing tokens
+pub async fn refresh(
     State(context): State<core::ArcContext>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
-    // attempt to extract refresh_token from the Cookie header
+    // attempt to extract and decode the refresh_token from the Cookie header
     let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
-    // decode refresh token and check if it exists in the database and is not revoked
     let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
+    
+    // get the refresh tokens from db, including revoked ones to detect reuse
+    // for example, if a token was stolen and used by an attacker:
+    // the attacker uses valid refresh_token_v1 -> gets refresh_token_v2 and revokes refresh_token_v1 in DB
+    // the valid user tries to use the same refresh_token_v1 -> we detect that it was already revoked 
+    // this is treated it as a potential reuse attack, and we revoke all refresh tokens for that user as a precaution
     let stored_token = db::get_refresh_token_by_jti(&context.db, refresh_claims.tenant_id, &refresh_claims.jti).await?;
-    let token_hash = auth::get_token_hash_as_hex(refresh_token); // verify token hash
+    if stored_token.revoked_at.is_some() {
+        let _ = db::revoke_all_refresh_tokens_for_user(&context.db, refresh_claims.tenant_id, stored_token.user_id).await;
+        return Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid));
+    }
+
+    // verify token hash
+    let token_hash = auth::get_token_hash_as_hex(refresh_token); 
     if stored_token.token_hash != token_hash {
         return Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid));
     }
 
-    // generate new access token for the user
+    // revoke old refresh token
+    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
+
+    // generate and store a new refresh token for the user
     let user = db::get_user_by_id(&context.db, stored_token.user_id).await?;
-    let new_access_token = generate_access_token(&context, &user)?;
+    let new_refresh_token_data = generate_refresh_token(&context, &user)?;
+    let new_token_hash = auth::get_token_hash_as_hex(&new_refresh_token_data.value);
+    let new_refresh_token_db = db::NewRefreshToken {
+        jti: new_refresh_token_data.claims.jti.clone(),
+        tenant_id: user.tenant_id,
+        user_id: user.id,
+        token_hash: new_token_hash,
+        expires_at: auth::get_token_expiration_as_naive_utc(new_refresh_token_data.claims.exp)?,
+    };
+    db::create_refresh_token(&context.db, new_refresh_token_db).await?;
     auth::log_token_refresh(req.headers(), user.id, &refresh_claims.jti, &refresh_claims.sub);
 
     let body = json!({
@@ -123,7 +141,14 @@ pub async fn refresh_access_token(
             "tenant_id": user.tenant_id
         }
     });
-    let r = auth::create_json_response_with_auth_cookies(&context, Some(&new_access_token.value), None, body)?;
+    // set both new access token and new refresh token in cookies
+    let new_access_token = generate_access_token(&context, &user)?;
+    let r = auth::create_json_response_with_auth_cookies(
+        &context, 
+        Some(&new_access_token.value), 
+        Some(&new_refresh_token_data.value), 
+        body
+    )?;
     Ok(r)
 }
 
@@ -153,23 +178,6 @@ pub async fn user_info(
             "message": "Not authenticated"
         }))),
     }
-}
-
-/// Handler for revoking a refresh token
-pub async fn revoke_refresh_token(
-    State(context): State<core::ArcContext>,
-    req: Request<Body>,
-) -> Result<impl IntoResponse, AuthError> {
-    // attempt to extract refresh_token from the Cookie header
-    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
-    // decode refresh token to get JTI
-    let refresh_claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
-    db::revoke_refresh_token(&context.db, &refresh_claims.jti).await?;
-    auth::log_token_revoke(req.headers(), &refresh_claims.jti, &refresh_claims.sub);
-
-    let body = json!({"result": "ok"});
-    let r = auth::create_json_response_with_auth_cookies(&context, None, None, body)?;
-    Ok(r)
 }
 
 /// Handler for initiating Google OAuth flow

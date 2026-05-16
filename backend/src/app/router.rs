@@ -17,33 +17,33 @@ use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: core::ArcContext) -> Router {
-    // create auth routes with rate limiting for OAuth endpoints
-    let auth_routes = Router::new()
-        .route("/login", post(routes::auth::login)) // sets username in session and returns JWT
-        .route("/logout", post(routes::auth::logout)) // deletes username in session and revokes tokens
-        .route("/user_info", get(routes::auth::user_info)) // check session status
-        .route("/refresh", post(routes::auth::refresh_access_token)) // refresh access token
-        .route("/refresh/revoke", post(routes::auth::revoke_refresh_token)) // revoke refresh token
-        .route("/oauth/google", get(routes::auth::google_auth_init)) // initiate Google OAuth
-        .route("/oauth/google/callback", get(routes::auth::google_auth_callback)) // Google OAuth callback
-        .layer(axum::middleware::from_fn(middleware::oauth_rate_limit_middleware))
-        .with_state(context.clone());
+    // create auth routes 
+    let auth = Router::new()
+        .route("/login", post(routes::auth::login))
+        .route("/logout", post(routes::auth::logout))
+        .route("/user_info", get(routes::auth::user_info))
+        .route("/refresh", post(routes::auth::refresh));
+
+    // create oauth routes with rate limiting 
+    let oauth = Router::new()
+        .route("/google", get(routes::auth::google_auth_init))
+        .route("/google/callback", get(routes::auth::google_auth_callback))
+        .layer(axum::middleware::from_fn(middleware::oauth_rate_limit_middleware));
 
     // protected API routes that need ArcContext and auth middleware
-    let protected_api_routes = Router::new()
+    let protected = Router::new()
         .route("/test", get(routes::api::test_handler))
-        .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware))
-        .with_state(context.clone());
+        .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
 
     // public API routes
-    let public_routes = Router::new()
-        .route("/health", get(routes::health::health_check)) // health check endpoint
-        .with_state(context.clone());
+    let public = Router::new()
+        .route("/health", get(routes::health::health_check));
 
-    let api_router = Router::new()
-        .nest("/auth", auth_routes)
-        .merge(protected_api_routes)
-        .merge(public_routes)
+    let api = Router::new()
+        .nest("/auth", auth)
+        .nest("/oauth", oauth)
+        .merge(protected)
+        .merge(public)
         .fallback(|| async {
             (
                 axum::http::StatusCode::NOT_FOUND,
@@ -53,7 +53,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
 
     // combine all routes
     Router::new()
-        .nest("/api", api_router)
+        .nest("/api", api)
         .route("/user_info.js", get(routes::user_info::user_info_handler))
         .fallback(routes::assets::static_handler) // serve static assets
         .with_state(context)
