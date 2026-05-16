@@ -2,6 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{self, FromRow, Type};
 
+use crate::common;
 use crate::db::{SqlContext, SqlError};
 
 #[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
@@ -37,6 +38,7 @@ pub struct NewUser {
 }
 
 pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, SqlError> {
+    let email_normalized = common::normalize_email(&new_user.email);
     let user = sqlx::query_as!(
         User,
         r#"
@@ -55,7 +57,7 @@ pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, Sql
         "#,
         new_user.tenant_id,
         new_user.status,
-        new_user.email,
+        email_normalized,
         new_user.password_hash,
         new_user.sso_provider,
         new_user.sso_id,
@@ -90,6 +92,7 @@ pub async fn get_user_by_id(db: &SqlContext, id: i64) -> Result<User, SqlError> 
 }
 
 pub async fn get_user_by_email(db: &SqlContext, email: &str) -> Result<User, SqlError> {
+    let email = common::normalize_email(email);
     let user = sqlx::query_as!(
         User,
         r#"
@@ -145,6 +148,7 @@ pub async fn create_or_link_sso_user(
     sso_provider: &str,
     sso_id: &str,
 ) -> Result<User, SqlError> {
+    let email = common::normalize_email(email);
     let user = sqlx::query_as!(
         User,
         r#"

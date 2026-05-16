@@ -27,16 +27,17 @@ pub async fn login(
     Json(login): Json<Login>,
 ) -> Result<impl IntoResponse, AuthError> {
     auth::log_user_login_attempt(&headers, &login.email);
-    let user = db::get_user_by_email(&context.db, &login.email).await?;
+    let email_normalized = common::normalize_email(&login.email);
+    let user = db::get_user_by_email(&context.db, &email_normalized).await?;
     let password_hash = user.password_hash.as_ref().ok_or_else(|| {
-        auth::log_missing_password(&headers, &login.email);
+        auth::log_missing_password(&headers, &email_normalized);
         AuthError::InvalidCredentials
     })?;
     if !auth::verify_password(&login.password, password_hash)? {
-        auth::log_invalid_password(&headers, &login.email);
+        auth::log_invalid_password(&headers, &email_normalized);
         return Err(AuthError::InvalidCredentials);
     }
-    auth::log_user_login_success(&headers, &user.email);
+    auth::log_user_login_success(&headers, &email_normalized);
 
     // generate JWT tokens with appropriate expiration
     let access_token = generate_access_token(&context, &user)?;
@@ -224,9 +225,10 @@ pub async fn google_auth_callback(
     auth::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
     // insert new user or link existing user if user already exists (matching email)
+    let email_normalized = common::normalize_email(&user_info.email);
     let user = db::create_or_link_sso_user(
         &context.db,
-        &user_info.email,
+        &email_normalized,
         SSO_DEFAULT_TENANT_ID,
         "google",
         &user_info.id,
