@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{self, FromRow, Type};
 
-use crate::core::{DbContext, DbError};
+use crate::common::{DbContext, DbError};
 
 #[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]

@@ -11,12 +11,12 @@ use axum::routing::post;
 use tower_http::trace::TraceLayer;
 
 use crate::auth;
-use crate::core;
+use crate::common;
 use crate::middleware;
 use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
-pub fn create_router(context: core::ArcContext) -> Router {
+pub fn create_router(context: common::ArcContext) -> Router {
     // create auth routes 
     let auth = Router::new()
         .route("/login", post(routes::auth::login))
@@ -61,7 +61,7 @@ pub fn create_router(context: core::ArcContext) -> Router {
 }
 
 async fn auth_middleware(
-    State(context): State<core::ArcContext>,
+    State(context): State<common::ArcContext>,
     mut req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Result<Response, auth::AuthError> {

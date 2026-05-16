@@ -7,7 +7,7 @@ use sha2::Digest;
 use thiserror::Error;
 
 use crate::auth;
-use crate::core;
+use crate::common;
 
 #[derive(Debug, Error)]
 pub enum TokenError {
@@ -29,7 +29,7 @@ pub fn get_token_hash_as_hex(token: &str) -> String {
 }
 
 pub fn decode_token_from_req(
-    context: &core::ArcContext,
+    context: &common::ArcContext,
     req: &Request,
     token_type: auth::TokenType,
 ) -> Result<auth::TokenClaims, TokenError> {
@@ -53,7 +53,7 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
 }
 
 pub fn add_auth_cookies(
-    context: &core::ArcContext,
+    context: &common::ArcContext,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
     response: Response<Body>,
@@ -78,7 +78,7 @@ pub fn add_auth_cookies(
 
 /// Build a JSON response and attach auth cookies in one step.
 pub fn create_json_response_with_auth_cookies(
-    context: &core::ArcContext,
+    context: &common::ArcContext,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
     json: serde_json::Value,

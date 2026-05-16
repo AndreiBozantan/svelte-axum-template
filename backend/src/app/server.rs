@@ -9,7 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use crate::app;
 use crate::auth;
 use crate::cfg;
-use crate::core;
+use crate::common;
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -18,7 +18,7 @@ pub enum AppError {
     ConfigLoadingFailed(#[from] config::ConfigError),
 
     #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] core::DbError),
+    DatabaseOperationFailed(#[from] common::DbError),
 
     #[error("JWT error: {0}")]
     JwtOperationFailed(#[from] auth::JwtError),
@@ -39,7 +39,7 @@ pub enum AppError {
     HttpClientCreationFailed(#[from] reqwest::Error),
 }
 
-pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<core::DbContext, core::DbError> {
+pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<common::DbContext, common::DbError> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
@@ -88,7 +88,7 @@ async fn run_app() -> Result<(), AppError> {
     let db = create_db_context(&settings.database).await?;
     let jwt_secret = auth::get_jwt_secret()?;
     let jwt = auth::JwtContext::new(&settings.jwt, &jwt_secret)?;
-    let ctx = core::Context::new(db, jwt, http_client, settings);
+    let ctx = common::Context::new(db, jwt, http_client, settings);
     if !app::run_cli(&ctx.db).await? {
         app::run_migrations(&ctx.db).await?;
         start_server(ctx).await?;
@@ -96,7 +96,7 @@ async fn run_app() -> Result<(), AppError> {
     Ok(())
 }
 
-async fn start_server(ctx: core::ArcContext) -> Result<(), AppError> {
+async fn start_server(ctx: common::ArcContext) -> Result<(), AppError> {
     let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
     let router = app::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;

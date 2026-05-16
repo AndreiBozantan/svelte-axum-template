@@ -5,7 +5,8 @@ use clap::{Parser, Subcommand};
 
 use crate::app;
 use crate::auth;
-use crate::core;
+use crate::common;
+use crate::common::normalize_email;
 use crate::db;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
@@ -76,7 +77,7 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(db: &core::DbContext) -> Result<bool, CliError> {
+pub async fn run_cli(db: &common::DbContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -94,7 +95,7 @@ pub async fn run_cli(db: &core::DbContext) -> Result<bool, CliError> {
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, db: &core::DbContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, db: &common::DbContext) -> Result<(), CliError> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -123,7 +124,7 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
+async fn migrate_action_status(db: &common::DbContext) -> Result<(), CliError> {
     match app::check_pending_migrations(db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
@@ -133,7 +134,7 @@ async fn migrate_action_status(db: &core::DbContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
+async fn migrate_action_run(db: &common::DbContext) -> Result<(), CliError> {
     app::run_migrations(db)
         .await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
@@ -141,7 +142,7 @@ async fn migrate_action_run(db: &core::DbContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn create_admin(email: String, db: &core::DbContext) -> Result<(), CliError> {
+async fn create_admin(email: String, db: &common::DbContext) -> Result<(), CliError> {
     // prompt for password securely
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
@@ -155,7 +156,7 @@ async fn create_admin(email: String, db: &core::DbContext) -> Result<(), CliErro
 
     // check if user already exists; if found, return an error
     match db::get_user_by_email(db, &email).await {
-        Err(core::DbError::RowNotFound) => Ok(()),
+        Err(common::DbError::RowNotFound) => Ok(()),
         Err(e) => Err(CliError::Other(e.to_string())),
         Ok(_) => Err(CliError::Other("User already exists".to_string())),
     }?;
