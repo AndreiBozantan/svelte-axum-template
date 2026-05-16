@@ -29,7 +29,7 @@ impl Default for OAuthSettings {
         Self {
             google_client_id: String::new(),
             google_client_secret: String::new(),
-            google_redirect_uri: "http://localhost:3000/auth/oauth/google/callback".to_string(),
+            google_redirect_uri: "http://localhost:3000/oauth/google/callback".to_string(),
             allowed_redirect_domains: vec![
                 "localhost".to_string(),
                 "127.0.0.1".to_string(),

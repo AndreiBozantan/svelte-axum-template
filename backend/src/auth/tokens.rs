@@ -70,7 +70,7 @@ pub fn add_auth_cookies(
     // refresh token (default to empty string with Max-Age=0 to clear it if None)
     let rt_val = refresh_token.unwrap_or("");
     let refresh_max_age = context.settings.jwt.refresh_token_expiry_days * 60 * 60 * 24;
-    let refresh_cookie = create_token_cookie("refresh_token", rt_val, "/api/auth/refresh", refresh_max_age);
+    let refresh_cookie = create_token_cookie("refresh_token", rt_val, "/api/auth/", refresh_max_age);
     headers.append(http::header::SET_COOKIE, refresh_cookie.parse()?);
 
     Ok(response)

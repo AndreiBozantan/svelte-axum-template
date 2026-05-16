@@ -108,7 +108,7 @@ This template includes Google OAuth2 SSO integration. To set it up:
     *   Click **+ Create Credentials** at the top and select **OAuth client ID**.
     *   Select **Web application** as the Application type.
     *   **Authorized JavaScript origins**: Add `http://localhost:5173` (for the Svelte dev server).
-    *   **Authorized redirect URIs**: Add `http://localhost:3000/api/auth/oauth/google/callback`.
+    *   **Authorized redirect URIs**: Add `http://localhost:3000/api/oauth/google/callback`.
     *   Click **Create**.
 5.  **Get Your Keys**: A dialog will appear showing your **Client ID** and **Client Secret**. Copy these for the next step.
 
