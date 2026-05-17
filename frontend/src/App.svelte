@@ -36,7 +36,10 @@
         
         // If logged out and on a protected page, redirect to login
         if (active && !active.public && !AppState.isLoggedIn) {
-            AppState.setIntendedPage(AppState.activePage);
+            const isAuthPage = ['logout', 'login'].includes(AppState.activePage);
+            if (!isAuthPage) {
+                AppState.setIntendedPage(AppState.activePage);  // only store real destinations
+            }
             history.pushState(null, '', '/login');
             AppState.setActivePage('login');
         }
