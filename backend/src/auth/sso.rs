@@ -149,9 +149,13 @@ pub fn get_google_auth_url_and_csrf_token(
     redirect_url: Option<String>,
 ) -> Result<(Url, String), SsoError> {
     // validate redirect URL if provided
-    if let Some(url) = &redirect_url {
-        validate_redirect_path(url)?;
-    }
+    let redirect_url =
+        if let Some(url) = redirect_url && validate_redirect_path(&url).is_ok() {
+            Some(url)
+        } else {
+            // and fallback to root so the login flow doesn't break
+            Some("/".to_string())
+        };
 
     // generate CSRF token and create OAuth session
     let client = create_google_client(&context.settings.oauth)?;
@@ -278,6 +282,9 @@ pub async fn get_google_user_info(
 /// Validation happens at JWT-creation time so the signed token acts as a
 /// tamper-evident record - no re-validation is needed at callback time.
 fn validate_redirect_path(p: &str) -> Result<(), SsoError> {
+    if p.len() > 512 {
+        return Err(SsoError::InvalidRedirectUrl); 
+    }
     if !p.starts_with('/') || p.starts_with("//") || p.contains("://") {
         return Err(SsoError::InvalidRedirectUrl);
     }
