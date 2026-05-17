@@ -17,8 +17,8 @@ impl Context {
     pub fn new(
         db: db::SqlContext,
         jwt: auth::JwtContext,
-        http_client: reqwest::Client,
         settings: cfg::AppSettings,
+        http_client: reqwest::Client,
     ) -> ArcContext {
         Self {
             db,

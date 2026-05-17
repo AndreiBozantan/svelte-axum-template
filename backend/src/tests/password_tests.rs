@@ -1,4 +1,8 @@
-use crate::auth::{hash_password, verify_password};
+use argon2::Argon2;
+use argon2::password_hash::rand_core::OsRng;
+use argon2::password_hash::{PasswordHasher, SaltString};
+
+use crate::auth::{self, hash_password, verify_password};
 
 #[test]
 fn test_hash_password_creates_valid_hash() {
@@ -63,4 +67,19 @@ fn test_hash_unicode_password() {
     let hash = hash_password(password).unwrap();
     let result = verify_password(password, &hash).unwrap();
     assert!(result);
+}
+
+#[test]
+fn dummy_hash_parameters_match_argon2_default() {
+    // Parse both hashes and compare their parameters
+    let salt = SaltString::generate(&mut OsRng);
+    let fresh = Argon2::default().hash_password(b"test", &salt).expect("hash failed");
+    let dummy = argon2::PasswordHash::new(auth::DUMMY_HASH).expect("dummy hash is valid");
+
+    assert_eq!(dummy.algorithm, fresh.algorithm, 
+        "DUMMY_HASH algorithm does not match Argon2::default() — regenerate the constant");
+    assert_eq!(dummy.version, fresh.version,
+        "DUMMY_HASH version does not match Argon2::default() — regenerate the constant");
+    assert_eq!(dummy.params, fresh.params,
+        "DUMMY_HASH params (m, t, p) do not match Argon2::default() — regenerate the constant");
 }
