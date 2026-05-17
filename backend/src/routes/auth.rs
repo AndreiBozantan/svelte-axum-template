@@ -20,7 +20,7 @@ pub struct Login {
     pub password: String,
 }
 
-/// Handler for logging in using email and password credentials
+/// Login handler - validates user credentials and issues JWT tokens
 pub async fn login(
     State(context): State<common::ArcContext>,
     headers: HeaderMap,
@@ -28,18 +28,30 @@ pub async fn login(
 ) -> Result<impl IntoResponse, AuthError> {
     auth::log_user_login_attempt(&headers, &login.email);
     let email_normalized = common::normalize_email(&login.email);
-    let user = db::get_user_by_email(&context.db, &email_normalized).await?;
-    let password_hash = user.password_hash.as_ref().ok_or_else(|| {
+
+    let maybe_user = db::get_user_by_email(&context.db, &email_normalized).await.ok();
+    if matches!(&maybe_user, Some(u) if u.password_hash.is_none()) {
         auth::log_missing_password(&headers, &email_normalized);
-        AuthError::InvalidCredentials
-    })?;
+    }
+
+    let password_hash = maybe_user
+        .as_ref()
+        .and_then(|u| u.password_hash.as_deref())
+        .ok_or_else(|| {
+            // perform a dummy verify to mitigate timing attacks that check for user existence
+            let _ = auth::verify_password(&login.password, auth::DUMMY_HASH);
+            AuthError::InvalidCredentials
+        })?;
+
     if !auth::verify_password(&login.password, password_hash)? {
         auth::log_invalid_password(&headers, &email_normalized);
         return Err(AuthError::InvalidCredentials);
     }
+
     auth::log_user_login_success(&headers, &email_normalized);
 
     // generate JWT tokens with appropriate expiration
+    let user =  maybe_user.ok_or(AuthError::InvalidCredentials)?;
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
@@ -71,7 +83,7 @@ pub async fn login(
     Ok(r)
 }
 
-/// Handler for logging out
+/// Logout handler - revokes the refresh token and clears cookies
 pub async fn logout(
     State(context): State<common::ArcContext>,
     req: Request<Body>,
@@ -82,15 +94,7 @@ pub async fn logout(
     Ok(r)
 }
 
-async fn try_revoke_refresh_token(context: &common::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
-    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
-    let claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
-    db::revoke_refresh_token(&context.db, &claims.jti).await?;
-    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
-    Ok(())
-}
-
-/// Handler for refreshing tokens
+/// Refresh handler - generates new tokens using a valid refresh token
 pub async fn refresh(
     State(context): State<common::ArcContext>,
     req: Request<Body>,
@@ -153,7 +157,7 @@ pub async fn refresh(
     Ok(r)
 }
 
-/// Handler for checking user info based on access token
+/// User info handler - returns user information based on the access token
 pub async fn user_info(
     State(context): State<common::ArcContext>,
     req: Request<Body>,
@@ -178,7 +182,7 @@ pub async fn user_info(
     }
 }
 
-/// Handler for initiating Google OAuth flow
+/// Google OAuth initiation handler - redirects user to Google's OAuth consent screen
 pub async fn google_auth_init(
     State(context): State<common::ArcContext>,
     headers: HeaderMap,
@@ -203,7 +207,7 @@ pub async fn google_auth_init(
     Ok(response)
 }
 
-/// Handler for Google OAuth callback
+/// Google OAuth callback handler - processes the OAuth callback and logs the user in
 pub async fn google_auth_callback(
     State(context): State<common::ArcContext>,
     headers: HeaderMap,
@@ -291,4 +295,12 @@ fn generate_access_token(context: &common::ArcContext, user: &db::User) -> Resul
         auth::TokenType::Access,
         context.jwt.access_token_expiry,
     )?)
+}
+
+async fn try_revoke_refresh_token(context: &common::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
+    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
+    let claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
+    db::revoke_refresh_token(&context.db, &claims.jti).await?;
+    auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
+    Ok(())
 }
