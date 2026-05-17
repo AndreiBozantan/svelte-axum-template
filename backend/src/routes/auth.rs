@@ -51,7 +51,7 @@ pub async fn login(
     auth::log_user_login_success(&headers, &email_normalized);
 
     // generate JWT tokens with appropriate expiration
-    let user =  maybe_user.ok_or(AuthError::InvalidCredentials)?;
+    let user = maybe_user.ok_or(AuthError::InvalidCredentials)?;
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 

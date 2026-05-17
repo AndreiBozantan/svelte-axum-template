@@ -22,4 +22,6 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, Error> {
 /// A pre-computed Argon2 hash of a dummy password, used to perform a
 /// constant-time "wasted" verify when the requested user does not exist,
 /// preventing user-enumeration via response-time differences.
-pub static DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore
+pub static DUMMY_HASH: &str = "$argon2id$\
+    v=19$m=19456,t=2,p=1$\
+    HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore

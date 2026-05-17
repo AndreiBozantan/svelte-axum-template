@@ -231,9 +231,9 @@ async fn test_revoke_token_success() {
     let server = create_test_server(default_config()).await;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await;
 
-    // revoke the refresh token
+    // refresh will revoke the refresh token
     let revoke_response = server
-        .post("/api/auth/refresh/revoke")
+        .post("/api/auth/refresh")
         .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
         .await;
 
@@ -253,12 +253,12 @@ async fn test_revoke_token_success() {
 #[tokio::test]
 async fn test_logout_success() {
     let server = create_test_server(default_config()).await;
-    let (_body, access_token, refresh_token) = login_testuser_and_get_tokens(&server).await;
+    let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await;
 
     // logout
     let logout_response = server
         .post("/api/auth/logout")
-        .add_cookie(cookie::Cookie::new("access_token", access_token.clone()))
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
         .await;
 
     logout_response.assert_status(StatusCode::OK);
