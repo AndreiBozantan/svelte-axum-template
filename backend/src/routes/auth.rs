@@ -320,9 +320,16 @@ fn generate_access_token(context: &common::ArcContext, user: &db::User) -> Resul
 }
 
 async fn try_revoke_refresh_token(context: &common::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
-    let refresh_token = auth::get_refresh_token_from_cookie(&req)?;
-    let claims = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh)?;
+    // extract cookie - if missing, they are technically already logged out
+    let Ok(refresh_token) = auth::get_refresh_token_from_cookie(&req) else { return Ok(()) };
+
+    // decode token - if it's expired or invalid, we don't need to revoke it in the DB.
+    let Ok(claims) = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh) else { return Ok(()) };
+
+    // database revocation - if this fails, we want the ? to trigger a 500 error
     db::revoke_refresh_token(&context.db, &claims.jti).await?;
+    
     auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
+
     Ok(())
 }
