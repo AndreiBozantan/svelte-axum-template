@@ -77,7 +77,7 @@ export const Pages: PageDefinition[] = [
         id: 'logout',
         label: 'logout',
         component: LogOut,
-        public: false,
+        public: true,
         icon: faSignOutAlt,
         navPosition: 'footer',
         visible: () => AppState.isLoggedIn,
