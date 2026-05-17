@@ -76,10 +76,16 @@ fn dummy_hash_parameters_match_argon2_default() {
     let fresh = Argon2::default().hash_password(b"test", &salt).expect("hash failed");
     let dummy = argon2::PasswordHash::new(auth::DUMMY_HASH).expect("dummy hash is valid");
 
-    assert_eq!(dummy.algorithm, fresh.algorithm, 
-        "DUMMY_HASH algorithm does not match Argon2::default() — regenerate the constant");
-    assert_eq!(dummy.version, fresh.version,
-        "DUMMY_HASH version does not match Argon2::default() — regenerate the constant");
-    assert_eq!(dummy.params, fresh.params,
-        "DUMMY_HASH params (m, t, p) do not match Argon2::default() — regenerate the constant");
+    assert_eq!(
+        dummy.algorithm, fresh.algorithm,
+        "DUMMY_HASH algorithm does not match Argon2::default() — regenerate the constant"
+    );
+    assert_eq!(
+        dummy.version, fresh.version,
+        "DUMMY_HASH version does not match Argon2::default() — regenerate the constant"
+    );
+    assert_eq!(
+        dummy.params, fresh.params,
+        "DUMMY_HASH params (m, t, p) do not match Argon2::default() — regenerate the constant"
+    );
 }
