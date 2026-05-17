@@ -25,7 +25,7 @@ impl Default for OAuthSettings {
         Self {
             google_client_id: String::new(),
             google_client_secret: String::new(),
-            google_redirect_uri: "http://localhost:3000/oauth/google/callback".to_string(),
+            google_redirect_uri: "http://localhost:3000/api/oauth/google/callback".to_string(),
             session_timeout_minutes: default_session_timeout(),
         }
     }
