@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT,  -- NULL for SSO-only users
     sso_provider TEXT,   -- 'google', 'microsoft', 'github', etc.
     sso_id TEXT,         -- Provider's user ID
+    failed_login_count INTEGER NOT NULL DEFAULT 0,
+    last_failed_login DATETIME,
     UNIQUE(email),
     UNIQUE(tenant_id, id),
     UNIQUE(sso_provider, sso_id),

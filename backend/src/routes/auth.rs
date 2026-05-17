@@ -20,7 +20,16 @@ pub struct Login {
     pub password: String,
 }
 
-/// Login handler - validates user credentials and issues JWT tokens
+fn is_temporarily_locked(user: &db::User) -> bool {
+    if user.failed_login_count < common::AUTH_FAILED_LOGIN_MAX_ATTEMPTS {
+        return false;
+    }
+    user.last_failed_login.is_some_and(|last| {
+        chrono::Utc::now().naive_utc() - last < chrono::Duration::minutes(common::AUTH_FAILED_LOGIN_WINDOW_MINUTES)
+    })
+}
+
+// Login handler - verifies user credentials and creates a response with access and refresh tokens set in HttpOnly cookies
 pub async fn login(
     State(context): State<common::ArcContext>,
     headers: HeaderMap,
@@ -30,6 +39,16 @@ pub async fn login(
     let email_normalized = common::normalize_email(&login.email);
 
     let maybe_user = db::get_user_by_email(&context.db, &email_normalized).await.ok();
+
+    // check account lockout before doing any password work
+    if let Some(user) = &maybe_user
+        && is_temporarily_locked(user)
+    {
+        // TODO: should we log this? 
+        // should we return another error, to make it clear that the account is temporarily locked?
+        return Err(AuthError::InvalidCredentials);
+    }
+
     if matches!(&maybe_user, Some(u) if u.password_hash.is_none()) {
         auth::log_missing_password(&headers, &email_normalized);
     }
@@ -38,24 +57,25 @@ pub async fn login(
         .as_ref()
         .and_then(|u| u.password_hash.as_deref())
         .ok_or_else(|| {
-            // perform a dummy verify to mitigate timing attacks that check for user existence
             let _ = auth::verify_password(&login.password, auth::DUMMY_HASH);
             AuthError::InvalidCredentials
         })?;
 
     if !auth::verify_password(&login.password, password_hash)? {
         auth::log_invalid_password(&headers, &email_normalized);
+        if let Some(user) = &maybe_user {
+            db::increment_failed_login(&context.db, user.id).await?;
+        }
         return Err(AuthError::InvalidCredentials);
     }
 
+    let user = maybe_user.ok_or(AuthError::InvalidCredentials)?;
+    db::reset_failed_login(&context.db, user.id).await?;
     auth::log_user_login_success(&headers, &email_normalized);
 
-    // generate JWT tokens with appropriate expiration
-    let user = maybe_user.ok_or(AuthError::InvalidCredentials)?;
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
-    // store refresh token in database
     let token_hash = auth::get_token_hash_as_hex(&refresh_token.value);
     let new_refresh_token = db::NewRefreshToken {
         jti: refresh_token.claims.jti,
@@ -66,7 +86,7 @@ pub async fn login(
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let body = json!({
+    let body = serde_json::json!({
         "result": "ok",
         "user": {
             "id": user.id,
@@ -197,7 +217,9 @@ pub async fn google_auth_init(
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
 
     let cookie_max_age = context.settings.oauth.session_timeout_minutes * 60;
-    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}");
+    let cookie = format!(
+        "oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}"
+    );
     let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
 
     response

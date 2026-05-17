@@ -57,6 +57,9 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
         tenant_id: 0,
         status: db::UserStatus::Active,
         email: "test@example.com".to_string(),
+        first_name: "Test".to_string().into(),
+        middle_name: None,
+        last_name: "User".to_string().into(),
         password_hash: Some(password_hash),
         sso_provider: None,
         sso_id: None,
@@ -409,4 +412,30 @@ async fn test_decode_access_token_from_req_wrong_format() {
     let result = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access);
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), auth::TokenError::TokenInvalid));
+}
+
+#[tokio::test]
+async fn test_account_lockout_after_failed_attempts() {
+    let server = create_test_server(default_config()).await;
+
+    for _ in 0..5 {
+        let response = server
+            .post("/api/auth/login")
+            .json(&json!({
+                "email": TEST_USER_EMAIL,
+                "password": "wrong_password"
+            }))
+            .await;
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+
+    // correct password on the 6th attempt — should still be rejected
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD
+        }))
+        .await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
 }
