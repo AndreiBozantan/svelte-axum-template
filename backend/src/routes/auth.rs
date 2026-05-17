@@ -197,7 +197,7 @@ pub async fn google_auth_init(
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
 
     let cookie_max_age = context.settings.oauth.session_timeout_minutes * 60;
-    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={cookie_max_age}");
+    let cookie = format!("oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}");
     let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
 
     response
@@ -256,7 +256,7 @@ pub async fn google_auth_callback(
     )?;
 
     // clear oauth_state cookie by setting Max-Age=0
-    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+    let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age=0";
     let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
     response
         .headers_mut()
