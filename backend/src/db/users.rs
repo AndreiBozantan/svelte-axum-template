@@ -18,13 +18,18 @@ pub enum UserStatus {
 pub struct User {
     pub id: i64,
     pub tenant_id: i64,
-    pub status: UserStatus,
-    pub email: String,
-    pub password_hash: Option<String>, // Nullable for SSO users
-    pub sso_provider: Option<String>,
-    pub sso_id: Option<String>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+    pub status: UserStatus,
+    pub email: String,
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub password_hash: Option<String>,
+    pub sso_provider: Option<String>,
+    pub sso_id: Option<String>,
+    pub failed_login_count: i64,
+    pub last_failed_login: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,7 +37,10 @@ pub struct NewUser {
     pub tenant_id: i64,
     pub status: UserStatus,
     pub email: String,
-    pub password_hash: Option<String>, // Nullable for SSO users
+    pub first_name: Option<String>,
+    pub middle_name: Option<String>,
+    pub last_name: Option<String>,
+    pub password_hash: Option<String>,
     pub sso_provider: Option<String>,
     pub sso_id: Option<String>,
 }
@@ -45,15 +53,20 @@ pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, Sql
         INSERT INTO users (tenant_id, status, email, password_hash, sso_provider, sso_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         RETURNING
-            id as "id!",
-            tenant_id as "tenant_id!",
-            status as "status: UserStatus",
-            email as "email!",
+            id "id!",
+            tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
+            status "status: UserStatus",
+            email "email!",
+            first_name,
+            middle_name,
+            last_name,
             password_hash,
             sso_provider,
             sso_id,
-            created_at as "created_at!",
-            updated_at as "updated_at!"
+            failed_login_count "failed_login_count!",
+            last_failed_login
         "#,
         new_user.tenant_id,
         new_user.status,
@@ -74,13 +87,18 @@ pub async fn get_user_by_id(db: &SqlContext, id: i64) -> Result<User, SqlError> 
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
             status "status: UserStatus",
             email "email!",
+            first_name,
+            middle_name,
+            last_name,
             password_hash,
             sso_provider,
             sso_id,
-            created_at "created_at!",
-            updated_at "updated_at!"
+            failed_login_count "failed_login_count!",
+            last_failed_login
         FROM users
         WHERE id = ?
         "#,
@@ -99,13 +117,18 @@ pub async fn get_user_by_email(db: &SqlContext, email: &str) -> Result<User, Sql
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
             status "status: UserStatus",
             email "email!",
+            first_name,
+            middle_name,
+            last_name,
             password_hash,
             sso_provider,
             sso_id,
-            created_at "created_at!",
-            updated_at "updated_at!"
+            failed_login_count "failed_login_count!",
+            last_failed_login
         FROM users
         WHERE email = ?
         "#,
@@ -123,13 +146,18 @@ pub async fn get_user_by_sso_id(db: &SqlContext, sso_provider: &str, sso_id: &st
         SELECT
             id "id!",
             tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
             status "status: UserStatus",
             email "email!",
+            first_name,
+            middle_name,
+            last_name,
             password_hash,
             sso_provider,
             sso_id,
-            created_at "created_at!",
-            updated_at "updated_at!"
+            failed_login_count "failed_login_count!",
+            last_failed_login
         FROM users
         WHERE sso_provider = ? AND sso_id = ?
         "#,
@@ -161,13 +189,18 @@ pub async fn create_or_link_sso_user(
         RETURNING
             id "id!",
             tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
             status "status: UserStatus",
             email "email!",
+            first_name,
+            middle_name,
+            last_name,
             password_hash,
             sso_provider,
             sso_id,
-            created_at "created_at!",
-            updated_at "updated_at!"
+            failed_login_count "failed_login_count!",
+            last_failed_login
         "#,
         tenant_id,
         email,
@@ -177,4 +210,46 @@ pub async fn create_or_link_sso_user(
     .fetch_one(db)
     .await?;
     Ok(user)
+}
+
+/// Increment failed login count using a sliding window.
+///
+/// If the last failure was outside the window, the count resets to 1.
+/// The window duration (15 min) must match `AUTH_FAILED_LOGIN_WINDOW_MINUTES` in routes/auth.rs.
+pub async fn increment_failed_login(db: &SqlContext, user_id: i64) -> Result<(), SqlError> {
+    // create the modifier string, e.g., "-15 minutes"
+    let window_length = format!("-{} minutes", common::AUTH_FAILED_LOGIN_WINDOW_MINUTES);
+
+    sqlx::query!(
+        r#"
+        UPDATE users SET
+            failed_login_count = CASE
+                WHEN last_failed_login > datetime('now', ?) THEN failed_login_count + 1
+                ELSE 1
+            END,
+            last_failed_login = CURRENT_TIMESTAMP
+        WHERE id = ?
+        "#,
+        window_length,
+        user_id
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// Reset the failed login counter on successful authentication.
+pub async fn reset_failed_login(db: &SqlContext, user_id: i64) -> Result<(), SqlError> {
+    sqlx::query!(
+        r#"
+        UPDATE users SET
+            failed_login_count = 0,
+            last_failed_login = NULL
+        WHERE id = ?
+        "#,
+        user_id
+    )
+    .execute(db)
+    .await?;
+    Ok(())
 }

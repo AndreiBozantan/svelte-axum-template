@@ -166,6 +166,9 @@ async fn create_admin(email: String, db: &db::SqlContext) -> Result<(), CliError
         email,
         status: db::UserStatus::Active,
         tenant_id: 0, // default tenant
+        first_name: "admin".to_string().into(),
+        middle_name: None,
+        last_name: None,
         password_hash: Some(password_hash),
         sso_provider: None,
         sso_id: None,

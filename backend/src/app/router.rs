@@ -12,7 +12,6 @@ use tower_http::trace::TraceLayer;
 
 use crate::auth;
 use crate::common;
-use crate::middleware;
 use crate::routes;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
@@ -27,8 +26,7 @@ pub fn create_router(context: common::ArcContext) -> Router {
     // create oauth routes with rate limiting
     let oauth = Router::new()
         .route("/google", get(routes::auth::google_auth_init))
-        .route("/google/callback", get(routes::auth::google_auth_callback))
-        .layer(axum::middleware::from_fn(middleware::oauth_rate_limit_middleware));
+        .route("/google/callback", get(routes::auth::google_auth_callback));
 
     // protected API routes that need ArcContext and auth middleware
     let protected = Router::new()

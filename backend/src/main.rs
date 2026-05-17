@@ -26,9 +26,11 @@ pub mod cfg {
 }
 
 pub mod common {
+    mod constants;
     mod context;
     mod utils;
 
+    pub use constants::*;
     pub use context::*;
     pub use utils::*;
 }
@@ -68,12 +70,6 @@ pub mod routes {
     pub mod auth;
     pub mod health;
     pub mod user_info;
-}
-
-pub mod middleware {
-    mod rate_limit;
-
-    pub use rate_limit::*;
 }
 
 pub mod app {
