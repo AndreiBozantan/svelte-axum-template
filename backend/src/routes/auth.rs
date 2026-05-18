@@ -21,11 +21,12 @@ pub struct Login {
 }
 
 fn is_temporarily_locked(user: &db::User) -> bool {
-    if user.failed_login_count < common::AUTH_FAILED_LOGIN_MAX_ATTEMPTS {
+    if user.failed_login_count < common::constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
         return false;
     }
     user.last_failed_login.is_some_and(|last| {
-        chrono::Utc::now().naive_utc() - last < chrono::Duration::minutes(common::AUTH_FAILED_LOGIN_WINDOW_MINUTES)
+        chrono::Utc::now().naive_utc() - last
+            < chrono::Duration::minutes(common::constants::auth::FAILED_LOGIN_WINDOW_MINUTES)
     })
 }
 
@@ -44,7 +45,7 @@ pub async fn login(
     if let Some(user) = &maybe_user
         && is_temporarily_locked(user)
     {
-        // TODO: should we log this? 
+        // TODO: should we log this?
         // should we return another error, to make it clear that the account is temporarily locked?
         return Err(AuthError::InvalidCredentials);
     }
@@ -321,14 +322,18 @@ fn generate_access_token(context: &common::ArcContext, user: &db::User) -> Resul
 
 async fn try_revoke_refresh_token(context: &common::ArcContext, req: Request<Body>) -> Result<(), AuthError> {
     // extract cookie - if missing, they are technically already logged out
-    let Ok(refresh_token) = auth::get_refresh_token_from_cookie(&req) else { return Ok(()) };
+    let Ok(refresh_token) = auth::get_refresh_token_from_cookie(&req) else {
+        return Ok(());
+    };
 
     // decode token - if it's expired or invalid, we don't need to revoke it in the DB.
-    let Ok(claims) = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh) else { return Ok(()) };
+    let Ok(claims) = auth::decode_token(&context.jwt, refresh_token, auth::TokenType::Refresh) else {
+        return Ok(());
+    };
 
     // database revocation - if this fails, we want the ? to trigger a 500 error
     db::revoke_refresh_token(&context.db, &claims.jti).await?;
-    
+
     auth::log_user_logout(req.headers(), &claims.sub, &claims.email);
 
     Ok(())

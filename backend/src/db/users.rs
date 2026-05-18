@@ -218,7 +218,7 @@ pub async fn create_or_link_sso_user(
 /// The window duration (15 min) must match `AUTH_FAILED_LOGIN_WINDOW_MINUTES` in routes/auth.rs.
 pub async fn increment_failed_login(db: &SqlContext, user_id: i64) -> Result<(), SqlError> {
     // create the modifier string, e.g., "-15 minutes"
-    let window_length = format!("-{} minutes", common::AUTH_FAILED_LOGIN_WINDOW_MINUTES);
+    let window_length = format!("-{} minutes", common::constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
 
     sqlx::query!(
         r#"
