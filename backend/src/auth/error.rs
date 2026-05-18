@@ -5,6 +5,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::auth;
+use crate::common::constants;
 use crate::db;
 
 #[derive(Debug, Error)]
@@ -46,25 +47,29 @@ impl From<db::SqlError> for AuthError {
 impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
     fn into_response(self) -> Response {
-        let status = match self {
-            Self::PasswordHashingFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::DatabaseOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::RequestHeaderOperationFailed(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
-            Self::JwtOperationFailed(_) => StatusCode::UNAUTHORIZED,
-            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
-            Self::SsoOperationFailed(_) => StatusCode::UNAUTHORIZED,
-            Self::UserAlreadyExists => StatusCode::CONFLICT,
+        let (status, error_message) = match self {
+            Self::PasswordHashingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
+            Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
+            Self::RequestHeaderOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
+            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_CREDENTIALS),
+            Self::JwtOperationFailed(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN),
+            Self::InvalidToken(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN),
+            Self::SsoOperationFailed(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::SSO_OPERATION_FAILED),
+            Self::UserAlreadyExists => (StatusCode::CONFLICT, constants::err_msg::USER_ALREADY_EXISTS),
         };
         if status == StatusCode::INTERNAL_SERVER_ERROR {
             auth::log_internal_error(&self, "auth");
         } else {
             auth::log_auth_rejection(&self);
         }
+        if let Self::JwtOperationFailed(e) = self {
+            return e.into_response();
+        }
         let body = Json(json!({
             "result": "error",
-            "message": self.to_string(),
+            "message": error_message
         }));
+
         (status, body).into_response()
     }
 }
