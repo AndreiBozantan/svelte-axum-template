@@ -38,14 +38,14 @@ pub mod common {
 }
 
 pub mod auth {
-    mod error;
+    mod auth_error;
     mod jwt;
     mod logger;
     mod password;
     mod sso;
     mod tokens;
 
-    pub use error::*;
+    pub use auth_error::*;
     pub use jwt::*;
     pub use logger::*;
     pub use password::*;

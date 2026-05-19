@@ -1,12 +1,3 @@
-pub mod err_msg {
-    pub const INTERNAL: &str = "An internal server error occurred";
-    pub const SSO_OPERATION_FAILED: &str = "SSO authentication failed";
-    pub const USER_ALREADY_EXISTS: &str = "User with the given email already exists";
-    pub const INVALID_CREDENTIALS: &str = "Invalid credentials";
-    pub const TOKEN_EXPIRED: &str = "Authentication token has expired";
-    pub const INVALID_TOKEN: &str = "Invalid authentication token";
-}
-
 pub mod auth {
     /// Maximum allowed failed login attempts within the defined window before account is temporarily locked.
     pub const FAILED_LOGIN_MAX_ATTEMPTS: i64 = 5;
