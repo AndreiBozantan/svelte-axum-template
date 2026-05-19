@@ -5,6 +5,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::json;
 
 use crate::auth::{self, AuthError};
@@ -18,6 +19,39 @@ const SSO_DEFAULT_TENANT_ID: i64 = 0;
 pub struct Login {
     pub email: String,
     pub password: String,
+}
+
+#[derive(Serialize)]
+pub struct User {
+    pub id: i64,
+    pub email: String,
+    pub tenant_id: i64,
+}
+
+impl From<&db::User> for User {
+    fn from(u: &db::User) -> Self {
+        Self {
+            id: u.id,
+            email: u.email.clone(),
+            tenant_id: u.tenant_id,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct LoginResponse {
+    pub user: User,
+}
+
+#[derive(Serialize)]
+pub struct RefreshResponse {
+    pub expires_in: u32,
+    pub user: User,
+}
+
+#[derive(Serialize)]
+pub struct UserInfoResponse {
+    pub user: User,
 }
 
 fn is_temporarily_locked(user: &db::User) -> bool {
@@ -87,19 +121,12 @@ pub async fn login(
     };
     db::create_refresh_token(&context.db, new_refresh_token).await?;
 
-    let body = serde_json::json!({
-        "result": "ok",
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "tenant_id": user.tenant_id
-        }
-    });
-    let r = auth::create_json_response_with_auth_cookies(
+    let body = LoginResponse { user: (&user).into() };
+    let r = auth::create_response_with_auth_cookies(
         &context,
+        &body,
         Some(&access_token.value),
         Some(&refresh_token.value),
-        body,
     )?;
     Ok(r)
 }
@@ -110,8 +137,8 @@ pub async fn logout(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     try_revoke_refresh_token(&context, req).await?;
-    let json = json!({"result": "ok"});
-    let r = auth::create_json_response_with_auth_cookies(&context, None, None, json)?;
+    let body = json!({});
+    let r = auth::create_response_with_auth_cookies(&context, &body, None, None)?;
     Ok(r)
 }
 
@@ -158,22 +185,17 @@ pub async fn refresh(
     db::create_refresh_token(&context.db, new_refresh_token_db).await?;
     auth::log_token_refresh(req.headers(), user.id, &claims.jti, &claims.sub);
 
-    let body = json!({
-        "result": "ok",
-        "expires_in": context.settings.jwt.access_token_expiry_minutes * 60,
-        "user": {
-            "id": user.id,
-            "email": user.email,
-            "tenant_id": user.tenant_id
-        }
-    });
+    let body = RefreshResponse {
+        expires_in: context.settings.jwt.access_token_expiry_minutes * 60,
+        user: (&user).into(),
+    };
     // set both new access token and new refresh token in cookies
     let new_access_token = generate_access_token(&context, &user)?;
-    let r = auth::create_json_response_with_auth_cookies(
+    let r = auth::create_response_with_auth_cookies(
         &context,
+        &body,
         Some(&new_access_token.value),
         Some(&new_refresh_token_data.value),
-        body,
     )?;
     Ok(r)
 }
@@ -182,25 +204,14 @@ pub async fn refresh(
 pub async fn user_info(
     State(context): State<common::ArcContext>,
     req: Request<Body>,
-) -> Result<impl IntoResponse, AuthError> {
-    match auth::decode_token_from_req(&context, &req, auth::TokenType::Access) {
-        Ok(claims) => {
-            let user_id = claims
-                .sub
-                .parse::<i64>()
-                .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
-            let user = db::get_user_by_id(&context.db, user_id).await?;
-            Ok(Json(json!({
-                "result": "ok",
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "tenant_id": user.tenant_id
-                }
-            })))
-        }
-        Err(_) => Err(AuthError::InvalidToken(auth::TokenError::TokenInvalid)),
-    }
+) -> Result<Json<UserInfoResponse>, AuthError> {
+    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)?;
+    let user_id = claims
+        .sub
+        .parse::<i64>()
+        .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
+    let user = db::get_user_by_id(&context.db, user_id).await?;
+    Ok(Json(UserInfoResponse { user: (&user).into() }))
 }
 
 /// Google OAuth initiation handler - redirects user to Google's OAuth consent screen

@@ -67,10 +67,10 @@ pub mod db {
 }
 
 pub mod routes {
-    pub mod api;
     pub mod assets;
     pub mod auth;
     pub mod health;
+    pub mod test;
     pub mod user_info;
 }
 

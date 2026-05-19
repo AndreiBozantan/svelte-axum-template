@@ -1,22 +1,25 @@
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
-use serde_json::json;
+use axum::{extract::State, response::IntoResponse};
+use serde::Serialize;
 
 use crate::common;
+use crate::common::ApiError;
 use crate::db;
 
+#[derive(Serialize)]
+struct HealthCheckResponse {
+    message: String,
+}
+
 #[allow(clippy::unused_async)]
-pub async fn health_check(
-    State(context): State<common::ArcContext>,
-) -> Result<impl IntoResponse, axum::response::Response> {
+pub async fn health_check(State(context): State<common::ArcContext>) -> Result<impl IntoResponse, ApiError> {
     // read the tenant from db
     db::get_tenant_by_id(&context.db, 0).await.map_err(|e| {
         tracing::error!("Health check failed to read default tenant from database: {}", e);
-        let err_json = Json(json!({"result": "error", "message": "Internal Server Error"}));
-        (StatusCode::INTERNAL_SERVER_ERROR, err_json).into_response()
+        ApiError::internal()
     })?;
 
-    Ok((
-        StatusCode::OK,
-        Json(json!({"result": "ok", "message": "server and database are running"})),
-    ))
+    let body = HealthCheckResponse {
+        message: "sever and database are up and running".to_string(),
+    };
+    Ok(axum::response::Json(body))
 }

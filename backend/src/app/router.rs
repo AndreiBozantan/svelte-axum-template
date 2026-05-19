@@ -30,7 +30,7 @@ pub fn create_router(context: common::ArcContext) -> Router {
 
     // protected API routes that need ArcContext and auth middleware
     let protected = Router::new()
-        .route("/test", get(routes::api::test_handler))
+        .route("/test", get(routes::test::test_handler))
         .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
 
     // public API routes

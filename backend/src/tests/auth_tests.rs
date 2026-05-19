@@ -122,7 +122,7 @@ async fn test_login_invalid_credentials() {
 
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();
-    assert_eq!(body["result"], "error");
+    assert_eq!(body["code"], "invalid_credentials");
 }
 
 #[tokio::test]
@@ -139,7 +139,7 @@ async fn test_login_nonexistent_user() {
 
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();
-    assert_eq!(body["result"], "error");
+    assert_eq!(body["code"], "invalid_credentials");
 }
 
 #[tokio::test]
@@ -155,7 +155,7 @@ async fn test_refresh_token_invalid() {
 
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();
-    assert_eq!(body["result"], "error");
+    assert_eq!(body["code"], "invalid_token");
 }
 
 #[tokio::test]
@@ -181,7 +181,6 @@ async fn test_protected_route_with_invalid_token() {
 async fn test_login_success() {
     let server = create_test_server(default_config()).await;
     let (body, access_token, refresh_token) = login_testuser_and_get_tokens(&server).await;
-    assert_eq!(body["result"], "ok");
     assert!(!access_token.is_empty());
     assert!(!refresh_token.is_empty());
     assert_eq!(body["user"]["email"], TEST_USER_EMAIL);
@@ -224,14 +223,14 @@ async fn test_refresh_token_success() {
 
     refresh_response.assert_status(StatusCode::OK);
     let refresh_body: Value = refresh_response.json();
-    assert_eq!(refresh_body["result"], "ok");
     assert!(!refresh_response.cookie("access_token").value().is_empty());
     assert_eq!(refresh_body["user"]["email"], TEST_USER_EMAIL);
 }
 
 #[tokio::test]
 async fn test_revoke_token_success() {
-    let server = create_test_server(default_config()).await;
+    let settings = default_config();
+    let server = create_test_server(settings.clone()).await;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await;
 
     // refresh will revoke the refresh token
@@ -242,7 +241,7 @@ async fn test_revoke_token_success() {
 
     revoke_response.assert_status(StatusCode::OK);
     let revoke_body: Value = revoke_response.json();
-    assert_eq!(revoke_body["result"], "ok");
+    assert_eq!(revoke_body["expires_in"], settings.jwt.access_token_expiry_minutes * 60);
 
     // try to use the revoked token - should fail
     let refresh_response = server
@@ -266,7 +265,7 @@ async fn test_logout_success() {
 
     logout_response.assert_status(StatusCode::OK);
     let logout_body: Value = logout_response.json();
-    assert_eq!(logout_body["result"], "ok");
+    assert_eq!(logout_body.as_object().unwrap().len(), 0);
 
     // try to use refresh token after logout - should fail
     let refresh_response = server

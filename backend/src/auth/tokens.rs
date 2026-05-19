@@ -3,6 +3,7 @@ use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
 use axum::response::Response;
+use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
@@ -77,13 +78,13 @@ pub fn add_auth_cookies(
 }
 
 /// Build a JSON response and attach auth cookies in one step.
-pub fn create_json_response_with_auth_cookies(
+pub fn create_response_with_auth_cookies(
     context: &common::ArcContext,
+    body: &impl Serialize,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
-    json: serde_json::Value,
 ) -> Result<Response<Body>, TokenError> {
-    let response = axum::response::Json(json).into_response();
+    let response = axum::response::Json(body).into_response();
     add_auth_cookies(context, access_token, refresh_token, response)
 }
 

@@ -72,7 +72,7 @@ impl ApiError {
     pub fn expired_token() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
-            "token_expired",
+            "expired_token",
             "Authentication token has expired.",
         )
     }
@@ -81,7 +81,7 @@ impl ApiError {
     pub fn invalid_token() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
-            "token_invalid",
+            "invalid_token",
             "Authentication token is invalid.",
         )
     }
@@ -116,7 +116,7 @@ impl ApiError {
 
     #[must_use]
     pub fn user_already_exists() -> Self {
-        Self::conflict( "user_already_exists", "A user with the given email already exists.")
+        Self::conflict("user_already_exists", "A user with the given email already exists.")
     }
 
     #[must_use]
