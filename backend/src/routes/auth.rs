@@ -4,12 +4,13 @@ use axum::extract::Request;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
+use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::json;
 
 use crate::auth::{self, AuthError};
 use crate::common;
+use crate::common::ApiError;
 use crate::db;
 
 /// Default tenant ID assigned to users created via SSO.
@@ -137,9 +138,11 @@ pub async fn logout(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, AuthError> {
     try_revoke_refresh_token(&context, req).await?;
-    let body = json!({});
-    let r = auth::create_response_with_auth_cookies(&context, &body, None, None)?;
-    Ok(r)
+    let response = axum::http::Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(Body::empty())?;
+    let response = auth::add_auth_cookies(&context, response, None, None)?;
+    Ok(response)
 }
 
 /// Refresh handler - generates new tokens using a valid refresh token
@@ -204,13 +207,16 @@ pub async fn refresh(
 pub async fn user_info(
     State(context): State<common::ArcContext>,
     req: Request<Body>,
-) -> Result<Json<UserInfoResponse>, AuthError> {
-    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)?;
+) -> Result<Json<UserInfoResponse>, common::ApiError> {
+    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)
+        .map_err(|err| std::convert::Into::<ApiError>::into(&err))?;
     let user_id = claims
         .sub
         .parse::<i64>()
-        .map_err(|_| AuthError::InvalidToken(auth::TokenError::TokenInvalid))?;
-    let user = db::get_user_by_id(&context.db, user_id).await?;
+        .map_err(|_| common::ApiError::not_authenticated())?;
+    let user = db::get_user_by_id(&context.db, user_id)
+        .await
+        .map_err(|_| common::ApiError::not_authenticated())?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))
 }
 
@@ -284,9 +290,9 @@ pub async fn google_auth_callback(
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = auth::add_auth_cookies(
         &context,
+        response,
         Some(&access_token.value),
         Some(&refresh_token.value),
-        response,
     )?;
 
     // clear oauth_state cookie by setting Max-Age=0

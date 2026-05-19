@@ -263,9 +263,7 @@ async fn test_logout_success() {
         .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
         .await;
 
-    logout_response.assert_status(StatusCode::OK);
-    let logout_body: Value = logout_response.json();
-    assert_eq!(logout_body.as_object().unwrap().len(), 0);
+    logout_response.assert_status(StatusCode::NO_CONTENT);
 
     // try to use refresh token after logout - should fail
     let refresh_response = server
@@ -348,8 +346,9 @@ async fn test_access_token_expiry() {
         .get("/api/test")
         .add_cookie(cookie::Cookie::new("access_token", expired_token))
         .await;
-
     response_expired.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response_expired.json();
+    assert_eq!(body["code"], "expired_token");
 }
 
 #[tokio::test]
@@ -437,4 +436,15 @@ async fn test_account_lockout_after_failed_attempts() {
         }))
         .await;
     response.assert_status(StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_user_info_unauthenticated_returns_401() {
+    let server = create_test_server(default_config()).await;
+
+    let response = server.get("/api/auth/user_info").await;
+
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "invalid_token");
 }

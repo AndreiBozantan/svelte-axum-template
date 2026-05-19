@@ -8,6 +8,9 @@ use crate::db;
 
 #[derive(Debug, Error)]
 pub enum AuthError {
+    #[error("Internal server error {0}")]
+    Internal(#[from] axum::http::Error),
+
     #[error("Invalid credentials")]
     InvalidCredentials,
 
@@ -46,14 +49,15 @@ impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
     fn into_response(self) -> Response {
         let err = match &self {
+            Self::Internal(_) => common::ApiError::internal(),
             Self::PasswordHashingFailed(_) => common::ApiError::internal(),
             Self::DatabaseOperationFailed(_) => common::ApiError::internal(),
             Self::RequestHeaderOperationFailed(_) => common::ApiError::internal(),
             Self::InvalidCredentials => common::ApiError::invalid_credentials(),
-            Self::InvalidToken(_) => common::ApiError::invalid_token(),
             Self::SsoOperationFailed(_) => common::ApiError::not_authenticated(),
             Self::UserAlreadyExists => common::ApiError::user_already_exists(),
             Self::JwtOperationFailed(jwt_error) => jwt_error.into(),
+            Self::InvalidToken(token_error) => token_error.into(),
         };
         if err.status == StatusCode::INTERNAL_SERVER_ERROR {
             auth::log_internal_error(&self, "auth");
