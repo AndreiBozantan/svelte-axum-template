@@ -26,10 +26,13 @@ pub mod cfg {
 }
 
 pub mod common {
-    pub mod constants;
+    mod api_error;
     mod context;
     mod utils;
 
+    pub mod constants;
+
+    pub use api_error::*;
     pub use context::*;
     pub use utils::*;
 }
