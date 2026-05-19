@@ -1,9 +1,9 @@
 use sha2::{Digest, Sha256};
 
-pub fn log_internal_error(error: &dyn std::error::Error, context: &str) {
+pub fn log_internal_error<E: std::fmt::Display>(error: E, context: &str) {
     tracing::error!(
         event_type = "auth",
-        error_type = std::any::type_name_of_val(error),
+        error_type = std::any::type_name::<E>(),
         error_message = %error,
         context,
         message = "Internal error occurred"

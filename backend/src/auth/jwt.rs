@@ -1,21 +1,16 @@
 use std::fs;
 
-use axum::Json;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use jsonwebtoken as jwt;
 use rand::TryRng;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::auth;
 use crate::cfg;
-use crate::common::constants;
+use crate::common::ApiError;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -52,28 +47,17 @@ impl From<jwt::errors::Error> for JwtError {
     }
 }
 
-impl IntoResponse for JwtError {
-    fn into_response(self) -> axum::response::Response {
-        #[rustfmt::skip]
+impl From<&JwtError> for ApiError {
+    fn from(error: &JwtError) -> Self {
         #[allow(clippy::match_same_arms)]
-        let (status, error_message) = match self {
-            Self::RngOperationFailed { source: _ } => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL.to_string()),
-            Self::FileSystemOperationFailed { source: _ } => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL.to_string()),
-            Self::EncodingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL.to_string()),
-            Self::DecodingFailed(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN.to_string()),
-            Self::InvalidToken => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN.to_string()),
-            Self::TokenExpired => (StatusCode::UNAUTHORIZED, constants::err_msg::TOKEN_EXPIRED.to_string()),
-        };
-        if status == StatusCode::INTERNAL_SERVER_ERROR {
-            auth::log_internal_error(&self, "jwt");
-        } else {
-            auth::log_auth_rejection(&self);
+        match error {
+            JwtError::RngOperationFailed { .. } => Self::internal(),
+            JwtError::FileSystemOperationFailed { .. } => Self::internal(),
+            JwtError::EncodingFailed(_) => Self::internal(),
+            JwtError::DecodingFailed(_) => Self::invalid_token(),
+            JwtError::InvalidToken => Self::invalid_token(),
+            JwtError::TokenExpired => Self::expired_token(),
         }
-        let body = Json(json!({
-            "result": "error",
-            "message": error_message
-        }));
-        (status, body).into_response()
     }
 }
 

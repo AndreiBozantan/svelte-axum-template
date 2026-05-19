@@ -1,11 +1,9 @@
-use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use serde_json::json;
 use thiserror::Error;
 
 use crate::auth;
-use crate::common::constants;
+use crate::common;
 use crate::db;
 
 #[derive(Debug, Error)]
@@ -47,29 +45,21 @@ impl From<db::SqlError> for AuthError {
 impl IntoResponse for AuthError {
     #[allow(clippy::match_same_arms)]
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            Self::PasswordHashingFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
-            Self::DatabaseOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
-            Self::RequestHeaderOperationFailed(_) => (StatusCode::INTERNAL_SERVER_ERROR, constants::err_msg::INTERNAL),
-            Self::InvalidCredentials => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_CREDENTIALS),
-            Self::JwtOperationFailed(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN),
-            Self::InvalidToken(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::INVALID_TOKEN),
-            Self::SsoOperationFailed(_) => (StatusCode::UNAUTHORIZED, constants::err_msg::SSO_OPERATION_FAILED),
-            Self::UserAlreadyExists => (StatusCode::CONFLICT, constants::err_msg::USER_ALREADY_EXISTS),
+        let err = match &self {
+            Self::PasswordHashingFailed(_) => common::ApiError::internal(),
+            Self::DatabaseOperationFailed(_) => common::ApiError::internal(),
+            Self::RequestHeaderOperationFailed(_) => common::ApiError::internal(),
+            Self::InvalidCredentials => common::ApiError::invalid_credentials(),
+            Self::InvalidToken(_) => common::ApiError::invalid_token(),
+            Self::SsoOperationFailed(_) => common::ApiError::not_authenticated(),
+            Self::UserAlreadyExists => common::ApiError::user_already_exists(),
+            Self::JwtOperationFailed(jwt_error) => jwt_error.into(),
         };
-        if status == StatusCode::INTERNAL_SERVER_ERROR {
+        if err.status == StatusCode::INTERNAL_SERVER_ERROR {
             auth::log_internal_error(&self, "auth");
         } else {
             auth::log_auth_rejection(&self);
         }
-        if let Self::JwtOperationFailed(e) = self {
-            return e.into_response();
-        }
-        let body = Json(json!({
-            "result": "error",
-            "message": error_message
-        }));
-
-        (status, body).into_response()
+        err.into_response()
     }
 }

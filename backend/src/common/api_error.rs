@@ -33,7 +33,7 @@ impl ApiError {
     }
 
     #[must_use]
-    pub fn internal_error() -> Self {
+    pub fn internal() -> Self {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal_error",
@@ -51,7 +51,7 @@ impl ApiError {
     }
 
     #[must_use]
-    pub fn not_authentucated() -> Self {
+    pub fn not_authenticated() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
             "not_authenticated",
@@ -60,11 +60,29 @@ impl ApiError {
     }
 
     #[must_use]
-    pub fn token_expired() -> Self {
+    pub fn sso_failed() -> Self {
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "sso_failed",
+            "Single sign-on authentication failed.",
+        )
+    }
+
+    #[must_use]
+    pub fn expired_token() -> Self {
         Self::new(
             StatusCode::UNAUTHORIZED,
             "token_expired",
             "Authentication token has expired.",
+        )
+    }
+
+    #[must_use]
+    pub fn invalid_token() -> Self {
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "token_invalid",
+            "Authentication token is invalid.",
         )
     }
 
@@ -97,8 +115,13 @@ impl ApiError {
     }
 
     #[must_use]
-    pub fn conflict(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::CONFLICT, "conflict", message)
+    pub fn user_already_exists() -> Self {
+        Self::conflict( "user_already_exists", "A user with the given email already exists.")
+    }
+
+    #[must_use]
+    pub fn conflict(code: &'static str, message: impl Into<String>) -> Self {
+        Self::new(StatusCode::CONFLICT, code, message)
     }
 }
 
