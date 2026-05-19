@@ -66,8 +66,7 @@ pub mod db {
     pub type SqlError = sqlx::Error;
 }
 
-pub mod routes {
-    pub mod assets;
+pub mod api {
     pub mod auth;
     pub mod health;
     pub mod test;
@@ -75,6 +74,7 @@ pub mod routes {
 }
 
 pub mod app {
+    mod assets_loader;
     mod cli;
     mod migrations;
     mod router;
