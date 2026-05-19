@@ -3,6 +3,7 @@ use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
 use axum::response::Response;
+use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
@@ -19,6 +20,16 @@ pub enum TokenError {
 
     #[error("Token expired or invalid")]
     TokenInvalid,
+}
+
+impl From<&TokenError> for common::ApiError {
+    fn from(error: &TokenError) -> Self {
+        #[allow(clippy::match_same_arms)]
+        match error {
+            TokenError::JwtOperationFailed(auth::JwtError::TokenExpired) => Self::expired_token(),
+            _ => Self::invalid_token(),
+        }
+    }
 }
 
 #[must_use]
@@ -54,9 +65,9 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
 
 pub fn add_auth_cookies(
     context: &common::ArcContext,
+    response: Response<Body>,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
-    response: Response<Body>,
 ) -> Result<Response<Body>, TokenError> {
     let mut response = response;
     let headers = response.headers_mut();
@@ -77,14 +88,14 @@ pub fn add_auth_cookies(
 }
 
 /// Build a JSON response and attach auth cookies in one step.
-pub fn create_json_response_with_auth_cookies(
+pub fn create_response_with_auth_cookies(
     context: &common::ArcContext,
+    body: &impl Serialize,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
-    json: serde_json::Value,
 ) -> Result<Response<Body>, TokenError> {
-    let response = axum::response::Json(json).into_response();
-    add_auth_cookies(context, access_token, refresh_token, response)
+    let response = axum::response::Json(body).into_response();
+    add_auth_cookies(context, response, access_token, refresh_token)
 }
 
 pub fn get_cookie_value_from_headers<'a>(headers: &'a http::HeaderMap, name: &str) -> Option<&'a str> {
