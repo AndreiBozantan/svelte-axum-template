@@ -12,29 +12,29 @@ use tower_http::trace::TraceLayer;
 
 use crate::auth;
 use crate::common;
-use crate::routes;
+use crate::api;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: common::ArcContext) -> Router {
     // create auth routes
     let auth = Router::new()
-        .route("/login", post(routes::auth::login))
-        .route("/logout", post(routes::auth::logout))
-        .route("/user_info", get(routes::auth::user_info))
-        .route("/refresh", post(routes::auth::refresh));
+        .route("/login", post(api::auth::login))
+        .route("/logout", post(api::auth::logout))
+        .route("/user_info", get(api::auth::user_info))
+        .route("/refresh", post(api::auth::refresh));
 
     // create oauth routes with rate limiting
     let oauth = Router::new()
-        .route("/google", get(routes::auth::google_auth_init))
-        .route("/google/callback", get(routes::auth::google_auth_callback));
+        .route("/google", get(api::auth::google_auth_init))
+        .route("/google/callback", get(api::auth::google_auth_callback));
 
     // protected API routes that need ArcContext and auth middleware
     let protected = Router::new()
-        .route("/test", get(routes::test::test_handler))
+        .route("/test", get(api::test::test_handler))
         .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
 
     // public API routes
-    let public = Router::new().route("/health", get(routes::health::health_check));
+    let public = Router::new().route("/health", get(api::health::health_check));
 
     let api = Router::new()
         .nest("/auth", auth)
@@ -51,8 +51,8 @@ pub fn create_router(context: common::ArcContext) -> Router {
     // combine all routes
     Router::new()
         .nest("/api", api)
-        .route("/user_info.js", get(routes::user_info::user_info_handler))
-        .fallback(routes::assets::static_handler) // serve static assets
+        .route("/user_info.js", get(api::user_info::user_info_handler))
+        .fallback(crate::app::assets_loader::static_handler) // serve static assets
         .with_state(context)
         .layer(TraceLayer::new_for_http()) // add http request tracing for all routes
 }
