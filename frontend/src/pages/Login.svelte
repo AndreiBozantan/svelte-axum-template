@@ -1,7 +1,8 @@
 <script lang="ts">
     import { AppState } from "../AppState.svelte";
-    import { api } from "../lib/api";
+    import { api, ApiError } from "../lib/api";
     import { onMount, tick } from "svelte";
+
 
     let email = $state("");
     let password = $state("");
@@ -21,19 +22,16 @@
         errorMessage = "";
         isLoading = true;
         try {
-            const loginResponse = await api.login(email, password);
-            if (loginResponse.result === "error") {
-                errorMessage = loginResponse.message || "Invalid credentials";
-                AppState.setAuth(loginResponse);
-            } else {
-                AppState.setAuth(loginResponse);
-            }
+            const { user } = await api.login(email, password);
+            AppState.setAuth(user);
         } catch (error) {
-            errorMessage = "An unexpected error occurred. Please try again.";
+            errorMessage = error instanceof ApiError ? error.message : "An unexpected error occurred. Please try again.";
+            AppState.setAuth(null);
         } finally {
             isLoading = false;
         }
     }
+
 
     function handleGoogleLogin() {
         const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);

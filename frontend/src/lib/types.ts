@@ -4,8 +4,7 @@ export interface User {
     tenant_id: number;
 }
 
-export interface AuthResponse {
-    result: 'ok' | 'error';
-    user?: User;
-    message?: string;
+export interface ApiErrorResponse {
+    code: string;
+    message: string;
 }
