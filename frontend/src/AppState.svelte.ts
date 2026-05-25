@@ -1,4 +1,4 @@
-import type { AuthResponse } from './lib/types';
+import type { User } from './lib/types';
 
 class AppStateDef {
     isLoading = $state<boolean>(true);
@@ -22,10 +22,10 @@ class AppStateDef {
      * Updates the application authentication state from an AuthResponse.
      * Returns true if the user is authenticated, false otherwise.
      */
-    setAuth(data: AuthResponse): boolean {
-        if (data.result === 'ok' && data.user) {
-            this.user = data.user.email;
-            this.userId = data.user.id;
+    setAuth(user: User | null): boolean {
+        if (user) {
+            this.user = user.email;
+            this.userId = user.id;
             return true;
         }
         this.user = '';

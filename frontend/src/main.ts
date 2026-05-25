@@ -1,8 +1,9 @@
 import './app.css'
 
 import { mount } from 'svelte'
-import { api } from './lib/api'
 import { AppState } from './AppState.svelte'
+import { api } from './lib/api'
+import type { User } from './lib/types';
 
 import App from './App.svelte'
 
@@ -14,11 +15,13 @@ async function bootstrap() {
         const { initialUserInfo } = await import(/* @vite-ignore */ userInfoPath)
             .catch(() => ({ initialUserInfo: null })) as any;
 
-        const userInfo = (initialUserInfo?.result === 'ok' && initialUserInfo.user) 
-            ? initialUserInfo 
-            : await api.getUserInfo();
-        
-        AppState.setAuth(userInfo);
+        // initialUserInfo from /user_info.js is a raw User object or null (no envelope)
+        // api.getUserInfo() returns { user: User } — unwrap accordingly
+        const user = initialUserInfo?.email
+            ? initialUserInfo as User
+            : await api.getUserInfo().then(r => r.user).catch(() => null);
+
+        AppState.setAuth(user);
     } catch (error) {
         console.error("Bootstrap failed:", error);
     }
