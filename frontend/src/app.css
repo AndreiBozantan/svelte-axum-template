@@ -45,24 +45,6 @@ input:disabled {
     color: #ccc;
 }
 
-button {
-    color: #333;
-    background-color: #f4f4f4;
-    outline: none;
-}
-
-button:disabled {
-    color: #999;
-}
-
-button:not(:disabled):active {
-    background-color: #ddd;
-}
-
-button:focus {
-    border-color: #666;
-}
-
 /* --- Shared Page Layout Styles --- */
 
 .page {
@@ -77,9 +59,6 @@ button:focus {
 .content-container {
     width: 100%;
     max-width: 800px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
@@ -88,15 +67,17 @@ button:focus {
     padding: 24px;
     border-bottom: 1px solid #f1f5f9;
     padding-bottom: 32px;
-    background-color: #eefdfd;
-    /* background: linear-gradient(to bottom, #eefdfd, #fbfdfb); */
+    background-color: #fafdfd;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
+    .section-block { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
 
 .section-header-block {
     padding: 16px 24px;
     border-bottom: none;
     background-color: #fbfdfb;
-    /* background: linear-gradient(to bottom, #fbfdfb, #ffffff); */
 }
 
 /* Typography */
@@ -158,23 +139,104 @@ button:focus {
 }
 
 /* Buttons */
-.btn-primary { 
-    background: #10b981; 
-    color: white; 
-    border: none; 
-    padding: 12px 24px; 
-    border-radius: 8px; 
-    font-weight: 600; 
-    cursor: pointer; 
-    transition: 0.2s;
-    font-size: 1rem;
-    display: inline-block;
+button {
+    color: #333;
+    background-color: #f4f4f4;
+    outline: none;
 }
 
-.btn-primary:hover:not(:disabled) { background: #059669; }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+button:disabled {
+    color: #999;
+}
+
+button:not(:disabled):active {
+    background-color: #ddd;
+}
+
+button:focus {
+    border-color: #666;
+}
+
+.btn-primary {
+    border: none;
+    background: #10b981;
+    color: white;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-size: 1rem;
+    cursor: pointer;
+    min-width: 170px;
+    transition: 0.2s;
+    display: inline-block;
+    font-weight: 600; 
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    color: #eee;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #059669;
+}
+
 /* --- Migrated from global.css --- */
 .mono {
     font-family: 'Courier New', Courier, monospace;
 }
 
+.input-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.section-block {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.section-header {
+    margin-bottom: 16px;
+}
+
+.section-header h2 {
+    margin: 0 0 6px;
+    font-size: 1.1rem;
+}
+
+.section-header p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.two-column-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.three-column-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.field-group.full-width {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+    .two-column-grid,
+    .three-column-grid { grid-template-columns: 1fr; }
+}
