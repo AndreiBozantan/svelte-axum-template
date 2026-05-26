@@ -3,39 +3,30 @@ import './app.css'
 import { mount } from 'svelte'
 import { AppState } from './AppState.svelte'
 import { api } from './lib/api'
-import type { User } from './lib/types';
 
 import App from './App.svelte'
 
 async function bootstrap() {
     try {
-        // Try to get the initial user_info data (user, theme, etc.)
-        // This is preloaded in index.html for maximum performance
-        const userInfoPath = "/user_info.js"; // nosemgrep: ajinabraham.njsscan.generic.hardcoded_secrets.node_username
-        const { initialUserInfo } = await import(/* @vite-ignore */ userInfoPath)
-            .catch(() => ({ initialUserInfo: null })) as any;
+        const user = await api.getUserInfo()
+            .then(r => r.user)
+            .catch((err) => {
+                // 401 is expected (not logged in); anything else is worth knowing about
+                if (err.code !== 'not_authenticated') console.warn('getUserInfo failed:', err);
+                return null;
+            });
 
-        // initialUserInfo from /user_info.js is a raw User object or null (no envelope)
-        // api.getUserInfo() returns { user: User } — unwrap accordingly
-        const user = initialUserInfo?.email
-            ? initialUserInfo as User
-            : await api.getUserInfo().then(r => r.user).catch(() => null);
+        AppState.setUser(user);
 
-        AppState.setAuth(user);
+        const target = document.getElementById('app');
+        if (!target) {
+            throw new Error("Target element #app not found in the DOM.");
+        }
+
+        return mount(App, { target });
     } catch (error) {
         console.error("Bootstrap failed:", error);
     }
-
-    const targetElement = document.getElementById('app');
-    if (!targetElement) {
-        throw new Error("Target element #app not found in the DOM.");
-    }
-
-    return mount(App, {
-        target: targetElement
-    });
 }
 
-const app = bootstrap();
-
-export default app
+bootstrap();

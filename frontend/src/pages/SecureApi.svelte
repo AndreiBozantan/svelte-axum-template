@@ -8,7 +8,7 @@
         AppState.startLoading();
         response = "";
         try {
-            const data = await api.getTest();
+            const data = await api.getUserInfo();
             response = JSON.stringify(data, null, 2);
         } catch (e) {
             response = `Error: ${e}`;
@@ -27,20 +27,22 @@
         </div>
 
         <!-- API Action Group -->
-        <div class="content-group">
-            <div class="group-body">
-                <div class="item-block">
-                    <button class="btn-primary" onclick={handleApiCheck} disabled={AppState.isLoading}>
-                        {AppState.isLoading ? "Calling API..." : "Call Protected /api"}
-                    </button>
+        <div class="section-block">
+            <div class="section-header">
+                <h2>Protected API Endpoint</h2>
+                <p class="">Click the button to call a protected API endpoint that requires authentication.</p>
+            </div>
+            <div>
+                <button class="btn-primary" onclick={handleApiCheck} disabled={AppState.isLoading}>
+                    {AppState.isLoading ? "Calling API..." : "Call Protected API endpoint"}
+                </button>
 
-                    {#if response}
-                        <div class="response-container">
-                            <div class="info-label">Backend Response:</div>
-                            <pre class="response-box">{response}</pre>
-                        </div>
-                    {/if}
-                </div>
+                {#if response}
+                    <div class="response-container">
+                        <div class="info-label">Backend Response:</div>
+                        <pre class="response-box">{response}</pre>
+                    </div>
+                {/if}
             </div>
         </div>
     </div>

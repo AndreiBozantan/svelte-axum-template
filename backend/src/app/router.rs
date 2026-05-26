@@ -10,9 +10,9 @@ use axum::routing::get;
 use axum::routing::post;
 use tower_http::trace::TraceLayer;
 
+use crate::api;
 use crate::auth;
 use crate::common;
-use crate::api;
 
 /// Back end server built form various routes that are either public, require auth, or secure login
 pub fn create_router(context: common::ArcContext) -> Router {
@@ -20,7 +20,6 @@ pub fn create_router(context: common::ArcContext) -> Router {
     let auth = Router::new()
         .route("/login", post(api::auth::login))
         .route("/logout", post(api::auth::logout))
-        .route("/user_info", get(api::auth::user_info))
         .route("/refresh", post(api::auth::refresh));
 
     // create oauth routes with rate limiting
@@ -30,7 +29,8 @@ pub fn create_router(context: common::ArcContext) -> Router {
 
     // protected API routes that need ArcContext and auth middleware
     let protected = Router::new()
-        .route("/test", get(api::test::test_handler))
+        .route("/users", get(api::users::list_users))
+        .route("/users/me", get(api::users::user_info))
         .layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
 
     // public API routes
@@ -51,7 +51,6 @@ pub fn create_router(context: common::ArcContext) -> Router {
     // combine all routes
     Router::new()
         .nest("/api", api)
-        .route("/user_info.js", get(api::user_info::user_info_handler))
         .fallback(crate::app::assets_loader::static_handler) // serve static assets
         .with_state(context)
         .layer(TraceLayer::new_for_http()) // add http request tracing for all routes
