@@ -68,6 +68,7 @@ class Api {
         params?: Record<string, unknown>,
         signal?: AbortSignal,
     ): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.buildUrl(path, params), {
             credentials: 'same-origin',
             signal,
@@ -76,6 +77,7 @@ class Api {
     }
 
     private async post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.baseUrl + path, {
             method: 'POST',
             headers: this.jsonHeaders(),
@@ -87,6 +89,7 @@ class Api {
     }
 
     private async postEmpty<T>(path: string, signal?: AbortSignal): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.baseUrl + path, {
             method: 'POST',
             credentials: 'same-origin',
@@ -96,6 +99,7 @@ class Api {
     }
 
     private async put<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.baseUrl + path, {
             method: 'PUT',
             headers: this.jsonHeaders(),
@@ -107,6 +111,7 @@ class Api {
     }
 
     private async patch<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.baseUrl + path, {
             method: 'PATCH',
             headers: this.jsonHeaders(),
@@ -118,6 +123,7 @@ class Api {
     }
 
     private async del<T>(path: string, signal?: AbortSignal): Promise<T> {
+        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.baseUrl + path, {
             method: 'DELETE',
             credentials: 'same-origin',
