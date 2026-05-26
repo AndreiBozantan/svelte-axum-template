@@ -169,6 +169,50 @@ pub async fn get_user_by_sso_id(db: &SqlContext, sso_provider: &str, sso_id: &st
     Ok(user)
 }
 
+pub async fn get_users_by_tenant_id(
+    db: &SqlContext,
+    tenant_id: i64,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<User>, SqlError> {
+    let users = sqlx::query_as!(
+        User,
+        r#"
+        SELECT
+            id "id!",
+            tenant_id "tenant_id!",
+            created_at "created_at!",
+            updated_at "updated_at!",
+            status "status: UserStatus",
+            email "email!",
+            first_name,
+            middle_name,
+            last_name,
+            password_hash,
+            sso_provider,
+            sso_id,
+            failed_login_count "failed_login_count!",
+            last_failed_login
+        FROM users
+        WHERE tenant_id = ?
+        ORDER BY id ASC
+        LIMIT ? OFFSET ?
+        "#,
+        tenant_id,
+        limit,
+        offset,
+    )
+    .fetch_all(db)
+    .await?;
+    Ok(users)
+}
+
+pub async fn count_users_by_tenant_id(db: &SqlContext, tenant_id: i64) -> Result<i64, SqlError> {
+    let row = sqlx::query!("SELECT COUNT(*) as count FROM users WHERE tenant_id = ?", tenant_id)
+        .fetch_one(db)
+        .await?;
+    Ok(row.count)
+}
 pub async fn create_or_link_sso_user(
     db: &SqlContext,
     email: &str,

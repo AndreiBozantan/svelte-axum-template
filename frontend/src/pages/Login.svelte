@@ -23,10 +23,10 @@
         isLoading = true;
         try {
             const { user } = await api.login(email, password);
-            AppState.setAuth(user);
+            AppState.setUser(user);
         } catch (error) {
             errorMessage = error instanceof ApiError ? error.message : "An unexpected error occurred. Please try again.";
-            AppState.setAuth(null);
+            AppState.setUser(null);
         } finally {
             isLoading = false;
         }

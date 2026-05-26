@@ -31,6 +31,7 @@ pub mod common {
     mod utils;
 
     pub mod constants;
+    pub mod types;
 
     pub use api_error::*;
     pub use context::*;
@@ -69,8 +70,7 @@ pub mod db {
 pub mod api {
     pub mod auth;
     pub mod health;
-    pub mod test;
-    pub mod user_info;
+    pub mod users;
 }
 
 pub mod app {

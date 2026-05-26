@@ -168,7 +168,7 @@
                         <span class="role-icon" class:admin={AppState.isAdmin}>
                             <Fa icon={AppState.isAdmin ? faUserShield : faUser} />
                         </span>
-                        <span class="confirm-user-email">{AppState.user}</span>
+                        <span class="confirm-user-email">{AppState.user?.email}</span>
                     </div>
                     <button 
                         class="confirm-action-btn" 

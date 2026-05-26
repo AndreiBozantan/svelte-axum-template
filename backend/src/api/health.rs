@@ -18,8 +18,9 @@ pub async fn health_check(State(context): State<common::ArcContext>) -> Result<i
         ApiError::internal()
     })?;
 
+    let time = chrono::Utc::now().to_rfc3339();
     let body = HealthCheckResponse {
-        message: "sever and database are up and running".to_string(),
+        message: format!("sever and database are up and running at {time}"),
     };
     Ok(axum::response::Json(body))
 }

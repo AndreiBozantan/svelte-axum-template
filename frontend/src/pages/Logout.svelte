@@ -9,7 +9,7 @@
         } catch {
             // already expired or invalid — clear local state regardless
         }
-        AppState.setAuth(null);
+        AppState.setUser(null);
     });
 </script>
 

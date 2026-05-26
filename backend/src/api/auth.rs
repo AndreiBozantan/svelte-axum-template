@@ -8,9 +8,10 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::auth::{self, AuthError};
+use crate::api::users::User;
+use crate::auth;
+use crate::auth::AuthError;
 use crate::common;
-use crate::common::ApiError;
 use crate::db;
 
 /// Default tenant ID assigned to users created via SSO.
@@ -23,23 +24,6 @@ pub struct Login {
 }
 
 #[derive(Serialize)]
-pub struct User {
-    pub id: i64,
-    pub email: String,
-    pub tenant_id: i64,
-}
-
-impl From<&db::User> for User {
-    fn from(u: &db::User) -> Self {
-        Self {
-            id: u.id,
-            email: u.email.clone(),
-            tenant_id: u.tenant_id,
-        }
-    }
-}
-
-#[derive(Serialize)]
 pub struct LoginResponse {
     pub user: User,
 }
@@ -47,11 +31,6 @@ pub struct LoginResponse {
 #[derive(Serialize)]
 pub struct RefreshResponse {
     pub expires_in: u32,
-    pub user: User,
-}
-
-#[derive(Serialize)]
-pub struct UserInfoResponse {
     pub user: User,
 }
 
@@ -201,23 +180,6 @@ pub async fn refresh(
         Some(&new_refresh_token_data.value),
     )?;
     Ok(r)
-}
-
-/// User info handler - returns user information based on the access token
-pub async fn user_info(
-    State(context): State<common::ArcContext>,
-    req: Request<Body>,
-) -> Result<Json<UserInfoResponse>, common::ApiError> {
-    let claims = auth::decode_token_from_req(&context, &req, auth::TokenType::Access)
-        .map_err(|err| std::convert::Into::<ApiError>::into(&err))?;
-    let user_id = claims
-        .sub
-        .parse::<i64>()
-        .map_err(|_| common::ApiError::not_authenticated())?;
-    let user = db::get_user_by_id(&context.db, user_id)
-        .await
-        .map_err(|_| common::ApiError::not_authenticated())?;
-    Ok(Json(UserInfoResponse { user: (&user).into() }))
 }
 
 /// Google OAuth initiation handler - redirects user to Google's OAuth consent screen
