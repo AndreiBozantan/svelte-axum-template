@@ -85,11 +85,12 @@ async fn run_app() -> Result<(), AppError> {
 
     auth::check_oauth_config(&settings.oauth);
 
+    let app_run_env = cfg::AppSettings::get_app_run_env();
     let http_client = create_http_client()?;
     let db = create_db_context(&settings.database).await?;
     let jwt_secret = auth::get_jwt_secret()?;
     let jwt = auth::JwtContext::new(&settings.jwt, &jwt_secret)?;
-    let ctx = common::Context::new(db, jwt, settings, http_client);
+    let ctx = common::Context::new(app_run_env, db, jwt, settings, http_client);
     if !app::run_cli(&ctx.db).await? {
         app::run_migrations(&ctx.db).await?;
         start_server(ctx).await?;
@@ -102,9 +103,9 @@ async fn start_server(ctx: common::ArcContext) -> Result<(), AppError> {
     let router = app::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("starting server... 🚀 ");
-    tracing::info!("app_env: {}", cfg::AppSettings::get_app_run_env());
-    tracing::info!("cfg_dir: {}", cfg::AppSettings::get_config_full_path());
+    tracing::info!("app_env: {}", ctx.env);
     tracing::info!("logging: {}", ctx.settings.server.log_directives);
+    tracing::info!("cfg_dir: {}", cfg::AppSettings::get_config_full_path());
     tracing::info!("address: http://{}", addr);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
