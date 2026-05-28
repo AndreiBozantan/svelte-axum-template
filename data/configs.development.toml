@@ -5,7 +5,7 @@ log_directives = "debug,tower_http=debug,axum=debug"
 env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
 
 [database]
-url = "sqlite:db.sqlite"
+url = "./data/sqlite:db.sqlite"
 max_connections = 5
 store_temp_tables_in_memory = true
 
@@ -22,6 +22,3 @@ refresh_token_expiry_days = 32
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = "http://localhost:3000/api/oauth/google/callback"
-
-# Session timeout for OAuth flow (in minutes)
-session_timeout_minutes = 10

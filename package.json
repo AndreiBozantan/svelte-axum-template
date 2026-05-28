@@ -10,11 +10,11 @@
 
     "cargo:binstall": "node -e \"try { require('child_process').execSync('cargo-binstall -V') } catch (e) { require('child_process').execSync('cargo install cargo-binstall', {stdio: 'inherit'}) }\"",
     "cargo:install": "npm run cargo:binstall && cargo binstall sqlx-cli cargo-watch --no-confirm",
-    "db:drop": "cargo sqlx database drop -y --database-url sqlite:db.sqlite",
-    "db:create": "cargo sqlx database create --database-url sqlite:db.sqlite",
-    "db:migrate": "cargo sqlx migrate run --database-url sqlite:db.sqlite --source migrations",
-    "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:db.sqlite",
-    "db:init": "export DATABASE_URL=sqlite:db.sqlite && npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
+    "db:drop": "cargo sqlx database drop -y --database-url sqlite:./data/db.sqlite",
+    "db:create": "cargo sqlx database create --database-url sqlite:./data/db.sqlite",
+    "db:migrate": "cargo sqlx migrate run --database-url sqlite:./data/db.sqlite --source migrations",
+    "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:./data/db.sqlite",
+    "db:init": "export DATABASE_URL=sqlite:./data/db.sqlite && npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
 
     "lint:security": "semgrep --config r/all",
 
@@ -24,7 +24,7 @@
 
     "dev:init": "npm install && npm run build:frontend && npm run db:init && npm run dev:init:admin",
     "dev:init:admin": "cargo run -- create-admin --email a@b.cc",
-    "dev:backend": "cargo watch --ignore db.sqlite --watch backend/src --exec run",
+    "dev:backend": "cargo watch --ignore ./data/db.sqlite --watch backend/src --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd frontend && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && node -e \"import('open').then(m => m.default('http://localhost:5173'))\"",
     "dev": "concurrently npm:dev:frontend npm:dev:backend npm:dev:open --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green",

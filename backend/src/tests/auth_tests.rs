@@ -45,7 +45,7 @@ async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
         .build()
         .expect("Failed to create HTTP client");
 
-    common::Context::new("test".to_string(), db, jwt, config, http_client)
+    common::Context::new(db, jwt, config, http_client)
 }
 
 async fn create_test_server(config: cfg::AppSettings) -> TestServer {

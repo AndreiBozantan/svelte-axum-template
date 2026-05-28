@@ -24,7 +24,6 @@ impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
         dotenvy::dotenv().ok();
 
-        let app_run_env = Self::get_app_run_env();
         let config_path = Self::get_config_path();
         let mut builder = config::Config::builder();
 
@@ -34,11 +33,17 @@ impl AppSettings {
             .map_err(|e| ConfigError::Message(format!("Failed to serialize defaults: {e}")))?;
         builder = builder.add_source(File::from_str(&default_toml, config::FileFormat::Toml));
 
-        // Layer 1: Add default configuration from files
-        let default_config_path = config_path.join("configs.default.toml");
-        if default_config_path.exists() {
-            builder = builder.add_source(File::from(default_config_path));
+        // Layer 1: Add common configuration from files
+        let common_config_path = config_path.join("configs.common.toml");
+        if common_config_path.exists() {
+            builder = builder.add_source(File::from(common_config_path));
         }
+
+        // extract the env_vars_prefix from the common config 
+        // clone the builder so we don't mutate the original builder state prematurely
+        let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
+        let env_vars_prefix = partial_config.server.env_vars_prefix;
+        let app_run_env = Self::get_app_run_env(&env_vars_prefix);
 
         // Layer 2: Add environment-specific config
         let env_config_path = config_path.join(format!("configs.{app_run_env}.toml"));
@@ -53,13 +58,9 @@ impl AppSettings {
             builder = builder.add_source(File::from(local_config_path));
         }
 
-        // extract the env_vars_prefix from the file layers
-        // clone the builder up to Layer 3 so we don't mutate the original builder state prematurely
-        let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
-    
         // Layer 4: Override with environment variables, using a dynamic prefix
         // Use APP_SERVER_HOST, APP_DATABASE_URL, etc.
-        builder = builder.add_source(Environment::with_prefix(&partial_config.server.env_vars_prefix).separator("_"));
+        builder = builder.add_source(Environment::with_prefix(&env_vars_prefix).separator("_"));
 
         // Build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;
@@ -83,13 +84,13 @@ impl AppSettings {
     }
 
     #[must_use]
-    pub fn get_app_run_env() -> String {
-        env::var("APP_RUN_ENV").unwrap_or_else(|_| "production".to_string())
+    pub fn get_app_run_env(env_vars_prefix: &str) -> String {
+        env::var(format!("{env_vars_prefix}_RUN_ENV")).unwrap_or_else(|_| "production".to_string())
     }
 
     #[must_use]
     pub fn get_config_path() -> &'static Path {
-        Path::new(".")
+        Path::new("./data/")
     }
 
     #[must_use]
