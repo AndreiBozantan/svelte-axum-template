@@ -2,6 +2,7 @@
 host = "127.0.0.1"
 port = 3000
 log_directives = "debug,tower_http=debug,axum=debug"
+env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
 
 [database]
 url = "sqlite:db.sqlite"
@@ -10,7 +11,7 @@ store_temp_tables_in_memory = true
 
 [jwt]
 access_token_expiry_minutes = 16
-refresh_token_expiry_days = 128
+refresh_token_expiry_days = 32
 
 [oauth]
 # ⚠️ SECURITY WARNING: NEVER commit real OAuth secrets to git!

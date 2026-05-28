@@ -1,7 +1,8 @@
 [server]
-host = "127.0.0.1"
+host = "0.0.0.0"
 port = 3000
-log_directives = "debug,tower_http=debug,axum=debug"
+log_directives = "info,tower_http=warn,axum=warn"
+env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
 
 [database]
 url = "sqlite:db.sqlite"
@@ -10,9 +11,14 @@ store_temp_tables_in_memory = true
 
 [jwt]
 access_token_expiry_minutes = 16
-refresh_token_expiry_days = 128
+refresh_token_expiry_days = 32
 
 [oauth]
+# ⚠️ SECURITY WARNING: NEVER commit real OAuth secrets to git!
+# Use one of these secure methods instead:
+# 1. Environment variables (in .env file): APP_OAUTH_GOOGLE_CLIENT_ID, APP_OAUTH_GOOGLE_CLIENT_SECRET
+# 2. Create configs.local.toml (git-ignored)
+
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = ""   # 🚀 add your actual redirect URI here

@@ -53,9 +53,13 @@ impl AppSettings {
             builder = builder.add_source(File::from(local_config_path));
         }
 
-        // Layer 4: Override with environment variables
+        // extract the env_vars_prefix from the file layers
+        // clone the builder up to Layer 3 so we don't mutate the original builder state prematurely
+        let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
+    
+        // Layer 4: Override with environment variables, using a dynamic prefix
         // Use APP_SERVER_HOST, APP_DATABASE_URL, etc.
-        builder = builder.add_source(Environment::with_prefix("APP").separator("_"));
+        builder = builder.add_source(Environment::with_prefix(&partial_config.server.env_vars_prefix).separator("_"));
 
         // Build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;
