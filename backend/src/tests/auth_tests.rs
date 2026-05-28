@@ -45,7 +45,7 @@ async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
         .build()
         .expect("Failed to create HTTP client");
 
-    common::Context::new(db, jwt, config, http_client)
+    common::Context::new("test".to_string(), db, jwt, config, http_client)
 }
 
 async fn create_test_server(config: cfg::AppSettings) -> TestServer {
@@ -161,7 +161,7 @@ async fn test_refresh_token_invalid() {
 #[tokio::test]
 async fn test_protected_route_without_token() {
     let server = create_test_server(default_config()).await;
-    let response = server.get("/api/test").await;
+    let response = server.get("/api/users/me").await;
     response.assert_status(StatusCode::UNAUTHORIZED);
 }
 
@@ -170,7 +170,7 @@ async fn test_protected_route_with_invalid_token() {
     let server = create_test_server(default_config()).await;
 
     let response = server
-        .get("/api/test")
+        .get("/api/users/me")
         .add_header(header::AUTHORIZATION, "Bearer invalid_token")
         .await;
 
@@ -281,7 +281,7 @@ async fn test_protected_route_with_valid_token() {
 
     // access protected route
     let api_response = server
-        .get("/api/test")
+        .get("/api/users/me")
         .add_cookie(cookie::Cookie::new("access_token", access_token.clone()))
         .await;
 
@@ -311,7 +311,7 @@ async fn test_access_token_expiry() {
 
     // test that a valid token works
     let response_valid = server
-        .get("/api/test")
+        .get("/api/users/me")
         .add_cookie(cookie::Cookie::new("access_token", valid_access_token.clone()))
         .await;
     response_valid.assert_status(StatusCode::OK);
@@ -343,7 +343,7 @@ async fn test_access_token_expiry() {
 
     // test that expired token is rejected
     let response_expired = server
-        .get("/api/test")
+        .get("/api/users/me")
         .add_cookie(cookie::Cookie::new("access_token", expired_token))
         .await;
     response_expired.assert_status(StatusCode::UNAUTHORIZED);
@@ -442,7 +442,7 @@ async fn test_account_lockout_after_failed_attempts() {
 async fn test_user_info_unauthenticated_returns_401() {
     let server = create_test_server(default_config()).await;
 
-    let response = server.get("/api/auth/user_info").await;
+    let response = server.get("/api/users/me").await;
 
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();
