@@ -6,6 +6,10 @@ CREATE TABLE IF NOT EXISTS tenants (
     name TEXT NOT NULL,
     description TEXT
 );
+-- create a default tenant, for new users who sign up without specifying a tenant (e.g., via SSO) or 
+-- for system users that don't belong to any specific tenant
+INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)
+VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Default', 'Default tenant for system users');
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,10 +34,9 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_users_sso_provider_id ON users(sso_provider, sso_id);
 CREATE UNIQUE INDEX users_email_case_insensitive ON users(LOWER(email));
--- create a default tenant, for new users who sign up without specifying a tenant (e.g., via SSO) or 
--- for system users that don't belong to any specific tenant
-INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)
-VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Default', 'Default tenant for system users');
+-- create a default system user for internal operations, associated with the default tenant
+INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
+VALUES (0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

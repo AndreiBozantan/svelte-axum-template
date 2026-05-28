@@ -5,7 +5,6 @@ use clap::{Parser, Subcommand};
 
 use crate::app;
 use crate::auth;
-use crate::common;
 use crate::db;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
@@ -153,31 +152,11 @@ async fn create_admin(email: String, db: &db::SqlContext) -> Result<(), CliError
         .then(|| CliError::Other("Password cannot be empty".to_string()))
         .map_or(Ok(()), Err)?;
 
-    // check if user already exists; if found, return an error
-    let email = common::normalize_email(&email);
-    match db::get_user_by_email(db, &email).await {
-        Err(db::SqlError::RowNotFound) => Ok(()),
-        Err(e) => Err(CliError::Other(e.to_string())),
-        Ok(_) => Err(CliError::Other("User already exists".to_string())),
-    }?;
-
     let password_hash = auth::hash_password(&password)?;
-    let new_user = db::NewUser {
-        email,
-        status: db::UserStatus::Active,
-        tenant_id: 0, // default tenant
-        first_name: "admin".to_string().into(),
-        middle_name: None,
-        last_name: None,
-        password_hash: Some(password_hash),
-        sso_provider: None,
-        sso_id: None,
-    };
-
-    db::create_user(db, new_user)
+    db::update_user_email_and_password(db, 0, &email, &password_hash)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 
-    println!("Admin user created successfully.");
+    println!("Admin user updated successfully.");
     Ok(())
 }

@@ -80,6 +80,35 @@ pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, Sql
     Ok(user)
 }
 
+pub async fn update_user_email_and_password(
+    db: &SqlContext,
+    user_id: i64,
+    email: &str,
+    password_hash: &str,
+) -> Result<(), SqlError> {
+    let email_normalized = common::normalize_email(email);
+
+    let result = sqlx::query!(
+        r#"
+        UPDATE users 
+        SET email = ?, password_hash = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        "#,
+        email_normalized,
+        password_hash,
+        user_id
+    )
+    .execute(db)
+    .await?;
+
+    // If no rows were updated, the user didn't exist
+    if result.rows_affected() == 0 {
+        return Err(SqlError::RowNotFound);
+    }
+
+    Ok(())
+}
+
 pub async fn get_user_by_id(db: &SqlContext, id: i64) -> Result<User, SqlError> {
     let user = sqlx::query_as!(
         User,
