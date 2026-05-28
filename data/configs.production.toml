@@ -5,7 +5,7 @@ log_directives = "info,tower_http=warn,axum=warn"
 env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
 
 [database]
-url = "sqlite:db.sqlite"
+url = "./data/sqlite:db.sqlite"
 max_connections = 5
 store_temp_tables_in_memory = true
 

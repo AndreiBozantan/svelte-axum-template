@@ -18,7 +18,7 @@ node_modules
 .sqlx
 
 # db files
-db.sqlite*
+data/db.sqlite*
 
 # misc
 .DS_Store
