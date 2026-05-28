@@ -10,6 +10,9 @@ pub struct ServerSettings {
 
     #[serde(default)]
     pub log_directives: String,
+
+    #[serde(default)]
+    pub env_vars_prefix: String,
 }
 
 impl Default for ServerSettings {
@@ -18,6 +21,7 @@ impl Default for ServerSettings {
             host: "0.0.0.0".to_string(),
             port: 3000,
             log_directives: "info,tower_http=info,axum=info".to_string(),
+            env_vars_prefix: "APP".to_string(),
         }
     }
 }
