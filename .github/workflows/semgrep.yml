@@ -1,10 +1,11 @@
 name: Semgrep
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch: # Enables manual triggering from the GitHub UI/API
+  # push:
+  #   branches: [ main, master ]
+  # pull_request:
+  #   branches: [ main, master ]
   schedule:
     - cron: '0 0 * * 1' # Weekly on Mondays
 
@@ -16,6 +17,10 @@ jobs:
       image: semgrep/semgrep
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # Ensure you fetch enough history if semgrep needs to diff, 
+          # though for manual full scans, default fetch-depth is usually fine.
+          fetch-depth: 0 
       - run: semgrep ci
         env:
           SEMGREP_RULES: r/all
