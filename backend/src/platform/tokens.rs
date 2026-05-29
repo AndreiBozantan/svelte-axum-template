@@ -7,8 +7,9 @@ use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
-use crate::auth;
-use crate::common;
+use crate::platform::common::ArcContext;
+use crate::platform::common::ApiError;
+use crate::platform::jwt;
 
 #[derive(Debug, Error)]
 pub enum TokenError {
@@ -16,17 +17,17 @@ pub enum TokenError {
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 
     #[error("JWT operation failed: {0}")]
-    JwtOperationFailed(#[from] auth::JwtError),
+    JwtOperationFailed(#[from] jwt::JwtError),
 
     #[error("Token expired or invalid")]
     TokenInvalid,
 }
 
-impl From<&TokenError> for common::ApiError {
+impl From<&TokenError> for ApiError {
     fn from(error: &TokenError) -> Self {
         #[allow(clippy::match_same_arms)]
         match error {
-            TokenError::JwtOperationFailed(auth::JwtError::TokenExpired) => Self::expired_token(),
+            TokenError::JwtOperationFailed(jwt::JwtError::TokenExpired) => Self::expired_token(),
             _ => Self::invalid_token(),
         }
     }
@@ -40,13 +41,13 @@ pub fn get_token_hash_as_hex(token: &str) -> String {
 }
 
 pub fn decode_token_from_req(
-    context: &common::ArcContext,
+    context: &ArcContext,
     req: &Request,
-    token_type: auth::TokenType,
-) -> Result<auth::TokenClaims, TokenError> {
+    token_type: jwt::TokenType,
+) -> Result<jwt::TokenClaims, TokenError> {
     get_cookie_value_from_headers(req.headers(), "access_token")
         .map_or_else(|| extract_bearer_token(req), Ok) // fallback to Authorization: Bearer for API clients
-        .and_then(|token| auth::decode_token(&context.jwt, token, token_type).map_err(TokenError::from))
+        .and_then(|token| jwt::decode_token(&context.jwt, token, token_type).map_err(TokenError::from))
 }
 
 fn extract_bearer_token(req: &Request<Body>) -> Result<&str, TokenError> {
@@ -64,7 +65,7 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
 }
 
 pub fn add_auth_cookies(
-    context: &common::ArcContext,
+    context: &ArcContext,
     response: Response<Body>,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
@@ -89,7 +90,7 @@ pub fn add_auth_cookies(
 
 /// Build a JSON response and attach auth cookies in one step.
 pub fn create_response_with_auth_cookies(
-    context: &common::ArcContext,
+    context: &ArcContext,
     body: &impl Serialize,
     access_token: Option<&str>,
     refresh_token: Option<&str>,

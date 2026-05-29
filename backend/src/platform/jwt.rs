@@ -5,12 +5,13 @@ use chrono::NaiveDateTime;
 use chrono::Utc;
 use jsonwebtoken as jwt;
 use rand::TryRng;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::cfg;
-use crate::common::ApiError;
+use crate::platform::common::ApiError;
+use crate::platform::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -122,7 +123,7 @@ pub struct JwtContext {
 }
 
 impl JwtContext {
-    pub fn new(settings: &cfg::JwtSettings, secret: &str) -> Result<Self, JwtError> {
+    pub fn new(settings: &config::JwtSettings, secret: &str) -> Result<Self, JwtError> {
         let encoding_key = jwt::EncodingKey::from_secret(secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(secret.as_ref());
         let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
@@ -179,7 +180,7 @@ pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Res
 /// Loads or creates a JWT secret
 pub fn get_jwt_secret() -> Result<String, JwtError> {
     // check persisted secret file
-    let secret_file_path = cfg::AppSettings::get_config_path().join(".jwt.secret");
+    let secret_file_path = config::AppSettings::get_config_path().join(".jwt.secret");
     if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
         let trimmed_secret = file_secret.trim();
         if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {

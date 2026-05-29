@@ -2,7 +2,7 @@ use argon2::Argon2;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHasher, SaltString};
 
-use crate::auth::{self, hash_password, verify_password};
+use crate::platform::password::*;
 
 #[test]
 fn test_hash_password_creates_valid_hash() {
@@ -74,7 +74,7 @@ fn dummy_hash_parameters_match_argon2_default() {
     // Parse both hashes and compare their parameters
     let salt = SaltString::generate(&mut OsRng);
     let fresh = Argon2::default().hash_password(b"test", &salt).expect("hash failed");
-    let dummy = argon2::PasswordHash::new(auth::DUMMY_HASH).expect("dummy hash is valid");
+    let dummy = argon2::PasswordHash::new(DUMMY_HASH).expect("dummy hash is valid");
 
     assert_eq!(
         dummy.algorithm, fresh.algorithm,

@@ -1,8 +1,8 @@
-use crate::auth::*;
-use crate::cfg;
+use crate::platform::jwt::*;
+use crate::platform::config;
 
 fn create_test_context() -> JwtContext {
-    let settings = cfg::JwtSettings {
+    let settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
     };
@@ -72,7 +72,7 @@ fn test_decode_refresh_token_success() {
 #[test]
 fn test_decode_access_token_wrong_secret() {
     // create a context with a different secret
-    let settings = cfg::JwtSettings {
+    let settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
     };

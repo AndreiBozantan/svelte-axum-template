@@ -8,9 +8,8 @@ use sqlx::Error as SqlxError;
 use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
-use crate::app;
-use crate::common;
-use crate::db;
+use crate::platform::common::ArcContext;
+use crate::platform::db;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -47,7 +46,7 @@ pub fn list_migrations() -> Vec<String> {
 }
 
 /// Runs the embedded migrations
-pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), MigrationError> {
+pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
     // run core structural migrations safely on ALL environments
     sqlx::migrate!("../migrations")
         .run(&ctx.db)
@@ -77,7 +76,7 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), MigrationErr
 
 /// Check if migrations need to be applied
 pub async fn check_pending_migrations(db: &db::SqlContext) -> Result<bool, MigrationError> {
-    let available_migrations = app::list_migrations();
+    let available_migrations = list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)
         .await

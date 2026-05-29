@@ -8,18 +8,25 @@ use axum_test::TestServer;
 use serde_json::Value;
 use serde_json::json;
 
-use crate::app;
-use crate::auth;
-use crate::cfg;
-use crate::common;
-use crate::db;
+use crate::platform::common::ArcContext;
+use crate::platform::common::Context;
+use crate::platform::db;
+use crate::platform::jwt;
+use crate::platform::password;
+use crate::platform::tokens;
+use crate::platform::migrations;
+use crate::platform::router;
+
+use crate::app::identity::identity_models;
+use crate::app::identity::identity_store;
+use crate::platform::config;
 
 const TEST_USER_EMAIL: &str = "test@example.com";
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
 
-fn default_config() -> cfg::AppSettings {
-    cfg::AppSettings {
-        jwt: cfg::JwtSettings {
+fn default_config() -> config::AppSettings {
+    config::AppSettings {
+        jwt: config::JwtSettings {
             access_token_expiry_minutes: 60,
             refresh_token_expiry_days: 1,
         },
@@ -27,38 +34,38 @@ fn default_config() -> cfg::AppSettings {
     }
 }
 
-async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
+async fn create_test_context(config: config::AppSettings) -> ArcContext {
     // use a temporary in-memory SQLite database for testing
-    let db_config = cfg::DatabaseSettings {
+    let db_config = config::DatabaseSettings {
         url: "sqlite::memory:".to_string(),
         max_connections: 5,
         store_temp_tables_in_memory: true,
     };
-    let db = app::create_db_context(&db_config).await.unwrap();
+    let db = db::create_context(&db_config).await.unwrap();
 
     let jwt_secret = "test__secret__key__for__jwt__testing";
-    let jwt = auth::JwtContext::new(&config.jwt, jwt_secret).unwrap();
+    let jwt = jwt::JwtContext::new(&config.jwt, jwt_secret).unwrap();
 
     let http_client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .expect("Failed to create HTTP client");
 
-    let ctx = common::Context::new(db, jwt, config, http_client);
+let ctx = Context::new(db, jwt, config, http_client);
 
-    app::run_migrations(&ctx).await.unwrap();
+    migrations::run_migrations(&ctx).await.unwrap();
 
     ctx
 }
 
-async fn create_test_server(config: cfg::AppSettings) -> TestServer {
+async fn create_test_server(config: config::AppSettings) -> TestServer {
     let ctx = create_test_context(config).await;
 
     // create test user
-    let password_hash = auth::hash_password(TEST_PASSWORD).unwrap();
-    let user = db::NewUser {
+    let password_hash = password::hash_password(TEST_PASSWORD).unwrap();
+    let user = identity_models::NewUser {
         tenant_id: 0,
-        status: db::UserStatus::Active,
+        status: identity_models::UserStatus::Active,
         email: "test@example.com".to_string(),
         first_name: "Test".to_string().into(),
         middle_name: None,
@@ -67,9 +74,9 @@ async fn create_test_server(config: cfg::AppSettings) -> TestServer {
         sso_provider: None,
         sso_id: None,
     };
-    db::create_user(&ctx.db, user).await.unwrap();
+    identity_store::create_user(&ctx.db, user).await.unwrap();
 
-    let router = app::create_router(ctx);
+    let router = router::create_router(ctx);
     TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
 }
 
@@ -296,7 +303,7 @@ async fn test_access_token_expiry() {
     // instead of using sleep and waiting for tokens to expire (which is slow and flaky),
     // we manually create expired tokens with past timestamps for fast, deterministic testing
     use chrono::Utc;
-    use jsonwebtoken as jwt;
+    use jsonwebtoken as jwtk;
     use uuid::Uuid;
 
     let server = create_test_server(default_config()).await;
@@ -320,29 +327,29 @@ async fn test_access_token_expiry() {
     response_valid.assert_status(StatusCode::OK);
 
     // now create an expired token manually using the same JWT context setup as the server
-    let jwt_settings = cfg::JwtSettings {
+    let jwt_settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
     };
     let jwt_secret = "test__secret__key__for__jwt__testing";
-    let jwt_context = auth::JwtContext::new(&jwt_settings, jwt_secret).unwrap();
+    let jwt_context = jwt::JwtContext::new(&jwt_settings, jwt_secret).unwrap();
 
     // create an expired access token by setting past timestamps
     let now = Utc::now().timestamp();
     let expired_time = now - 3600; // 1 hour ago
 
-    let header = jwt::Header::new(jwt::Algorithm::HS256);
-    let expired_claims = auth::TokenClaims {
+    let header = jwtk::Header::new(jwtk::Algorithm::HS256);
+    let expired_claims = jwt::TokenClaims {
         sub: "1".to_string(), // user ID from our test user
         tenant_id: 1,
         email: TEST_USER_EMAIL.to_string(),
         exp: expired_time,        // expired timestamp
         iat: expired_time - 3600, // issued 2 hours ago
         jti: Uuid::new_v4().to_string(),
-        token_type: auth::TokenType::Access,
+        token_type: jwt::TokenType::Access,
     };
 
-    let expired_token = jwt::encode(&header, &expired_claims, &jwt_context.encoding_key).unwrap();
+    let expired_token = jwtk::encode(&header, &expired_claims, &jwt_context.encoding_key).unwrap();
 
     // test that expired token is rejected
     let response_expired = server
@@ -359,13 +366,13 @@ async fn test_decode_access_token_from_req_cookie_success() {
     let ctx = create_test_context(default_config()).await;
     let user_id = 123;
     let email = "test_user";
-    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access, 1).unwrap();
+    let token = jwt::generate_token(&ctx.jwt, user_id, 0, email, jwt::TokenType::Access, 1).unwrap();
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::COOKIE,
         HeaderValue::from_str(&format!("access_token={}", token.value)).unwrap(),
     );
-    let claims = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access).unwrap();
+    let claims = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
     assert_eq!(claims.email, email);
 }
@@ -376,7 +383,7 @@ async fn test_decode_access_token_from_req_success() {
     let user_id = 123;
     let email = "test_user";
 
-    let token = auth::generate_token(&ctx.jwt, user_id, 0, email, auth::TokenType::Access, 1).unwrap();
+    let token = jwt::generate_token(&ctx.jwt, user_id, 0, email, jwt::TokenType::Access, 1).unwrap();
 
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
@@ -384,7 +391,7 @@ async fn test_decode_access_token_from_req_success() {
         HeaderValue::from_str(&format!("Bearer {}", token.value)).unwrap(),
     );
 
-    let claims = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access).unwrap();
+    let claims = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).unwrap();
     assert_eq!(claims.sub, user_id.to_string());
     assert_eq!(claims.email, email);
 }
@@ -394,9 +401,9 @@ async fn test_decode_access_token_from_req_missing_header() {
     let ctx = create_test_context(default_config()).await;
     let req = Request::new(Body::empty());
 
-    let result = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access);
+    let result = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), auth::TokenError::TokenInvalid));
+    assert!(matches!(result.unwrap_err(), tokens::TokenError::TokenInvalid));
 }
 
 #[tokio::test]
@@ -410,9 +417,9 @@ async fn test_decode_access_token_from_req_wrong_format() {
         HeaderValue::from_str("some_token").unwrap(),
     );
 
-    let result = auth::decode_token_from_req(&ctx, &req, auth::TokenType::Access);
+    let result = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), auth::TokenError::TokenInvalid));
+    assert!(matches!(result.unwrap_err(), tokens::TokenError::TokenInvalid));
 }
 
 #[tokio::test]

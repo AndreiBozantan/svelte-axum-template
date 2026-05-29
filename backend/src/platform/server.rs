@@ -1,34 +1,36 @@
 use std::error::Error;
 use std::net::SocketAddr;
-use std::str::FromStr;
 
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use thiserror::Error;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::app;
-use crate::auth;
-use crate::cfg;
-use crate::common;
-use crate::db;
+use crate::platform::db;
+use crate::platform::jwt;
+use crate::platform::sso;
+use crate::platform::common;
+use crate::platform::config;
+use crate::platform::migrations;
+use crate::platform::cli;
+use crate::platform::router;
 
 /// Application-level error type
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error("Configuration error: {0}")]
-    ConfigLoadingFailed(#[from] config::ConfigError),
+    ConfigLoadingFailed(#[from] ::config::ConfigError),
 
     #[error("Database error: {0}")]
     DatabaseOperationFailed(#[from] db::SqlError),
 
     #[error("JWT error: {0}")]
-    JwtOperationFailed(#[from] auth::JwtError),
+    JwtOperationFailed(#[from] jwt::JwtError),
 
     #[error("Migration error: {0}")]
-    MigrationFailed(#[from] app::MigrationError),
+    MigrationFailed(#[from] migrations::MigrationError),
 
     #[error("CLI error: {0}")]
-    CliOperationFailed(#[from] app::CliError),
+    CliOperationFailed(#[from] cli::CliError),
 
     #[error("Network address parsing error: {0}")]
     AddressParsingFailed(#[from] std::net::AddrParseError),
@@ -38,25 +40,6 @@ pub enum AppError {
 
     #[error("Server error: {0}")]
     HttpClientCreationFailed(#[from] reqwest::Error),
-}
-
-pub async fn create_db_context(db_config: &cfg::DatabaseSettings) -> Result<db::SqlContext, db::SqlError> {
-    let options = SqliteConnectOptions::from_str(&db_config.url)?
-        .create_if_missing(true)
-        .foreign_keys(true)
-        // Increase SQLite busy timeout to handle concurrent connections better
-        .busy_timeout(std::time::Duration::from_secs(30));
-    let pool = SqlitePoolOptions::new()
-        .max_connections(db_config.max_connections)
-        .connect_with(options)
-        .await?;
-    // enable WAL mode for better concurrency
-    sqlx::query("PRAGMA journal_mode = WAL").execute(&pool).await?;
-    if db_config.store_temp_tables_in_memory {
-        // store temporary tables in memory for better performance
-        sqlx::query("PRAGMA temp_store = MEMORY").execute(&pool).await?;
-    }
-    Ok(pool)
 }
 
 pub async fn run() {
@@ -77,21 +60,21 @@ pub async fn run() {
 }
 
 async fn run_app() -> Result<(), AppError> {
-    let settings = cfg::AppSettings::new()?;
+    let settings = config::AppSettings::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    auth::check_oauth_config(&settings.oauth);
+    sso::check_oauth_config(&settings.oauth);
 
     let http_client = create_http_client()?;
-    let db = create_db_context(&settings.database).await?;
-    let jwt_secret = auth::get_jwt_secret()?;
-    let jwt = auth::JwtContext::new(&settings.jwt, &jwt_secret)?;
+    let db = db::create_context(&settings.database).await?;
+    let jwt_secret = jwt::get_jwt_secret()?;
+    let jwt = jwt::JwtContext::new(&settings.jwt, &jwt_secret)?;
     let ctx = common::Context::new(db, jwt, settings, http_client);
-    if !app::run_cli(&ctx).await? {
-        app::run_migrations(&ctx).await?;
+    if !cli::run_cli(&ctx).await? {
+        migrations::run_migrations(&ctx).await?;
         start_server(ctx).await?;
     }
     Ok(())
@@ -99,12 +82,12 @@ async fn run_app() -> Result<(), AppError> {
 
 async fn start_server(ctx: common::ArcContext) -> Result<(), AppError> {
     let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
-    let router = app::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
+    let router = router::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("starting server... 🚀 ");
     tracing::info!("app_env: {}", ctx.env);
     tracing::info!("logging: {}", ctx.settings.server.log_directives);
-    tracing::info!("cfg_dir: {}", cfg::AppSettings::get_config_full_path());
+    tracing::info!("cfg_dir: {}", config::AppSettings::get_config_full_path());
     tracing::info!("address: http://{}", addr);
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())

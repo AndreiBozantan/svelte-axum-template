@@ -1,52 +1,19 @@
-use chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
-use sqlx::{self, FromRow, Type};
+use chrono::Utc;
+use sqlx::sqlite::SqliteQueryResult;
 
-use crate::common;
-use crate::db::{SqlContext, SqlError};
+use crate::platform::utils;
+use crate::platform::constants::auth;
+use crate::platform::db::SqlContext;
+use crate::platform::db::SqlError;
 
-#[derive(Debug, PartialEq, Eq, Type, Serialize, Deserialize)]
-#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
-pub enum UserStatus {
-    Onboarding,
-    Active,
-    Suspended,
-    Archived,
-}
+use crate::app::identity::identity_models::{
+    NewRefreshToken, NewUser, RefreshToken, Tenant, TenantStatus, User, UserStatus,
+};
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
-pub struct User {
-    pub id: i64,
-    pub tenant_id: i64,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-    pub status: UserStatus,
-    pub email: String,
-    pub first_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub last_name: Option<String>,
-    pub password_hash: Option<String>,
-    pub sso_provider: Option<String>,
-    pub sso_id: Option<String>,
-    pub failed_login_count: i64,
-    pub last_failed_login: Option<NaiveDateTime>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NewUser {
-    pub tenant_id: i64,
-    pub status: UserStatus,
-    pub email: String,
-    pub first_name: Option<String>,
-    pub middle_name: Option<String>,
-    pub last_name: Option<String>,
-    pub password_hash: Option<String>,
-    pub sso_provider: Option<String>,
-    pub sso_id: Option<String>,
-}
+// ==================== Users ====================
 
 pub async fn create_user(db: &SqlContext, new_user: NewUser) -> Result<User, SqlError> {
-    let email_normalized = common::normalize_email(&new_user.email);
+    let email_normalized = utils::normalize_email(&new_user.email);
     let user = sqlx::query_as!(
         User,
         r#"
@@ -86,7 +53,7 @@ pub async fn update_user_email_and_password(
     email: &str,
     password_hash: &str,
 ) -> Result<(), SqlError> {
-    let email_normalized = common::normalize_email(email);
+    let email_normalized = utils::normalize_email(email);
 
     let result = sqlx::query!(
         r#"
@@ -139,7 +106,7 @@ pub async fn get_user_by_id(db: &SqlContext, id: i64) -> Result<User, SqlError> 
 }
 
 pub async fn get_user_by_email(db: &SqlContext, email: &str) -> Result<User, SqlError> {
-    let email = common::normalize_email(email);
+    let email = utils::normalize_email(email);
     let user = sqlx::query_as!(
         User,
         r#"
@@ -242,6 +209,7 @@ pub async fn count_users_by_tenant_id(db: &SqlContext, tenant_id: i64) -> Result
         .await?;
     Ok(row.count)
 }
+
 pub async fn create_or_link_sso_user(
     db: &SqlContext,
     email: &str,
@@ -249,7 +217,7 @@ pub async fn create_or_link_sso_user(
     sso_provider: &str,
     sso_id: &str,
 ) -> Result<User, SqlError> {
-    let email = common::normalize_email(email);
+    let email = utils::normalize_email(email);
     let user = sqlx::query_as!(
         User,
         r#"
@@ -291,7 +259,7 @@ pub async fn create_or_link_sso_user(
 /// The window duration (15 min) must match `AUTH_FAILED_LOGIN_WINDOW_MINUTES` in routes/auth.rs.
 pub async fn increment_failed_login(db: &SqlContext, user_id: i64) -> Result<(), SqlError> {
     // create the modifier string, e.g., "-15 minutes"
-    let window_length = format!("-{} minutes", common::constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
+    let window_length = format!("-{} minutes", auth::FAILED_LOGIN_WINDOW_MINUTES);
 
     sqlx::query!(
         r#"
@@ -325,4 +293,120 @@ pub async fn reset_failed_login(db: &SqlContext, user_id: i64) -> Result<(), Sql
     .execute(db)
     .await?;
     Ok(())
+}
+
+// ==================== Refresh Tokens ====================
+
+pub async fn create_refresh_token(db: &SqlContext, new_refresh_token: NewRefreshToken) -> Result<(), SqlError> {
+    sqlx::query!(
+        r#"
+        INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
+        "#,
+        new_refresh_token.jti,
+        new_refresh_token.tenant_id,
+        new_refresh_token.user_id,
+        new_refresh_token.token_hash,
+        new_refresh_token.expires_at
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+pub async fn revoke_refresh_token(db: &SqlContext, jti: &str) -> Result<(), SqlError> {
+    sqlx::query!(
+        r#"
+        UPDATE refresh_tokens
+        SET revoked_at = CURRENT_TIMESTAMP
+        WHERE jti = ?
+        "#,
+        jti
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_refresh_token_by_jti(db: &SqlContext, tenant_id: i64, jti: &str) -> Result<RefreshToken, SqlError> {
+    let token = sqlx::query_as!(
+        RefreshToken,
+        r#"
+        SELECT
+            id "id!",
+            jti "jti!",
+            user_id "user_id!",
+            token_hash "token_hash!",
+            issued_at "issued_at!",
+            expires_at "expires_at!",
+            revoked_at
+        FROM refresh_tokens
+        WHERE tenant_id = ? AND jti = ?
+        "#,
+        tenant_id,
+        jti
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(token)
+}
+
+pub async fn revoke_all_refresh_tokens_for_user(
+    db: &SqlContext,
+    tenant_id: i64,
+    user_id: i64,
+) -> Result<SqliteQueryResult, SqlError> {
+    let now = Utc::now().naive_utc();
+    let result = sqlx::query!(
+        r#"
+        UPDATE refresh_tokens
+        SET revoked_at = ?
+        WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL
+        "#,
+        now,
+        tenant_id,
+        user_id,
+    )
+    .execute(db)
+    .await?;
+    Ok(result)
+}
+
+/// Cleanup expired refresh tokens
+/// TODO: add a way to use this (e.g. command in CLI and scheduled task in server or a background task)
+async fn _cleanup_expired(db: &SqlContext) -> Result<SqliteQueryResult, SqlError> {
+    let now = Utc::now().naive_utc();
+    let result = sqlx::query!(
+        r#"
+        DELETE FROM refresh_tokens
+        WHERE expires_at < ?
+        "#,
+        now
+    )
+    .execute(db)
+    .await?;
+    Ok(result)
+}
+
+// ==================== Tenants ====================
+
+pub async fn get_tenant_by_id(db: &SqlContext, id: i64) -> Result<Tenant, SqlError> {
+    let tenant = sqlx::query_as!(
+        Tenant,
+        r#"
+        SELECT
+            id as "id!",
+            status as "status: TenantStatus",
+            name as "name!",
+            description,
+            created_at as "created_at!",
+            updated_at as "updated_at!"
+        FROM tenants
+        WHERE id = ?
+        "#,
+        id
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(tenant)
 }

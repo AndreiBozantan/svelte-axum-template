@@ -1,4 +1,5 @@
-use sha2::{Digest, Sha256};
+use sha2::Digest;
+use sha2::Sha256;
 
 pub fn log_internal_error<E: std::fmt::Display>(error: E, context: &str) {
     tracing::error!(

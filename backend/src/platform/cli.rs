@@ -1,12 +1,14 @@
 use std::io;
 use std::io::Write;
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use clap::Subcommand;
 
-use crate::app;
-use crate::auth;
-use crate::common;
-use crate::db;
+use crate::platform::common::ArcContext;
+use crate::platform::migrations;
+use crate::platform::password;
+
+use crate::app::identity::identity_store;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
 // TODO: add support for expired tokens cleanup
@@ -15,15 +17,15 @@ use crate::db;
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]
-    MigrationCreateFailed { source: app::MigrationError },
+    MigrationCreateFailed { source: migrations::MigrationError },
 
     // For the Status command, only actual errors from check_pending should be wrapped.
     // NoMigrationsApplied is handled as informational output.
     #[error("Checking migration status failed")]
-    MigrationStatusCheckFailed { source: app::MigrationError },
+    MigrationStatusCheckFailed { source: migrations::MigrationError },
 
     #[error("Running migrations failed")]
-    MigrationRunFailed { source: app::MigrationError },
+    MigrationRunFailed { source: migrations::MigrationError },
 
     #[error("Password hashing failed")]
     PasswordHashFailed { #[from] source: argon2::password_hash::Error },
@@ -76,7 +78,7 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
+pub async fn run_cli(ctx: &ArcContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -94,7 +96,7 @@ pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, ctx: &ArcContext) -> Result<(), CliError> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -104,14 +106,14 @@ async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -
 }
 
 fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = app::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
+    let file_name = migrations::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
 fn migrate_action_list() -> Result<(), CliError> {
-    let migrations = app::list_migrations();
+    let migrations = migrations::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
     } else {
@@ -123,25 +125,25 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), CliError> {
-    match app::check_pending_migrations(&ctx.db).await {
+async fn migrate_action_status(ctx: &ArcContext) -> Result<(), CliError> {
+    match migrations::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
-        Err(app::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
+        Err(migrations::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
         Err(e) => return Err(CliError::MigrationStatusCheckFailed { source: e }),
     }
     Ok(())
 }
 
-async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), CliError> {
-    app::run_migrations(ctx)
+async fn migrate_action_run(ctx: &ArcContext) -> Result<(), CliError> {
+    migrations::run_migrations(ctx)
         .await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
     // prompt for password securely
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
@@ -153,8 +155,8 @@ async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Cli
         .then(|| CliError::Other("Password cannot be empty".to_string()))
         .map_or(Ok(()), Err)?;
 
-    let password_hash = auth::hash_password(&password)?;
-    db::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
+    let password_hash = password::hash_password(&password)?;
+    identity_store::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 

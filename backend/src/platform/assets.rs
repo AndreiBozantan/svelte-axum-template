@@ -2,11 +2,12 @@ use axum::body::Body;
 use axum::http;
 use axum::http::Uri;
 use axum::http::header;
-use axum::http::response::Builder as ResponseBuilder;
+use axum::http::response::Builder;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::response::Result;
-use chrono::{TimeZone, Utc};
+use chrono::TimeZone;
+use chrono::Utc;
 use rust_embed::EmbeddedFile;
 use rust_embed::RustEmbed;
 use thiserror::Error;
@@ -57,7 +58,7 @@ pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     Ok(builder.body(Body::from(asset.data.to_vec()))?.into_response())
 }
 
-fn create_index_response_builder(asset: &EmbeddedFile) -> ResponseBuilder {
+fn create_index_response_builder(asset: &EmbeddedFile) -> Builder {
     let etag = hex::encode(asset.metadata.sha256_hash());
     Response::builder()
         .header(header::CONTENT_TYPE, "text/html")
@@ -66,7 +67,7 @@ fn create_index_response_builder(asset: &EmbeddedFile) -> ResponseBuilder {
         .header(header::ETAG, etag)
 }
 
-fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> ResponseBuilder {
+fn create_asset_response_builder(asset: &EmbeddedFile, path: &str) -> Builder {
     let mime_type = mime_guess::from_path(path).first_or_octet_stream();
     let etag = hex::encode(asset.metadata.sha256_hash());
     let builder = Response::builder()

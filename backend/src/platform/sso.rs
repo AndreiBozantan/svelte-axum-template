@@ -6,9 +6,10 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
-use crate::auth;
-use crate::cfg;
-use crate::common;
+use crate::platform::common::ArcContext;
+use crate::platform::logger;
+use crate::platform::tokens;
+use crate::platform::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -83,7 +84,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-pub fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoError> {
+pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), SsoError> {
     if config.google_client_id.is_empty() {
         return Err(SsoError::InvalidConfig(
             "Google Client ID is not configured".to_string(),
@@ -111,7 +112,7 @@ pub fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoErro
     let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
     if parsed.scheme() != "https" && !is_localhost {
         // in production, ensure HTTPS is used for the redirect URI
-        auth::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
+        logger::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
         return Err(SsoError::InvalidConfig(
             "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
         ));
@@ -121,13 +122,13 @@ pub fn validate_google_config(config: &cfg::OAuthSettings) -> Result<(), SsoErro
 }
 
 /// Validates OAuth configuration and logs a warning if setup is incomplete.
-pub fn check_oauth_config(config: &cfg::OAuthSettings) {
+pub fn check_oauth_config(config: &config::OAuthSettings) {
     if let Err(e) = validate_google_config(config) {
         tracing::warn!("Google OAuth config is incomplete. {e}");
     }
 }
 
-fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Client, SsoError> {
+fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, SsoError> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())
         .map_err(|_| SsoError::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
@@ -145,7 +146,7 @@ fn create_google_client(config: &cfg::OAuthSettings) -> Result<GoogleOAuth2Clien
 }
 
 pub fn get_google_auth_url_and_csrf_token(
-    context: &common::ArcContext,
+    context: &ArcContext,
     redirect_url: Option<String>,
 ) -> Result<(Url, String), SsoError> {
     // validate redirect URL if provided
@@ -170,7 +171,7 @@ pub fn get_google_auth_url_and_csrf_token(
     let now = Utc::now().timestamp();
     let timeout_minutes = i64::from(context.settings.oauth.session_timeout_minutes);
     let claims = OAuthStateClaims {
-        csrf_token_hash: auth::get_token_hash_as_hex(csrf_token.secret()),
+        csrf_token_hash: tokens::get_token_hash_as_hex(csrf_token.secret()),
         iat: now,
         exp: now + (timeout_minutes * 60),
         redirect_url,
@@ -178,7 +179,7 @@ pub fn get_google_auth_url_and_csrf_token(
 
     let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key).map_err(|e| {
-        auth::log_internal_error(&e, "encode_oauth_state");
+        logger::log_internal_error(&e, "encode_oauth_state");
         SsoError::InvalidConfig("Failed to encode OAuth state JWT".to_string())
     })?;
 
@@ -186,7 +187,7 @@ pub fn get_google_auth_url_and_csrf_token(
 }
 
 pub async fn get_google_user_info(
-    context: &common::ArcContext,
+    context: &ArcContext,
     headers: &axum::http::HeaderMap,
     code: &str,
     state: &str,
@@ -201,10 +202,10 @@ pub async fn get_google_user_info(
         jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
             |e| {
                 if matches!(e.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature) {
-                    auth::log_signture_expired(headers);
+                    logger::log_signture_expired(headers);
                     SsoError::SessionExpired
                 } else {
-                    auth::log_internal_error(&e, "decode_oauth_state");
+                    logger::log_internal_error(&e, "decode_oauth_state");
                     SsoError::CsrfValidationFailed
                 }
             },
@@ -212,9 +213,9 @@ pub async fn get_google_user_info(
 
     // hash the incoming `state` parameter and compare hashes with constant-time
     // equality to prevent timing-based oracle attacks on the CSRF token
-    let incoming_hash = auth::get_token_hash_as_hex(state);
+    let incoming_hash = tokens::get_token_hash_as_hex(state);
     if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
-        auth::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
+        logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
         return Err(SsoError::CsrfValidationFailed);
     }
 
@@ -222,7 +223,7 @@ pub async fn get_google_user_info(
 
     // exchange authorization code for tokens
     let oauth_client = oauth2::reqwest::ClientBuilder::new().build().map_err(|e| {
-        auth::log_internal_error(&e, "create_oauth_client");
+        logger::log_internal_error(&e, "create_oauth_client");
         SsoError::InternalError(format!("Failed to create HTTP client for OAuth: {e}"))
     })?;
 
@@ -231,7 +232,7 @@ pub async fn get_google_user_info(
         .request_async(&oauth_client)
         .await
         .map_err(|e| {
-            auth::log_internal_error(&e, "oauth_exchange_code");
+            logger::log_internal_error(&e, "oauth_exchange_code");
             SsoError::OAuth2RequestFailed(e)
         })?;
 
@@ -250,7 +251,7 @@ pub async fn get_google_user_info(
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
     if !response.status().is_success() {
-        auth::log_provider_api_error(response.status(), "google");
+        logger::log_provider_api_error(response.status(), "google");
         return Err(SsoError::InvalidConfig("OAuth provider returned an error".to_string()));
     }
 
@@ -260,17 +261,17 @@ pub async fn get_google_user_info(
         .map_err(SsoError::UserInfoRetrievalApiCallFailed)?;
 
     if user_info.email.is_empty() {
-        auth::log_invalid_user_info("email", &user_info.email, "google");
+        logger::log_invalid_user_info("email", &user_info.email, "google");
         return Err(SsoError::InvalidUserInfo);
     }
 
     if !user_info.verified_email {
-        auth::log_invalid_user_info("verified_email", "false", "google");
+        logger::log_invalid_user_info("verified_email", "false", "google");
         return Err(SsoError::InvalidUserInfo);
     }
 
     if user_info.id.is_empty() {
-        auth::log_invalid_user_info("id", &user_info.id, "google");
+        logger::log_invalid_user_info("id", &user_info.id, "google");
         return Err(SsoError::InvalidUserInfo);
     }
 

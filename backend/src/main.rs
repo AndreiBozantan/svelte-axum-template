@@ -8,83 +8,39 @@
 
 #[tokio::main]
 async fn main() {
-    app::run().await;
+    platform::server::run().await;
 }
 
-pub mod cfg {
-    mod app_settings;
-    mod database_settings;
-    mod jwt_settings;
-    mod oauth_settings;
-    mod server_settings;
-
-    pub use app_settings::*;
-    pub use database_settings::*;
-    pub use jwt_settings::*;
-    pub use oauth_settings::*;
-    pub use server_settings::*;
-}
-
-pub mod common {
-    mod api_error;
-    mod context;
-    mod utils;
-
+pub mod platform {
+    pub mod assets;
+    pub mod cli;
+    pub mod common;
+    pub mod config;
     pub mod constants;
-    pub mod types;
-
-    pub use api_error::*;
-    pub use context::*;
-    pub use utils::*;
-}
-
-pub mod auth {
-    mod auth_error;
-    mod jwt;
-    mod logger;
-    mod password;
-    mod sso;
-    mod tokens;
-
-    pub use auth_error::*;
-    pub use jwt::*;
-    pub use logger::*;
-    pub use password::*;
-    pub use sso::*;
-    pub use tokens::*;
-}
-
-pub mod db {
-    mod refresh_tokens;
-    mod tenants;
-    mod users;
-
-    pub use refresh_tokens::*;
-    pub use tenants::*;
-    pub use users::*;
-
-    pub type SqlContext = sqlx::SqlitePool;
-    pub type SqlError = sqlx::Error;
-}
-
-pub mod api {
-    pub mod auth;
-    pub mod health;
-    pub mod users;
+    pub mod db;
+    pub mod jwt;
+    pub mod logger;
+    pub mod migrations;
+    pub mod password;
+    pub mod router;
+    pub mod server;
+    pub mod sso;
+    pub mod tokens;
+    pub mod utils;
 }
 
 pub mod app {
-    mod assets_loader;
-    mod cli;
-    mod migrations;
-    mod router;
-    mod server;
-
-    pub use cli::*;
-    pub use migrations::*;
-    pub use router::*;
-    pub use server::*;
+    pub mod identity {
+        pub mod identity_api;
+        pub mod identity_models;
+        pub mod identity_store;
+    }
+    pub mod system {
+        pub mod system_api;
+    }
 }
+
+
 
 #[cfg(test)]
 mod tests {
