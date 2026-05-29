@@ -35,7 +35,6 @@ async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
         store_temp_tables_in_memory: true,
     };
     let db = app::create_db_context(&db_config).await.unwrap();
-    app::run_migrations(&db).await.unwrap();
 
     let jwt_secret = "test__secret__key__for__jwt__testing";
     let jwt = auth::JwtContext::new(&config.jwt, jwt_secret).unwrap();
@@ -45,7 +44,11 @@ async fn create_test_context(config: cfg::AppSettings) -> common::ArcContext {
         .build()
         .expect("Failed to create HTTP client");
 
-    common::Context::new(db, jwt, config, http_client)
+    let ctx = common::Context::new(db, jwt, config, http_client);
+
+    app::run_migrations(&ctx).await.unwrap();
+
+    ctx
 }
 
 async fn create_test_server(config: cfg::AppSettings) -> TestServer {

@@ -9,7 +9,8 @@ use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
 use crate::app;
-use crate::db::SqlContext;
+use crate::common;
+use crate::db;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -46,17 +47,36 @@ pub fn list_migrations() -> Vec<String> {
 }
 
 /// Runs the embedded migrations
-pub async fn run_migrations(db: &SqlContext) -> Result<(), MigrationError> {
+pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), MigrationError> {
+    // run core structural migrations safely on ALL environments
     sqlx::migrate!("../migrations")
-        .run(db)
+        .run(&ctx.db)
         .await
         .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
     tracing::info!("Database migrations completed successfully.");
+
+    // conditionally run seed data ONLY in local/development profiles
+    if ctx.is_dev_env() || ctx.is_prod_env() {
+        tracing::info!("Non-production environment detected. Running test data seed...");
+
+        let seed_path = Path::new("./data/test-data.sql");
+        if !seed_path.exists() {
+            tracing::warn!("Seed file not found at expected path: {seed_path:?}");
+            return Ok(());
+        }
+
+        let seed_sql = fs::read_to_string(seed_path)?;
+
+        // execute the raw script directly on the database handle
+        sqlx::query(&seed_sql).execute(&ctx.db).await?;
+
+        tracing::info!("Database seeding completed.");
+    }
     Ok(())
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &SqlContext) -> Result<bool, MigrationError> {
+pub async fn check_pending_migrations(db: &db::SqlContext) -> Result<bool, MigrationError> {
     let available_migrations = app::list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)

@@ -39,7 +39,7 @@ impl AppSettings {
             builder = builder.add_source(File::from(common_config_path));
         }
 
-        // extract the env_vars_prefix from the common config 
+        // extract the env_vars_prefix from the common config
         // clone the builder so we don't mutate the original builder state prematurely
         let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
         let env_vars_prefix = partial_config.server.env_vars_prefix;
