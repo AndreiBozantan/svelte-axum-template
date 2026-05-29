@@ -32,4 +32,19 @@ impl Context {
         }
         .into()
     }
+
+    #[must_use]
+    pub fn is_prod_env(&self) -> bool {
+        self.env == "production"
+    }
+
+    #[must_use]
+    pub fn is_dev_env(&self) -> bool {
+        self.env == "development"
+    }
+
+    #[must_use]
+    pub fn is_test_env(&self) -> bool {
+        self.env == "test"
+    }
 }

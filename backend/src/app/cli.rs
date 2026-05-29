@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 
 use crate::app;
 use crate::auth;
+use crate::common;
 use crate::db;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
@@ -75,7 +76,7 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(db: &db::SqlContext) -> Result<bool, CliError> {
+pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -83,22 +84,22 @@ pub async fn run_cli(db: &db::SqlContext) -> Result<bool, CliError> {
             Ok(false)
         }
         Some(CliCommand::Migrate { action }) => {
-            exec_migrate_command(action, db).await?;
+            exec_migrate_command(action, ctx).await?;
             Ok(true)
         }
         Some(CliCommand::CreateAdmin { email }) => {
-            create_admin(email, db).await?;
+            create_admin(email, ctx).await?;
             Ok(true)
         }
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, db: &db::SqlContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), CliError> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
-        MigrateAction::Status => migrate_action_status(db).await,
-        MigrateAction::Run => migrate_action_run(db).await,
+        MigrateAction::Status => migrate_action_status(ctx).await,
+        MigrateAction::Run => migrate_action_run(ctx).await,
     }
 }
 
@@ -122,8 +123,8 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(db: &db::SqlContext) -> Result<(), CliError> {
-    match app::check_pending_migrations(db).await {
+async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), CliError> {
+    match app::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
         Err(app::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
@@ -132,15 +133,15 @@ async fn migrate_action_status(db: &db::SqlContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_run(db: &db::SqlContext) -> Result<(), CliError> {
-    app::run_migrations(db)
+async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), CliError> {
+    app::run_migrations(ctx)
         .await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn create_admin(email: String, db: &db::SqlContext) -> Result<(), CliError> {
+async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), CliError> {
     // prompt for password securely
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
@@ -153,7 +154,7 @@ async fn create_admin(email: String, db: &db::SqlContext) -> Result<(), CliError
         .map_or(Ok(()), Err)?;
 
     let password_hash = auth::hash_password(&password)?;
-    db::update_user_email_and_password(db, 0, &email, &password_hash)
+    db::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 
