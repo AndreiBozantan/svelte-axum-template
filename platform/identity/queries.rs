@@ -5,7 +5,8 @@ use crate::utils;
 use crate::constants::auth;
 use crate::db::SqlContext;
 use crate::db::SqlError;
-use crate::models::*;
+
+use super::models::*;
 
 // ==================== Users ====================
 

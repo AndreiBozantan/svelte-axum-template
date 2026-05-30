@@ -8,17 +8,18 @@ use axum_test::TestServer;
 use serde_json::Value;
 use serde_json::json;
 
-use platform::common::ArcContext;
-use platform::common::Context;
-use platform::config;
-use platform::db;
-use platform::jwt;
-use platform::password;
-use platform::tokens;
-use platform::migrations;
+use crate::common::ArcContext;
+use crate::common::Context;
+use crate::config;
+use crate::db;
+use crate::jwt;
+use crate::password;
+use crate::tokens;
+use crate::migrations;
 
-use platform::models;
-use platform::queries;
+use super::models;
+use super::queries;
+use super::routes;
 
 const TEST_USER_EMAIL: &str = "test@example.com";
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
@@ -72,7 +73,7 @@ async fn create_test_server(config: config::AppSettings) -> TestServer {
         sso_id: None,
     };
     queries::create_user(&ctx.db, user).await.unwrap();
-    let platform_router = platform::routes::create(ctx.clone()).with_state(ctx);
+    let platform_router = routes::create(ctx.clone()).with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);
     TestServer::new(api_router.into_make_service_with_connect_info::<std::net::SocketAddr>())
 }

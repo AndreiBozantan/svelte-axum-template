@@ -124,7 +124,7 @@ struct HealthCheckResponse {
 
 #[allow(clippy::unused_async)]
 pub async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, ApiError> {
-    platform::queries::get_tenant_by_id(&context.db, 0).await.map_err(|e| {
+    platform::identity::queries::get_tenant_by_id(&context.db, 0).await.map_err(|e| {
         tracing::error!("Health check failed to read default tenant from database: {}", e);
         ApiError::internal()
     })?;
@@ -141,7 +141,7 @@ pub fn create_router(context: ArcContext) -> Router {
         .with_state(context.clone());
 
     let api = Router::new()
-        .merge(platform::routes::create(context.clone()))
+        .merge(platform::identity::routes::create(context.clone()))
         .merge(public)
         .fallback(|| async { ApiError::not_found() });
 

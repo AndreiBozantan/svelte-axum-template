@@ -8,7 +8,7 @@ use platform::common::ArcContext;
 use platform::migrations;
 use platform::password;
 
-use platform::queries;
+use platform::identity::queries;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
 // TODO: add support for expired tokens cleanup

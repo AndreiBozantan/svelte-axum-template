@@ -19,8 +19,9 @@ use crate::password;
 use crate::sso;
 use crate::tokens;
 use crate::utils;
-use crate::models;
-use crate::queries;
+
+use super::models;
+use super::queries;
 
 
 /// Default tenant ID assigned to users created via SSO.
