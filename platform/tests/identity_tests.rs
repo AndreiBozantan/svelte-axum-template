@@ -8,18 +8,17 @@ use axum_test::TestServer;
 use serde_json::Value;
 use serde_json::json;
 
-use crate::platform::common::ArcContext;
-use crate::platform::common::Context;
-use crate::platform::db;
-use crate::platform::jwt;
-use crate::platform::password;
-use crate::platform::tokens;
-use crate::platform::migrations;
-use crate::platform::router;
+use platform::common::ArcContext;
+use platform::common::Context;
+use platform::config;
+use platform::db;
+use platform::jwt;
+use platform::password;
+use platform::tokens;
+use platform::migrations;
 
-use crate::app::identity::identity_models;
-use crate::app::identity::identity_store;
-use crate::platform::config;
+use platform::models;
+use platform::queries;
 
 const TEST_USER_EMAIL: &str = "test@example.com";
 const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
@@ -60,12 +59,10 @@ let ctx = Context::new(db, jwt, config, http_client);
 
 async fn create_test_server(config: config::AppSettings) -> TestServer {
     let ctx = create_test_context(config).await;
-
-    // create test user
     let password_hash = password::hash_password(TEST_PASSWORD).unwrap();
-    let user = identity_models::NewUser {
+    let user = models::NewUser {
         tenant_id: 0,
-        status: identity_models::UserStatus::Active,
+        status: models::UserStatus::Active,
         email: "test@example.com".to_string(),
         first_name: "Test".to_string().into(),
         middle_name: None,
@@ -74,10 +71,10 @@ async fn create_test_server(config: config::AppSettings) -> TestServer {
         sso_provider: None,
         sso_id: None,
     };
-    identity_store::create_user(&ctx.db, user).await.unwrap();
-
-    let router = router::create_router(ctx);
-    TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>())
+    queries::create_user(&ctx.db, user).await.unwrap();
+    let platform_router = platform::routes::create(ctx.clone()).with_state(ctx);
+    let api_router = axum::Router::new().nest("/api", platform_router);
+    TestServer::new(api_router.into_make_service_with_connect_info::<std::net::SocketAddr>())
 }
 
 async fn login_and_get_tokens(server: &TestServer, email: &str, password: &str) -> (Value, String, String) {

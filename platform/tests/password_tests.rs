@@ -2,7 +2,7 @@ use argon2::Argon2;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::{PasswordHasher, SaltString};
 
-use crate::platform::password::*;
+use platform::password::*;
 
 #[test]
 fn test_hash_password_creates_valid_hash() {

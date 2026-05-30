@@ -10,8 +10,8 @@ use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::platform::common::ApiError;
-use crate::platform::config;
+use crate::common::ApiError;
+use crate::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]

@@ -6,10 +6,10 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
-use crate::platform::common::ArcContext;
-use crate::platform::logger;
-use crate::platform::tokens;
-use crate::platform::config;
+use crate::common::ArcContext;
+use crate::logger;
+use crate::tokens;
+use crate::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]

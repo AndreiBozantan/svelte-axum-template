@@ -6,13 +6,13 @@ use serde::Deserialize;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::platform::common;
-use crate::platform::config;
-use crate::platform::db;
-use crate::platform::jwt;
-use crate::platform::logger;
-use crate::platform::tokens;
-use crate::platform::sso;
+use crate::common;
+use crate::config;
+use crate::db;
+use crate::jwt;
+use crate::logger;
+use crate::tokens;
+use crate::sso;
 
 pub type ArcContext = std::sync::Arc<Context>;
 pub type AppContext = axum::extract::State<ArcContext>;

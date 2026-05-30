@@ -3,8 +3,8 @@ use std::str::FromStr;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::SqlitePoolOptions;
 
-use crate::platform::config;
-use crate::platform::db;
+use crate::config;
+use crate::db;
 
 pub type SqlContext = sqlx::SqlitePool;
 pub type SqlError = sqlx::Error;

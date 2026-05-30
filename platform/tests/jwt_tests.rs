@@ -1,5 +1,5 @@
-use crate::platform::jwt::*;
-use crate::platform::config;
+use platform::jwt::*;
+use platform::config;
 
 fn create_test_context() -> JwtContext {
     let settings = config::JwtSettings {

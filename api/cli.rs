@@ -4,11 +4,11 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
-use crate::platform::common::ArcContext;
-use crate::platform::migrations;
-use crate::platform::password;
+use platform::common::ArcContext;
+use platform::migrations;
+use platform::password;
 
-use crate::app::identity::identity_store;
+use platform::queries;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
 // TODO: add support for expired tokens cleanup
@@ -156,7 +156,7 @@ async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
         .map_or(Ok(()), Err)?;
 
     let password_hash = password::hash_password(&password)?;
-    identity_store::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
+    queries::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 

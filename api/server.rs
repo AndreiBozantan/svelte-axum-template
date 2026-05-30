@@ -1,18 +1,24 @@
+use axum::Router;
+use axum::extract::State;
+use axum::response::IntoResponse;
 use std::error::Error;
 use std::net::SocketAddr;
 
+use serde::Serialize;
 use thiserror::Error;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use crate::platform::db;
-use crate::platform::jwt;
-use crate::platform::sso;
-use crate::platform::common;
-use crate::platform::config;
-use crate::platform::migrations;
-use crate::platform::cli;
-use crate::platform::router;
+use platform::common::ArcContext;
+use platform::common::ApiError;
+use platform::db;
+use platform::jwt;
+use platform::sso;
+use platform::common;
+use platform::config;
+use platform::migrations;
+
+use crate::cli;
 
 /// Application-level error type
 #[derive(Debug, Error)]
@@ -82,7 +88,7 @@ async fn run_app() -> Result<(), AppError> {
 
 async fn start_server(ctx: common::ArcContext) -> Result<(), AppError> {
     let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
-    let router = router::create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
+    let router = create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("starting server... 🚀 ");
     tracing::info!("app_env: {}", ctx.env);
@@ -108,4 +114,40 @@ async fn shutdown_signal() {
         Ok(()) => tracing::info!("Shutdown signal received, shutting down gracefully"),
         Err(e) => tracing::error!("Failed to listen for shutdown signal: {}", e),
     }
+}
+
+#[derive(Serialize)]
+struct HealthCheckResponse {
+    message: String,
+    time: String,
+}
+
+#[allow(clippy::unused_async)]
+pub async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, ApiError> {
+    platform::queries::get_tenant_by_id(&context.db, 0).await.map_err(|e| {
+        tracing::error!("Health check failed to read default tenant from database: {}", e);
+        ApiError::internal()
+    })?;
+    let body = HealthCheckResponse {
+        message: "sever and database are up and running".to_string(),
+        time: chrono::Utc::now().to_rfc3339(),
+    };
+    Ok(axum::response::Json(body))
+}
+
+pub fn create_router(context: ArcContext) -> Router {
+    let public = Router::new()
+        .route("/health", axum::routing::get(health_check))
+        .with_state(context.clone());
+
+    let api = Router::new()
+        .merge(platform::routes::create(context.clone()))
+        .merge(public)
+        .fallback(|| async { ApiError::not_found() });
+
+    Router::new()
+        .nest("/api", api)
+        .fallback(platform::assets::static_handler)
+        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .with_state(context)
 }

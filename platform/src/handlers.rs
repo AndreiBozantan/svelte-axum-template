@@ -8,20 +8,19 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::platform::common::ArcContext;
-use crate::platform::constants;
-use crate::platform::common::ApiError;
-use crate::platform::common::Pagination;
-use crate::platform::common::AuthError;
-use crate::platform::jwt;
-use crate::platform::logger;
-use crate::platform::password;
-use crate::platform::sso;
-use crate::platform::tokens;
-use crate::platform::utils;
-
-use crate::app::identity::identity_models;
-use crate::app::identity::identity_store;
+use crate::common::ArcContext;
+use crate::constants;
+use crate::common::ApiError;
+use crate::common::Pagination;
+use crate::common::AuthError;
+use crate::jwt;
+use crate::logger;
+use crate::password;
+use crate::sso;
+use crate::tokens;
+use crate::utils;
+use crate::models;
+use crate::queries;
 
 
 /// Default tenant ID assigned to users created via SSO.
@@ -44,7 +43,7 @@ pub struct RefreshResponse {
     pub user: User,
 }
 
-fn is_temporarily_locked(user: &identity_models::User) -> bool {
+fn is_temporarily_locked(user: &models::User) -> bool {
     if user.failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
         return false;
     }
@@ -62,8 +61,7 @@ pub async fn login(
 ) -> Result<impl IntoResponse, AuthError> {
     logger::log_user_login_attempt(&headers, &login.email);
     let email_normalized = utils::normalize_email(&login.email);
-
-    let maybe_user = identity_store::get_user_by_email(&context.db, &email_normalized).await.ok();
+    let maybe_user = queries::get_user_by_email(&context.db, &email_normalized).await.ok();
 
     // check account lockout before doing any password work
     if let Some(user) = &maybe_user
@@ -89,27 +87,27 @@ pub async fn login(
     if !password::verify_password(&login.password, password_hash)? {
         logger::log_invalid_password(&headers, &email_normalized);
         if let Some(user) = &maybe_user {
-            identity_store::increment_failed_login(&context.db, user.id).await?;
+            queries::increment_failed_login(&context.db, user.id).await?;
         }
         return Err(AuthError::InvalidCredentials);
     }
 
     let user = maybe_user.ok_or(AuthError::InvalidCredentials)?;
-    identity_store::reset_failed_login(&context.db, user.id).await?;
+    queries::reset_failed_login(&context.db, user.id).await?;
     logger::log_user_login_success(&headers, &email_normalized);
 
     let access_token = generate_access_token(&context, &user)?;
     let refresh_token = generate_refresh_token(&context, &user)?;
 
     let token_hash = tokens::get_token_hash_as_hex(&refresh_token.value);
-    let new_refresh_token = identity_models::NewRefreshToken {
+    let new_refresh_token = models::NewRefreshToken {
         jti: refresh_token.claims.jti,
         tenant_id: user.tenant_id,
         user_id: user.id,
         token_hash,
         expires_at: jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
-    identity_store::create_refresh_token(&context.db, new_refresh_token).await?;
+    queries::create_refresh_token(&context.db, new_refresh_token).await?;
 
     let body = LoginResponse { user: (&user).into() };
     let r = tokens::create_response_with_auth_cookies(
@@ -148,9 +146,9 @@ pub async fn refresh(
     // the attacker uses valid refresh_token_v1 -> gets refresh_token_v2 and revokes refresh_token_v1 in DB
     // the valid user tries to use the same refresh_token_v1 -> we detect that it was already revoked
     // this is treated it as a potential reuse attack, and we revoke all refresh tokens for that user as a precaution
-    let stored_token = identity_store::get_refresh_token_by_jti(&context.db, claims.tenant_id, &claims.jti).await?;
+    let stored_token = queries::get_refresh_token_by_jti(&context.db, claims.tenant_id, &claims.jti).await?;
     if stored_token.revoked_at.is_some() {
-        let _ = identity_store::revoke_all_refresh_tokens_for_user(&context.db, claims.tenant_id, stored_token.user_id).await;
+        let _ = queries::revoke_all_refresh_tokens_for_user(&context.db, claims.tenant_id, stored_token.user_id).await;
         return Err(AuthError::InvalidToken(tokens::TokenError::TokenInvalid));
     }
 
@@ -161,20 +159,20 @@ pub async fn refresh(
     }
 
     // revoke old refresh token
-    identity_store::revoke_refresh_token(&context.db, &claims.jti).await?;
+    queries::revoke_refresh_token(&context.db, &claims.jti).await?;
 
     // generate and store a new refresh token for the user
-    let user = identity_store::get_user_by_id(&context.db, stored_token.user_id).await?;
+    let user = queries::get_user_by_id(&context.db, stored_token.user_id).await?;
     let new_refresh_token_data = generate_refresh_token(&context, &user)?;
     let new_token_hash = tokens::get_token_hash_as_hex(&new_refresh_token_data.value);
-    let new_refresh_token_db = identity_models::NewRefreshToken {
+    let new_refresh_token_db = models::NewRefreshToken {
         jti: new_refresh_token_data.claims.jti.clone(),
         tenant_id: user.tenant_id,
         user_id: user.id,
         token_hash: new_token_hash,
         expires_at: jwt::get_token_expiration_as_naive_utc(new_refresh_token_data.claims.exp)?,
     };
-    identity_store::create_refresh_token(&context.db, new_refresh_token_db).await?;
+    queries::create_refresh_token(&context.db, new_refresh_token_db).await?;
     logger::log_token_refresh(req.headers(), user.id, &claims.jti, &claims.sub);
 
     let body = RefreshResponse {
@@ -242,7 +240,7 @@ pub async fn google_auth_callback(
 
     // insert new user or link existing user if user already exists (matching email)
     let email_normalized = utils::normalize_email(&user_info.email);
-    let user = identity_store::create_or_link_sso_user(
+    let user = queries::create_or_link_sso_user(
         &context.db,
         &email_normalized,
         SSO_DEFAULT_TENANT_ID,
@@ -275,19 +273,19 @@ pub async fn google_auth_callback(
         .append(axum::http::header::SET_COOKIE, cookie_val);
 
     // store refresh token in database if everthing went fine
-    let new_refresh_token = identity_models::NewRefreshToken {
+    let new_refresh_token = models::NewRefreshToken {
         jti: refresh_token.claims.jti,
         tenant_id: user.tenant_id,
         user_id: user.id,
         token_hash: tokens::get_token_hash_as_hex(&refresh_token.value),
         expires_at: jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?,
     };
-    identity_store::create_refresh_token(&context.db, new_refresh_token).await?;
+    queries::create_refresh_token(&context.db, new_refresh_token).await?;
 
     Ok(response)
 }
 
-fn generate_refresh_token(context: &ArcContext, user: &identity_models::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_refresh_token(context: &ArcContext, user: &models::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &context.jwt,
         user.id,
@@ -298,7 +296,7 @@ fn generate_refresh_token(context: &ArcContext, user: &identity_models::User) ->
     )?)
 }
 
-fn generate_access_token(context: &ArcContext, user: &identity_models::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_access_token(context: &ArcContext, user: &models::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &context.jwt,
         user.id,
@@ -321,7 +319,7 @@ async fn try_revoke_refresh_token(context: &ArcContext, req: Request<Body>) -> R
     };
 
     // database revocation - if this fails, we want the ? to trigger a 500 error
-    identity_store::revoke_refresh_token(&context.db, &claims.jti).await?;
+    queries::revoke_refresh_token(&context.db, &claims.jti).await?;
 
     logger::log_user_logout(req.headers(), &claims.sub, &claims.email);
 
@@ -337,8 +335,8 @@ pub struct User {
     pub tenant_id: i64,
 }
 
-impl From<&identity_models::User> for User {
-    fn from(u: &identity_models::User) -> Self {
+impl From<&models::User> for User {
+    fn from(u: &models::User) -> Self {
         Self {
             id: u.id,
             email: u.email.clone(),
@@ -372,8 +370,8 @@ pub async fn list_users(
     let offset = pagination.offset.max(0);
 
     let (users, total) = tokio::try_join!(
-        identity_store::get_users_by_tenant_id(&context.db, claims.tenant_id, limit, offset),
-        identity_store::count_users_by_tenant_id(&context.db, claims.tenant_id),
+        queries::get_users_by_tenant_id(&context.db, claims.tenant_id, limit, offset),
+        queries::count_users_by_tenant_id(&context.db, claims.tenant_id),
     )
     .map_err(|_| ApiError::internal())?;
 
@@ -393,7 +391,7 @@ pub async fn user_info(
     let claims =
         tokens::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|err| ApiError::from(&err))?;
     let user_id = claims.user_id().map_err(|_| ApiError::not_authenticated())?;
-    let user = identity_store::get_user_by_id(&context.db, user_id)
+    let user = queries::get_user_by_id(&context.db, user_id)
         .await
         .map_err(|_| ApiError::not_authenticated())?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))

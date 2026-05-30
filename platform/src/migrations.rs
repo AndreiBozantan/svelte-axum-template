@@ -8,8 +8,8 @@ use sqlx::Error as SqlxError;
 use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
-use crate::platform::common::ArcContext;
-use crate::platform::db;
+use crate::common::ArcContext;
+use crate::db;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]

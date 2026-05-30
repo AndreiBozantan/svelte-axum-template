@@ -43,6 +43,7 @@ impl IntoResponse for AssetError {
     }
 }
 
+#[allow(clippy::unused_async)]
 pub async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };

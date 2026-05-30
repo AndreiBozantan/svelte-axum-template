@@ -7,9 +7,9 @@ use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
-use crate::platform::common::ArcContext;
-use crate::platform::common::ApiError;
-use crate::platform::jwt;
+use crate::common::ArcContext;
+use crate::common::ApiError;
+use crate::jwt;
 
 #[derive(Debug, Error)]
 pub enum TokenError {

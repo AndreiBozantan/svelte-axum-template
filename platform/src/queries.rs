@@ -1,14 +1,11 @@
 use chrono::Utc;
 use sqlx::sqlite::SqliteQueryResult;
 
-use crate::platform::utils;
-use crate::platform::constants::auth;
-use crate::platform::db::SqlContext;
-use crate::platform::db::SqlError;
-
-use crate::app::identity::identity_models::{
-    NewRefreshToken, NewUser, RefreshToken, Tenant, TenantStatus, User, UserStatus,
-};
+use crate::utils;
+use crate::constants::auth;
+use crate::db::SqlContext;
+use crate::db::SqlError;
+use crate::models::*;
 
 // ==================== Users ====================
 
