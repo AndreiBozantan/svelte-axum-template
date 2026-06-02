@@ -49,7 +49,6 @@ toml = { workspace = true }
 axum = { version = "0.8", features = ["tokio", "http1", "http2"] }
 cookie = "0.18"
 
-
-# Important: This tells SQLx to skip compile-time verification of database queries
+# This tells SQLx to use the local json cache for query verification instead of a live database00
 [package.metadata.sqlx]
 offline = true
