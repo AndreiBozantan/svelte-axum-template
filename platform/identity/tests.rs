@@ -13,9 +13,9 @@ use crate::common::Context;
 use crate::config;
 use crate::db;
 use crate::jwt;
+use crate::migrations;
 use crate::password;
 use crate::tokens;
-use crate::migrations;
 
 use super::models;
 use super::queries;

@@ -356,7 +356,6 @@ pub async fn list_users(
     axum::extract::Query(pagination): axum::extract::Query<Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, ApiError> {
-    
     let (limit, offset) = pagination.sanitize();
 
     let users = queries::get_users_by_tenant_id(&context.db, claims.tenant_id, limit, offset)

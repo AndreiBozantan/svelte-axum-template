@@ -21,7 +21,6 @@ pub mod sso;
 #[path = "auth/tokens.rs"]
 pub mod tokens;
 
-
 #[path = "misc/assets.rs"]
 pub mod assets;
 

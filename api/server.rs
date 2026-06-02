@@ -9,14 +9,14 @@ use thiserror::Error;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-use platform::common::ArcContext;
+use platform::common;
 use platform::common::ApiError;
+use platform::common::ArcContext;
+use platform::config;
 use platform::db;
 use platform::jwt;
-use platform::sso;
-use platform::common;
-use platform::config;
 use platform::migrations;
+use platform::sso;
 
 use crate::cli;
 
@@ -124,10 +124,12 @@ struct HealthCheckResponse {
 
 #[allow(clippy::unused_async)]
 pub async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, ApiError> {
-    platform::identity::queries::get_tenant_by_id(&context.db, 0).await.map_err(|e| {
-        tracing::error!("Health check failed to read default tenant from database: {}", e);
-        ApiError::internal()
-    })?;
+    platform::identity::queries::get_tenant_by_id(&context.db, 0)
+        .await
+        .map_err(|e| {
+            tracing::error!("Health check failed to read default tenant from database: {}", e);
+            ApiError::internal()
+        })?;
     let body = HealthCheckResponse {
         message: "server and database are up and running".to_string(),
         time: chrono::Utc::now().to_rfc3339(),

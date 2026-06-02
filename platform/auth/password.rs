@@ -1,10 +1,10 @@
 use argon2::Argon2;
-use argon2::password_hash::rand_core::OsRng;
 use argon2::password_hash::Error;
 use argon2::password_hash::PasswordHash;
 use argon2::password_hash::PasswordHasher;
 use argon2::password_hash::PasswordVerifier;
 use argon2::password_hash::SaltString;
+use argon2::password_hash::rand_core::OsRng;
 
 /// Hash a password using Argon2
 pub fn hash_password(password: &str) -> Result<String, Error> {
