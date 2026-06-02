@@ -15,11 +15,7 @@ path = "platform.rs"
 
 [dependencies]
 axum = { workspace = true }
-tower = { workspace = true }
-tower-http = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rust-embed =  { workspace = true }
@@ -28,14 +24,11 @@ sqlx = { workspace = true }
 thiserror =  { workspace = true }
 chrono = { workspace = true }
 config = { workspace = true }
-jsonwebtoken = { workspace = true } 
+jsonwebtoken = { workspace = true }
 uuid = { workspace = true }
 argon2 = { workspace = true }
-md5 = { workspace = true }
-rpassword = { workspace = true }
 rand = { workspace = true }
 hex = { workspace = true }
-axum-test = { workspace = true }
 sha2 = { workspace = true }
 oauth2 = { workspace = true }
 url = { workspace = true }
@@ -45,9 +38,6 @@ toml = { workspace = true }
 
 
 
-[dev-dependencies]
-axum = { version = "0.8", features = ["tokio", "http1", "http2"] }
-cookie = "0.18"
 
 # This tells SQLx to use the local json cache for query verification instead of a live database00
 [package.metadata.sqlx]
