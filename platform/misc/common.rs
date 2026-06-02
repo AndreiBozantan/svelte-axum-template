@@ -88,7 +88,7 @@ impl Context {
         jwt: jwt::JwtContext,
         settings: config::AppSettings,
         http_client: reqwest::Client,
-    ) -> ArcContext {
+    ) -> Self {
         let env = config::AppSettings::get_app_run_env(&settings.server.env_vars_prefix);
         Self {
             env,
@@ -97,7 +97,6 @@ impl Context {
             settings,
             http_client,
         }
-        .into()
     }
 
     #[must_use]

@@ -78,7 +78,7 @@ async fn run_app() -> Result<(), AppError> {
     let db = db::create_context(&settings.database).await?;
     let jwt_secret = jwt::get_jwt_secret()?;
     let jwt = jwt::JwtContext::new(&settings.jwt, &jwt_secret)?;
-    let ctx = common::Context::new(db, jwt, settings, http_client);
+    let ctx = common::Context::new(db, jwt, settings, http_client).into();
     if !cli::run_cli(&ctx).await? {
         migrations::run_migrations(&ctx).await?;
         start_server(ctx).await?;

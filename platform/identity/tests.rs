@@ -51,7 +51,7 @@ async fn create_test_context(config: config::AppSettings) -> ArcContext {
         .build()
         .expect("Failed to create HTTP client");
 
-let ctx = Context::new(db, jwt, config, http_client);
+    let ctx = Context::new(db, jwt, config, http_client).into();
 
     migrations::run_migrations(&ctx).await.unwrap();
 
