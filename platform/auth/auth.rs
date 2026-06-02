@@ -2,10 +2,10 @@ use axum::body::Body;
 use axum::extract::FromRequestParts;
 use axum::extract::State;
 use axum::http::Request;
-use axum::http::StatusCode;
 use axum::http::request::Parts;
 use axum::response::Response;
 
+use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::common::AuthError;
 use crate::jwt;
@@ -36,18 +36,8 @@ impl<S> FromRequestParts<S> for jwt::TokenClaims
 where
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, axum::Json<serde_json::Value>);
-
+    type Rejection = ApiError;
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts.extensions.get().cloned().ok_or_else(|| {
-            (
-                StatusCode::UNAUTHORIZED,
-                axum::Json(serde_json::json!({
-                    "result": "error",
-                    "message": "missing auth claims"
-                })),
-            )
-        })
+        parts.extensions.get().cloned().ok_or_else(ApiError::not_authenticated)
     }
 }
-

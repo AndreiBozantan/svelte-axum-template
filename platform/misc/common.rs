@@ -78,7 +78,16 @@ pub struct Pagination {
 }
 
 const fn default_pagination_limit() -> i64 {
-    50
+    20
+}
+
+impl Pagination {
+    #[must_use]
+    pub fn sanitize(&self) -> (i64, i64) {
+        let limit = self.limit.clamp(1, 200);
+        let offset = self.offset.max(0);
+        (limit, offset)
+    }
 }
 
 impl Context {
