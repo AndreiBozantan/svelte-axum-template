@@ -8,11 +8,11 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::common::ArcContext;
-use crate::constants;
 use crate::common::ApiError;
-use crate::common::Pagination;
+use crate::common::ArcContext;
 use crate::common::AuthError;
+use crate::common::Pagination;
+use crate::constants;
 use crate::jwt;
 use crate::logger;
 use crate::password;
@@ -22,7 +22,6 @@ use crate::utils;
 
 use super::models;
 use super::queries;
-
 
 /// Default tenant ID assigned to users created via SSO.
 const SSO_DEFAULT_TENANT_ID: i64 = 0;
@@ -49,8 +48,7 @@ fn is_temporarily_locked(user: &models::User) -> bool {
         return false;
     }
     user.last_failed_login.is_some_and(|last| {
-        chrono::Utc::now().naive_utc() - last
-            < chrono::Duration::minutes(constants::auth::FAILED_LOGIN_WINDOW_MINUTES)
+        chrono::Utc::now().naive_utc() - last < chrono::Duration::minutes(constants::auth::FAILED_LOGIN_WINDOW_MINUTES)
     })
 }
 
@@ -121,10 +119,7 @@ pub async fn login(
 }
 
 /// Logout handler - revokes the refresh token and clears cookies
-pub async fn logout(
-    State(context): State<ArcContext>,
-    req: Request<Body>,
-) -> Result<impl IntoResponse, AuthError> {
+pub async fn logout(State(context): State<ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
     try_revoke_refresh_token(&context, req).await?;
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
@@ -134,10 +129,7 @@ pub async fn logout(
 }
 
 /// Refresh handler - generates new tokens using a valid refresh token
-pub async fn refresh(
-    State(context): State<ArcContext>,
-    req: Request<Body>,
-) -> Result<impl IntoResponse, AuthError> {
+pub async fn refresh(State(context): State<ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, AuthError> {
     // attempt to extract and decode the refresh_token from the Cookie header
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
     let claims = jwt::decode_token(&context.jwt, refresh_token, jwt::TokenType::Refresh)?;
@@ -362,19 +354,18 @@ pub struct UserInfoResponse {
 pub async fn list_users(
     State(context): State<ArcContext>,
     axum::extract::Query(pagination): axum::extract::Query<Pagination>,
-    req: Request<Body>,
+    claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, ApiError> {
-    let claims =
-        tokens::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|e| ApiError::from(&e))?;
+    
+    let (limit, offset) = pagination.sanitize();
 
-    let limit = pagination.limit.clamp(1, 200);
-    let offset = pagination.offset.max(0);
+    let users = queries::get_users_by_tenant_id(&context.db, claims.tenant_id, limit, offset)
+        .await
+        .map_err(|_| ApiError::internal())?;
 
-    let (users, total) = tokio::try_join!(
-        queries::get_users_by_tenant_id(&context.db, claims.tenant_id, limit, offset),
-        queries::count_users_by_tenant_id(&context.db, claims.tenant_id),
-    )
-    .map_err(|_| ApiError::internal())?;
+    let total = queries::count_users_by_tenant_id(&context.db, claims.tenant_id)
+        .await
+        .map_err(|_| ApiError::internal())?;
 
     Ok(Json(ListUsersResponse {
         users: users.iter().map(Into::into).collect(),
@@ -387,13 +378,11 @@ pub async fn list_users(
 /// User info handler - returns user information based on the access token
 pub async fn user_info(
     State(context): State<ArcContext>,
-    req: Request<Body>,
+    claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, ApiError> {
-    let claims =
-        tokens::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|err| ApiError::from(&err))?;
     let user_id = claims.user_id().map_err(|_| ApiError::not_authenticated())?;
     let user = queries::get_user_by_id(&context.db, user_id)
         .await
-        .map_err(|_| ApiError::not_authenticated())?;
+        .map_err(|_| ApiError::internal())?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))
 }

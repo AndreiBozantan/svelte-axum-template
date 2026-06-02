@@ -78,7 +78,16 @@ pub struct Pagination {
 }
 
 const fn default_pagination_limit() -> i64 {
-    50
+    20
+}
+
+impl Pagination {
+    #[must_use]
+    pub fn sanitize(&self) -> (i64, i64) {
+        let limit = self.limit.clamp(1, 200);
+        let offset = self.offset.max(0);
+        (limit, offset)
+    }
 }
 
 impl Context {
@@ -88,7 +97,7 @@ impl Context {
         jwt: jwt::JwtContext,
         settings: config::AppSettings,
         http_client: reqwest::Client,
-    ) -> ArcContext {
+    ) -> Self {
         let env = config::AppSettings::get_app_run_env(&settings.server.env_vars_prefix);
         Self {
             env,
@@ -97,7 +106,6 @@ impl Context {
             settings,
             http_client,
         }
-        .into()
     }
 
     #[must_use]
