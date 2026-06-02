@@ -129,7 +129,7 @@ pub async fn health_check(State(context): State<ArcContext>) -> Result<impl Into
         ApiError::internal()
     })?;
     let body = HealthCheckResponse {
-        message: "sever and database are up and running".to_string(),
+        message: "server and database are up and running".to_string(),
         time: chrono::Utc::now().to_rfc3339(),
     };
     Ok(axum::response::Json(body))

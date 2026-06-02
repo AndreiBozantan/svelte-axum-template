@@ -21,5 +21,7 @@ node_modules
 data/db.sqlite*
 
 # misc
-.DS_Store
 tmp
+.DS_Store
+.aicode/
+.ai_coding.db
