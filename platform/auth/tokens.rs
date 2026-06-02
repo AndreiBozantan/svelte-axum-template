@@ -7,8 +7,8 @@ use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
-use crate::common::ArcContext;
 use crate::common::ApiError;
+use crate::common::ArcContext;
 use crate::jwt;
 
 #[derive(Debug, Error)]

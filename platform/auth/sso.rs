@@ -7,9 +7,9 @@ use thiserror::Error;
 use url::Url;
 
 use crate::common::ArcContext;
+use crate::config;
 use crate::logger;
 use crate::tokens;
-use crate::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]

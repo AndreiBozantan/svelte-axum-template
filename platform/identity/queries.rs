@@ -1,12 +1,18 @@
 use chrono::Utc;
 use sqlx::sqlite::SqliteQueryResult;
 
-use crate::utils;
 use crate::constants::auth;
 use crate::db::SqlContext;
 use crate::db::SqlError;
+use crate::utils;
 
-use super::models::*;
+use super::models::NewRefreshToken;
+use super::models::NewUser;
+use super::models::RefreshToken;
+use super::models::Tenant;
+use super::models::TenantStatus;
+use super::models::User;
+use super::models::UserStatus;
 
 // ==================== Users ====================
 
@@ -254,7 +260,6 @@ pub async fn create_or_link_sso_user(
 /// Increment failed login count using a sliding window.
 ///
 /// If the last failure was outside the window, the count resets to 1.
-/// The window duration (15 min) must match `AUTH_FAILED_LOGIN_WINDOW_MINUTES` in routes/auth.rs.
 pub async fn increment_failed_login(db: &SqlContext, user_id: i64) -> Result<(), SqlError> {
     // create the modifier string, e.g., "-15 minutes"
     let window_length = format!("-{} minutes", auth::FAILED_LOGIN_WINDOW_MINUTES);

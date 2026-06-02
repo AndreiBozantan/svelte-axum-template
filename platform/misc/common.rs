@@ -1,6 +1,6 @@
 use axum::Json;
-use axum::response::Response;
 use axum::response::IntoResponse;
+use axum::response::Response;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -11,8 +11,8 @@ use crate::config;
 use crate::db;
 use crate::jwt;
 use crate::logger;
-use crate::tokens;
 use crate::sso;
+use crate::tokens;
 
 pub type ArcContext = std::sync::Arc<Context>;
 pub type AppContext = axum::extract::State<ArcContext>;
@@ -60,7 +60,6 @@ pub enum AuthError {
     SsoOperationFailed(#[from] sso::SsoError),
 }
 
-#[derive(Clone)]
 pub struct Context {
     pub env: String,
     pub db: db::SqlContext,
@@ -155,7 +154,6 @@ impl IntoResponse for AuthError {
         err.into_response()
     }
 }
-
 
 impl ApiError {
     pub fn new(status: StatusCode, code: &'static str, message: impl Into<String>) -> Self {
