@@ -54,8 +54,8 @@ pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
         .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
     tracing::info!("Database migrations completed successfully.");
 
-    // conditionally run seed data ONLY in local/development profiles
-    if ctx.is_dev_env() || ctx.is_prod_env() {
+    // conditionally run seed data ONLY in local/dev/test environments
+    if ctx.is_dev_env() || ctx.is_test_env() {
         tracing::info!("Non-production environment detected. Running test data seed...");
 
         let seed_path = Path::new("./data/test-data.sql");
