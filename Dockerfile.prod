@@ -1,41 +1,42 @@
 # syntax=docker/dockerfile:1
 
-# build stage with Rust and Node.js for building the frontend and backend
+# BUILD stage with Rust and Node.js for building the frontend and backend
 FROM svelaxum-dev AS builder
 WORKDIR /build
 COPY --chown=vscode:vscode . .
 
-# frontend
-RUN npm ci && cd frontend && npm ci && npm run build
+# build the frontend
+# use a cache mount to the standard npm cache directory location
+RUN --mount=type=cache,target=/home/vscode/.npm,uid=1000,gid=1000 \
+    npm ci && cd frontend && npm ci && npm run build
 
-# backend (sqlx offline mode requires .sqlx/ committed to the repo)
-ENV SQLX_OFFLINE=true
+# build the backend
+# use cache mounts for Cargo registry and target directories
+# SQLX_OFFLINE=true allows compilation without a live database connection by reading the cached query metadata
 RUN --mount=type=cache,target=/home/vscode/.cargo/registry,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/vscode/.cargo/git,uid=1000,gid=1000 \
     --mount=type=cache,target=/build/target,uid=1000,gid=1000 \
-    cargo build --release \
-    # Copy binary out of target before the cache mount disappears
+    SQLX_OFFLINE=true cargo build --release \
     && cp target/release/svelaxum /build/svelaxum
 
-# runtime stage with only the necessary dependencies to run the app
-FROM debian:bookworm-slim@sha256:b29f74a267526ae6ea104eed6c46133b0ca70ce812525df8cd5817698f0a624a
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        libsqlite3-0 \
-        curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && groupadd -r app \
-    && useradd -r -g app -s /sbin/nologin app \
-    && mkdir -p /data \
-    && chown app:app /data
+# create a completely empty directory out of reach of the build context
+RUN mkdir -p /tmp/empty_data
 
+
+# RUNTIME STAGE (distroless)
+FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1417ffc986ec9619bd0e1556b56
+
+# use the built-in nonroot system user
+USER nonroot:nonroot
+
+# copy the compiled binary from the builder stage
 COPY --from=builder /build/svelaxum /usr/local/bin/svelaxum
 
-USER app
+# copy the pristine empty directory and map it to /data with nonroot ownership
+COPY --from=builder --chown=nonroot:nonroot /tmp/empty_data /data
+
+# start the application
+WORKDIR /
 EXPOSE 3000
 VOLUME ["/data"]
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:3000/health || exit 1
-
 CMD ["svelaxum"]
