@@ -30,6 +30,10 @@ fn default_config() -> config::AppSettings {
             access_token_expiry_minutes: 60,
             refresh_token_expiry_days: 1,
         },
+        server: config::ServerSettings {
+            env: crate::constants::env::TEST.to_string(),
+            ..Default::default()
+        },
         ..Default::default()
     }
 }

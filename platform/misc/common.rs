@@ -61,7 +61,6 @@ pub enum AuthError {
 }
 
 pub struct Context {
-    pub env: String,
     pub db: db::SqlContext,
     pub jwt: jwt::JwtContext,
     pub settings: config::AppSettings,
@@ -91,15 +90,13 @@ impl Pagination {
 
 impl Context {
     #[must_use]
-    pub fn new(
+    pub const fn new(
         db: db::SqlContext,
         jwt: jwt::JwtContext,
         settings: config::AppSettings,
         http_client: reqwest::Client,
     ) -> Self {
-        let env = config::AppSettings::get_app_run_env(&settings.server.env_vars_prefix);
         Self {
-            env,
             db,
             jwt,
             settings,
@@ -108,18 +105,23 @@ impl Context {
     }
 
     #[must_use]
+    pub fn env(&self) -> &str {
+        &self.settings.server.env
+    }
+
+    #[must_use]
     pub fn is_prod_env(&self) -> bool {
-        self.env == "production"
+        self.settings.server.env == crate::constants::env::PRODUCTION
     }
 
     #[must_use]
     pub fn is_dev_env(&self) -> bool {
-        self.env == "development"
+        self.settings.server.env == crate::constants::env::DEVELOPMENT
     }
 
     #[must_use]
     pub fn is_test_env(&self) -> bool {
-        self.env == "test"
+        self.settings.server.env == crate::constants::env::TEST
     }
 }
 

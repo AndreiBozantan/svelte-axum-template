@@ -8,3 +8,9 @@ pub mod auth {
     /// This is a security measure to prevent brute-force attacks.
     pub const FAILED_LOGIN_WINDOW_MINUTES: i64 = 5;
 }
+
+pub mod env {
+    pub const PRODUCTION: &str = "production";
+    pub const DEVELOPMENT: &str = "development";
+    pub const TEST: &str = "test";
+}
