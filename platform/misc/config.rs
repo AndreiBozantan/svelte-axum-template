@@ -1,4 +1,6 @@
-use std::{env, fs, path::Path};
+use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 use config::ConfigError;
 use config::Environment;
@@ -36,7 +38,7 @@ pub struct DatabaseSettings {
 impl Default for DatabaseSettings {
     fn default() -> Self {
         Self {
-            url: "sqlite:db.sqlite".to_string(),
+            url: "sqlite:data/db.sqlite".to_string(),
             max_connections: 5,
             store_temp_tables_in_memory: true,
         }
@@ -95,6 +97,9 @@ impl Default for OAuthSettings {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerSettings {
     #[serde(default)]
+    pub env: String,
+
+    #[serde(default)]
     pub host: String,
 
     #[serde(default)]
@@ -110,6 +115,7 @@ pub struct ServerSettings {
 impl Default for ServerSettings {
     fn default() -> Self {
         Self {
+            env: crate::constants::env::PRODUCTION.to_string(),
             host: "0.0.0.0".to_string(),
             port: 3000,
             log_directives: "info,tower_http=info,axum=info".to_string(),
@@ -122,55 +128,56 @@ impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
         dotenvy::dotenv().ok();
 
-        let config_path = Self::get_config_path();
+        let config_dir = Self::get_config_dir()
+            .map_err(|e| ConfigError::Message(format!("Failed to get the config dir path: {e}")))?;
         let mut builder = ::config::Config::builder();
 
-        // Layer 0: Set defaults from AppSettings::default()
+        // layer 0: set defaults from AppSettings::default()
         let default_settings = Self::default();
         let default_toml = toml::to_string(&default_settings)
             .map_err(|e| ConfigError::Message(format!("Failed to serialize defaults: {e}")))?;
         builder = builder.add_source(File::from_str(&default_toml, ::config::FileFormat::Toml));
 
-        // Layer 1: Add common configuration from files
-        let common_config_path = config_path.join("configs.common.toml");
+        // layer 1: add common configuration from files
+        let common_config_path = config_dir.join("configs.common.toml");
         if common_config_path.exists() {
             builder = builder.add_source(File::from(common_config_path));
         }
 
-        // extract the env_vars_prefix from the common config
         // clone the builder so we don't mutate the original builder state prematurely
         let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
-        let env_vars_prefix = partial_config.server.env_vars_prefix;
-        let app_run_env = Self::get_app_run_env(&env_vars_prefix);
+        // extract the app_run_env from the common config, which will determine which environment-specific config file to load
+        let app_run_env = partial_config.server.env.as_str();
 
-        // Layer 2: Add environment-specific config
-        let env_config_path = config_path.join(format!("configs.{app_run_env}.toml"));
+        // layer 2: add environment-specific config
+        let env_config_path = config_dir.join(format!("configs.{app_run_env}.toml"));
         let env_config_exists = env_config_path.exists();
         if env_config_exists {
-            builder = builder.add_source(File::from(env_config_path.clone()));
+            builder = builder.add_source(File::from(env_config_path.as_path()));
         }
 
-        // Layer 3: Add local config overrides
-        let local_config_path = config_path.join("configs.local.toml");
+        // layer 3: add local config overrides
+        let local_config_path = config_dir.join("configs.local.toml");
         if local_config_path.exists() {
             builder = builder.add_source(File::from(local_config_path));
         }
 
-        // Layer 4: Override with environment variables, using a dynamic prefix
-        // Use APP_SERVER_HOST, APP_DATABASE_URL, etc.
-        builder = builder.add_source(Environment::with_prefix(&env_vars_prefix).separator("_"));
+        // layer 4: override with environment variables (APP_SERVER_HOST, APP_DATABASE_URL, etc.)
+        // use partial loaded config to extract the env_vars_prefix
+        let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
+        builder = builder.add_source(Environment::with_prefix(&partial_config.server.env_vars_prefix).separator("_"));
 
-        // Build the config
+        // build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;
 
-        // In the production environment, create the config file if it doesn't exist.
-        // This allows users to easily modify the file without needing to copy it during deployment.
-        if app_run_env == "production" && !env_config_exists {
+        // in the production environment, create the config file if it doesn't exist
+        // this allows users to easily modify the file without needing to copy it during deployment
+        if app_run_env == crate::constants::env::PRODUCTION && !env_config_exists {
+            println!("Creating default config file at {}", env_config_path.to_string_lossy());
             let settings_str = toml::to_string(&settings)
                 .map_err(|e| ConfigError::Message(format!("Failed to serialize config: {e}")))?;
             fs::write(&env_config_path, settings_str)
                 .map_err(|e| ConfigError::Message(format!("Failed to write config file: {e}")))?;
-            println!("Created default config file at {}", env_config_path.to_string_lossy());
         }
 
         Ok(settings)
@@ -181,24 +188,12 @@ impl AppSettings {
         format!("{}:{}", self.server.host, self.server.port)
     }
 
-    #[must_use]
-    pub fn get_app_run_env(env_vars_prefix: &str) -> String {
-        env::var(format!("{env_vars_prefix}_RUN_ENV")).unwrap_or_else(|_| "production".to_string())
+    pub fn get_config_dir() -> Result<PathBuf, std::io::Error> {
+        fs::create_dir_all("./data/")?;
+        Path::new("./data/").canonicalize()
     }
 
-    #[must_use]
-    pub fn get_config_path() -> &'static Path {
-        Path::new("./data/")
-    }
-
-    #[must_use]
-    pub fn get_config_full_path() -> String {
-        let config_path = Self::get_config_path();
-        config_path
-            .canonicalize()
-            .ok()
-            .unwrap_or_else(|| config_path.to_path_buf())
-            .to_string_lossy()
-            .to_string()
+    pub fn get_config_dir_str(&self) -> Result<String, std::io::Error> {
+        Self::get_config_dir().map(|p| p.to_string_lossy().into_owned())
     }
 }

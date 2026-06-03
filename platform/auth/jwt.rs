@@ -180,17 +180,12 @@ pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Res
 /// Loads or creates a JWT secret
 pub fn get_jwt_secret() -> Result<String, JwtError> {
     // check persisted secret file
-    let secret_file_path = config::AppSettings::get_config_path().join(".jwt.secret");
+    let secret_file_path = config::AppSettings::get_config_dir()?.join(".jwt.secret");
     if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
         let trimmed_secret = file_secret.trim();
         if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
             return Ok(trimmed_secret.to_string());
         }
-    }
-
-    // create config directory if it doesn't exist
-    if let Some(parent) = &secret_file_path.parent() {
-        fs::create_dir_all(parent)?;
     }
 
     // write the secret to file with restricted permissions

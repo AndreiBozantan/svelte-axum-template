@@ -1,11 +1,12 @@
 [server]
+env = "development"
 host = "127.0.0.1"
 port = 3000
 log_directives = "debug,tower_http=debug,axum=debug"
 env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
 
 [database]
-url = "./data/sqlite:db.sqlite"
+url = "sqlite:data/db.sqlite"
 max_connections = 5
 store_temp_tables_in_memory = true
 

@@ -1,2 +1,2 @@
 [env]
-DATABASE_URL = "sqlite:./data/db.sqlite"
+DATABASE_URL = "sqlite:data/db.sqlite"
