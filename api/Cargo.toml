@@ -25,6 +25,6 @@ tower-http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# This tells SQLx to use the local json cache for query verification instead of a live database00
+# This tells SQLx to use the local json cache for query verification instead of a live database
 [package.metadata.sqlx]
 offline = true
