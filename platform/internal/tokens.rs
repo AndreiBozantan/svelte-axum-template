@@ -23,13 +23,18 @@ pub enum TokenError {
     TokenInvalid,
 }
 
-impl From<&TokenError> for ApiError {
-    fn from(error: &TokenError) -> Self {
-        #[allow(clippy::match_same_arms)]
-        match error {
-            TokenError::JwtOperationFailed(jwt::JwtError::TokenExpired) => Self::expired_token(),
-            _ => Self::invalid_token(),
+impl TokenError {
+    pub fn into_api_error(self) -> ApiError {
+        match self {
+            Self::JwtOperationFailed(jwt::JwtError::TokenExpired) => ApiError::expired_token(),
+            _ => ApiError::invalid_token(),
         }
+    }
+}
+
+impl From<TokenError> for ApiError {
+    fn from(error: TokenError) -> Self {
+        error.into_api_error()
     }
 }
 

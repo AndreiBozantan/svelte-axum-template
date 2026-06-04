@@ -48,16 +48,17 @@ impl From<jwt::errors::Error> for JwtError {
     }
 }
 
-impl From<&JwtError> for ApiError {
-    fn from(error: &JwtError) -> Self {
+impl JwtError {
+    #[must_use]
+    pub fn into_api_error(self) -> ApiError {
         #[allow(clippy::match_same_arms)]
-        match error {
-            JwtError::RngOperationFailed { .. } => Self::internal(),
-            JwtError::FileSystemOperationFailed { .. } => Self::internal(),
-            JwtError::EncodingFailed(_) => Self::internal(),
-            JwtError::DecodingFailed(_) => Self::invalid_token(),
-            JwtError::InvalidToken => Self::invalid_token(),
-            JwtError::TokenExpired => Self::expired_token(),
+        match self {
+            Self::RngOperationFailed { .. } => ApiError::internal(),
+            Self::FileSystemOperationFailed { .. } => ApiError::internal(),
+            Self::EncodingFailed(_) => ApiError::internal(),
+            Self::DecodingFailed(_) => ApiError::invalid_token(),
+            Self::InvalidToken => ApiError::invalid_token(),
+            Self::TokenExpired => ApiError::expired_token(),
         }
     }
 }
@@ -71,13 +72,13 @@ pub enum TokenType {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TokenClaims {
-    pub sub: String,           // Subject (user ID)
-    pub tenant_id: i64,        // Tenant ID if applicable
-    pub email: String,         // Email for convenience
-    pub exp: i64,              // Expiration time
-    pub iat: i64,              // Issued at
-    pub jti: String,           // JWT ID (unique identifier)
-    pub token_type: TokenType, // "access" or "refresh"
+    pub sub: String,
+    pub tenant_id: i64,
+    pub email: String,
+    pub exp: i64,
+    pub iat: i64,
+    pub jti: String,
+    pub token_type: TokenType,
 }
 
 impl TokenClaims {
@@ -86,31 +87,10 @@ impl TokenClaims {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TokenWithClaims {
     pub value: String,
     pub claims: TokenClaims,
-}
-
-/// Response structure for token endpoints
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub refresh_token: String,
-    pub access_token_expires_in: i64,  // Seconds until access token expires
-    pub refresh_token_expires_in: i64, // Seconds until refresh token expires
-}
-
-impl TokenResponse {
-    #[must_use]
-    pub const fn new(ctx: &JwtContext, access_token: String, refresh_token: String) -> Self {
-        Self {
-            access_token,
-            refresh_token,
-            access_token_expires_in: ctx.access_token_expiry,
-            refresh_token_expires_in: ctx.refresh_token_expiry,
-        }
-    }
 }
 
 #[derive(Clone)]

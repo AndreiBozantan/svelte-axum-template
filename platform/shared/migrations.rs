@@ -9,7 +9,7 @@ use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
 use crate::common::ArcContext;
-use crate::db;
+use crate::common::SqlContext;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -75,7 +75,7 @@ pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &db::SqlContext) -> Result<bool, MigrationError> {
+pub async fn check_pending_migrations(db: &SqlContext) -> Result<bool, MigrationError> {
     let available_migrations = list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)

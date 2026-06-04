@@ -40,15 +40,6 @@ pub fn log_invalid_user_info(field_name: &str, value: &str, provider: &str) {
     );
 }
 
-pub fn log_redirect_violation(violation: &str, url: &str) {
-    tracing::warn!(
-        event_type = "auth",
-        violation,
-        url,
-        message = "Redirect URL validation failed"
-    );
-}
-
 pub fn log_oauth_security_violation(
     headers: &axum::http::HeaderMap,
     state: &str,
@@ -78,7 +69,7 @@ pub fn log_auth_rejection<E: std::fmt::Display>(error: E) -> E {
     error
 }
 
-pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: &Option<String>, provider: &str) {
+pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: Option<&String>, provider: &str) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -112,16 +103,6 @@ pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str
     );
 }
 
-pub fn log_oauth_rate_limit_exceeded(headers: &axum::http::HeaderMap, endpoint: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "OAuth rate limit exceeded",
-        endpoint,
-    );
-}
-
 pub fn log_user_login_attempt(headers: &axum::http::HeaderMap, email: &str) {
     tracing::info!(
         event_type = "auth",
@@ -142,33 +123,12 @@ pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
     );
 }
 
-pub fn log_missing_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Attempt login without password",
-        email,
-    );
-}
-
 pub fn log_invalid_password(headers: &axum::http::HeaderMap, email: &str) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
         user_agent = extract_user_agent(headers),
         message = "Invalid password attempt",
-        email,
-    );
-}
-
-pub fn log_user_logout(headers: &axum::http::HeaderMap, user_id: &str, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "User logout",
-        user_id,
         email,
     );
 }
@@ -180,17 +140,6 @@ pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &st
         user_agent = extract_user_agent(headers),
         message = "Token refreshed",
         user_id,
-        subject,
-        jti,
-    );
-}
-
-pub fn log_token_revoke(headers: &axum::http::HeaderMap, jti: &str, subject: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Token revoked",
         subject,
         jti,
     );
@@ -257,16 +206,4 @@ fn hash_state(state: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(state.as_bytes());
     hex::encode(hasher.finalize())
-}
-
-/// Returns the canonical client IP for rate limiting, logging, and audit trails.
-///
-/// Strategy: always trust the real TCP peer from `ConnectInfo`. If your deployment
-/// sits behind a trusted reverse proxy, swap this for a whitelist-gated
-/// `X-Forwarded-For` parser — but never read XFF unconditionally, because
-/// clients can forge it.
-pub fn canonical_client_ip(req: &Request) -> String {
-    req.extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map_or_else(|| "unknown".to_string(), |ConnectInfo(addr)| addr.ip().to_string())
 }

@@ -4,23 +4,17 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
-use platform::common::ArcContext;
-use platform::migrations;
-use platform::password;
+use crate::common::ArcContext;
+use crate::identity::auth::util;
+use crate::identity::users::repo::SqliteUserRepo;
+use crate::identity::users::service::{Email, UpdateAdminCredentialsCommand, UserId, UserService};
+use crate::migrations;
 
-use platform::identity::db;
-
-// TODO: add support for secret rotation (should mark all tokens as invalid)
-// TODO: add support for expired tokens cleanup
-
-#[rustfmt::skip]
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
     #[error("Migration creation failed")]
     MigrationCreateFailed { source: migrations::MigrationError },
 
-    // For the Status command, only actual errors from check_pending should be wrapped.
-    // NoMigrationsApplied is handled as informational output.
     #[error("Checking migration status failed")]
     MigrationStatusCheckFailed { source: migrations::MigrationError },
 
@@ -28,12 +22,17 @@ pub enum CliError {
     MigrationRunFailed { source: migrations::MigrationError },
 
     #[error("Password hashing failed")]
-    PasswordHashFailed { #[from] source: argon2::password_hash::Error },
+    PasswordHashFailed {
+        #[from]
+        source: argon2::password_hash::Error,
+    },
 
     #[error("Failed to read password input")]
-    PasswordReadFailed { #[from] source: std::io::Error },
+    PasswordReadFailed {
+        #[from]
+        source: std::io::Error,
+    },
 
-    // The Other(String) variant is kept as a fallback, though ideally all errors should be specific.
     #[error("An unexpected CLI error occurred: {0}")]
     Other(String),
 }
@@ -48,15 +47,11 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
-    /// run database migrations
     Migrate {
         #[command(subcommand)]
         action: MigrateAction,
     },
-
-    /// create an admin user
     CreateAdmin {
-        /// email for the admin user
         #[arg(short, long)]
         email: String,
     },
@@ -64,16 +59,9 @@ enum CliCommand {
 
 #[derive(Subcommand)]
 enum MigrateAction {
-    /// create a new migration file
     Create { name: String },
-
-    /// list all available migrations
     List,
-
-    /// check if there are pending migrations
     Status,
-
-    /// run all pending migrations
     Run,
 }
 
@@ -144,19 +132,26 @@ async fn migrate_action_run(ctx: &ArcContext) -> Result<(), CliError> {
 }
 
 async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
-    // prompt for password securely
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 
     let password = rpassword::read_password()?;
-    password
-        .trim()
-        .is_empty()
-        .then(|| CliError::Other("Password cannot be empty".to_string()))
-        .map_or(Ok(()), Err)?;
+    if password.trim().is_empty() {
+        return Err(CliError::Other("Password cannot be empty".to_string()));
+    }
 
-    let password_hash = password::hash_password(&password)?;
-    db::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
+    let password_hash = util::hash_password(password.trim())?;
+    let parsed_email = Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
+
+    UserService::new(SqliteUserRepo)
+        .update_admin_credentials(
+            &ctx.db,
+            UpdateAdminCredentialsCommand {
+                user_id: UserId(0),
+                email: parsed_email,
+                password_hash,
+            },
+        )
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 

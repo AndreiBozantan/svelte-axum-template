@@ -3,28 +3,26 @@ name = "svelaxum"
 version = "0.1.0"
 edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [[bin]]
 name = "svelaxum"
 path = "app.rs"
 
 [dependencies]
 platform = { workspace = true }
-argon2 = { workspace = true }
 axum = { workspace = true }
 chrono = { workspace = true }
-clap = { workspace = true }
 config = { workspace = true }
+hex = { workspace = true }
+mime_guess = { workspace = true }
 reqwest = { workspace = true }
-rpassword = { workspace = true }
+rust-embed = { workspace = true }
 serde = { workspace = true }
-thiserror =  { workspace = true }
+sqlx = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tower-http = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# This tells SQLx to use the local json cache for query verification instead of a live database
 [package.metadata.sqlx]
 offline = true
