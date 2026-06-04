@@ -83,10 +83,7 @@ async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestS
         )
         .await?;
 
-    let platform_router = axum::Router::new()
-        .merge(crate::identity::auth::api::router())
-        .merge(crate::identity::oauth::api::router())
-        .merge(crate::identity::users::api::router(ctx.clone()))
+    let platform_router = crate::identity::router(ctx.clone())
         .with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);
     Ok(TestServer::new(

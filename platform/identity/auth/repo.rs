@@ -29,6 +29,7 @@ impl From<RefreshTokenRow> for RefreshToken {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct SqliteRefreshTokenRepo;
 
 impl RefreshTokenRepo for SqliteRefreshTokenRepo {

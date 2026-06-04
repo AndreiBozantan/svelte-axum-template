@@ -8,7 +8,6 @@ use crate::constants;
 use crate::identity::users;
 use crate::jwt;
 
-use super::repo::SqliteRefreshTokenRepo;
 use crate::internal::tokens;
 
 use super::util::{self, DUMMY_HASH};
@@ -80,7 +79,7 @@ pub enum AuthError {
     Internal(String),
 }
 
-pub trait RefreshTokenRepo: Sync {
+pub trait RefreshTokenRepo: Send + Sync {
     fn create(
         &self,
         db: &SqlContext,
@@ -108,9 +107,10 @@ pub trait RefreshTokenRepo: Sync {
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 }
 
+#[derive(Clone)]
 pub struct AuthService<
-    UR: crate::identity::users::service::UserRepo = users::repo::SqliteUserRepo,
-    R: RefreshTokenRepo = SqliteRefreshTokenRepo,
+    UR: crate::identity::users::service::UserRepo,
+    R: RefreshTokenRepo,
 > {
     users: users::service::UserService<UR>,
     refresh_tokens: R,
@@ -246,7 +246,7 @@ impl<UR: crate::identity::users::service::UserRepo, R: RefreshTokenRepo> AuthSer
     }
 }
 
-pub type DefaultAuthService = AuthService<users::repo::SqliteUserRepo, SqliteRefreshTokenRepo>;
+
 
 fn is_temporarily_locked(record: &users::service::UserAuthRecord) -> bool {
     if record.failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {

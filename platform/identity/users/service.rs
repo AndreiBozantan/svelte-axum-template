@@ -4,7 +4,7 @@ use thiserror::Error;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 
-use super::repo::SqliteUserRepo;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UserId(pub i64);
@@ -130,7 +130,7 @@ impl From<RepoError> for UserError {
     }
 }
 
-pub trait UserRepo: Sync {
+pub trait UserRepo: Send + Sync {
     fn create_user(
         &self,
         db: &SqlContext,
@@ -180,7 +180,8 @@ pub trait UserRepo: Sync {
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 }
 
-pub struct UserService<R: UserRepo = SqliteUserRepo> {
+#[derive(Clone)]
+pub struct UserService<R: UserRepo> {
     repo: R,
 }
 

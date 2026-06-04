@@ -94,6 +94,7 @@ impl TryFrom<UserRow> for UserAuthRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct SqliteUserRepo;
 
 impl UserRepo for SqliteUserRepo {

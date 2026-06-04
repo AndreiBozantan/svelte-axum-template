@@ -10,26 +10,34 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use super::repo::SqliteRefreshTokenRepo;
-use super::service::{AuthError, AuthService, DefaultAuthService, LoginCommand};
+use super::service::{AuthError, AuthService, LoginCommand, RefreshTokenRepo};
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::identity::users;
+use crate::identity::users::service::UserRepo;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-pub fn router() -> Router<ArcContext> {
-    Router::new()
-        .route("/auth/login", post(login))
-        .route("/auth/logout", post(logout))
-        .route("/auth/refresh", post(refresh))
+#[derive(Clone)]
+pub struct AuthState<UR: UserRepo, R: RefreshTokenRepo> {
+    pub context: ArcContext,
+    pub service: AuthService<UR, R>,
 }
 
-const fn auth_service() -> DefaultAuthService {
-    AuthService::new(
-        users::service::UserService::new(users::repo::SqliteUserRepo),
-        SqliteRefreshTokenRepo,
-    )
+pub fn router<UR, R>(ctx: ArcContext, auth_service: AuthService<UR, R>) -> Router<ArcContext>
+where
+    UR: UserRepo + Clone + 'static,
+    R: RefreshTokenRepo + Clone + 'static,
+{
+    let state = AuthState {
+        context: ctx,
+        service: auth_service,
+    };
+    Router::new()
+        .route("/auth/login", post(login::<UR, R>))
+        .route("/auth/logout", post(logout::<UR, R>))
+        .route("/auth/refresh", post(refresh::<UR, R>))
+        .with_state(state)
 }
 
 #[derive(Deserialize)]
@@ -83,18 +91,22 @@ impl From<AuthError> for ApiError {
     }
 }
 
-pub async fn login(
-    State(context): State<ArcContext>,
+pub async fn login<UR, R>(
+    State(state): State<AuthState<UR, R>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
-) -> Result<impl IntoResponse, ApiError> {
+) -> Result<impl IntoResponse, ApiError>
+where
+    UR: UserRepo + Clone,
+    R: RefreshTokenRepo + Clone,
+{
     logger::log_user_login_attempt(&headers, &request.email);
     let email = users::service::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
     let cmd = LoginCommand {
         email: email.clone(),
         password: request.password,
     };
-    let session = auth_service().login(&context, cmd).await.map_err(|error| {
+    let session = state.service.login(&state.context, cmd).await.map_err(|error| {
         if matches!(error, AuthError::InvalidCredentials) {
             logger::log_invalid_password(&headers, email.as_str());
         }
@@ -106,30 +118,44 @@ pub async fn login(
         user: (&session.user).into(),
     };
     Ok(tokens::create_response_with_auth_cookies(
-        &context,
+        &state.context,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),
     )?)
 }
 
-pub async fn logout(State(context): State<ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, ApiError> {
+pub async fn logout<UR, R>(
+    State(state): State<AuthState<UR, R>>,
+    req: Request<Body>,
+) -> Result<impl IntoResponse, ApiError>
+where
+    UR: UserRepo + Clone,
+    R: RefreshTokenRepo + Clone,
+{
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
-    auth_service()
-        .revoke_refresh_from_request(&context, refresh_token)
+    state.service
+        .revoke_refresh_from_request(&state.context, refresh_token)
         .await?;
 
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
         .map_err(|_| ApiError::internal())?;
-    Ok(tokens::add_auth_cookies(&context, response, None, None)?)
+    Ok(tokens::add_auth_cookies(&state.context, response, None, None)?)
 }
 
-pub async fn refresh(State(context): State<ArcContext>, req: Request<Body>) -> Result<impl IntoResponse, ApiError> {
+pub async fn refresh<UR, R>(
+    State(state): State<AuthState<UR, R>>,
+    req: Request<Body>,
+) -> Result<impl IntoResponse, ApiError>
+where
+    UR: UserRepo + Clone,
+    R: RefreshTokenRepo + Clone,
+{
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
-    let session = auth_service()
-        .refresh(&context, refresh_token)
+    let session = state.service
+        .refresh(&state.context, refresh_token)
         .await
         .map_err(ApiError::from)?;
 
@@ -145,7 +171,7 @@ pub async fn refresh(State(context): State<ArcContext>, req: Request<Body>) -> R
         user: (&session.user).into(),
     };
     Ok(tokens::create_response_with_auth_cookies(
-        &context,
+        &state.context,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),

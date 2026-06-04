@@ -51,9 +51,15 @@ pub mod identity {
     mod tests;
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
+        let user_repo = users::repo::SqliteUserRepo;
+        let refresh_token_repo = auth::repo::SqliteRefreshTokenRepo;
+
+        let user_service = users::service::UserService::new(user_repo);
+        let auth_service = auth::service::AuthService::new(user_service.clone(), refresh_token_repo);
+
         axum::Router::new()
-            .merge(auth::api::router())
-            .merge(oauth::api::router())
-            .merge(users::api::router(ctx))
+            .merge(auth::api::router(ctx.clone(), auth_service.clone()))
+            .merge(oauth::api::router(ctx.clone(), auth_service, user_service.clone()))
+            .merge(users::api::router(ctx, user_service))
     }
 }
