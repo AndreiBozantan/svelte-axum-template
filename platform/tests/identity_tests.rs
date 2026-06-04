@@ -17,8 +17,8 @@ use crate::migrations;
 use crate::password;
 use crate::tokens;
 
-use super::models;
-use super::queries;
+use super::model;
+use super::db;
 use super::routes;
 
 const TEST_USER_EMAIL: &str = "test@example.com";
@@ -65,9 +65,9 @@ async fn create_test_context(config: config::AppSettings) -> ArcContext {
 async fn create_test_server(config: config::AppSettings) -> TestServer {
     let ctx = create_test_context(config).await;
     let password_hash = password::hash_password(TEST_PASSWORD).unwrap();
-    let user = models::NewUser {
+    let user = model::NewUser {
         tenant_id: 0,
-        status: models::UserStatus::Active,
+        status: model::UserStatus::Active,
         email: "test@example.com".to_string(),
         first_name: "Test".to_string().into(),
         middle_name: None,
@@ -76,7 +76,7 @@ async fn create_test_server(config: config::AppSettings) -> TestServer {
         sso_provider: None,
         sso_id: None,
     };
-    queries::create_user(&ctx.db, user).await.unwrap();
+    db::create_user(&ctx.db, user).await.unwrap();
     let platform_router = routes::create(ctx.clone()).with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);
     TestServer::new(api_router.into_make_service_with_connect_info::<std::net::SocketAddr>())

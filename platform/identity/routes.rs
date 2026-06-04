@@ -5,25 +5,25 @@ use axum::routing::post;
 use crate::auth::auth_middleware;
 use crate::common::ArcContext;
 
-use super::handlers;
+use super::api;
 
 fn auth() -> Router<ArcContext> {
     Router::new()
-        .route("/auth/login", post(handlers::login))
-        .route("/auth/logout", post(handlers::logout))
-        .route("/auth/refresh", post(handlers::refresh))
+        .route("/auth/login", post(api::login))
+        .route("/auth/logout", post(api::logout))
+        .route("/auth/refresh", post(api::refresh))
 }
 
 fn oauth() -> Router<ArcContext> {
     Router::new()
-        .route("/oauth/google", get(handlers::google_auth_init))
-        .route("/oauth/google/callback", get(handlers::google_auth_callback))
+        .route("/oauth/google", get(api::google_auth_init))
+        .route("/oauth/google/callback", get(api::google_auth_callback))
 }
 
 fn users(ctx: ArcContext) -> Router<ArcContext> {
     Router::new()
-        .route("/users", get(handlers::list_users))
-        .route("/users/me", get(handlers::user_info))
+        .route("/users", get(api::list_users))
+        .route("/users/me", get(api::user_info))
         .route_layer(axum::middleware::from_fn_with_state(ctx, auth_middleware))
 }
 

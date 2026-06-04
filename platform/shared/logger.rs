@@ -227,7 +227,7 @@ pub fn log_cookie_error(headers: &axum::http::HeaderMap, reason: &str) {
 }
 
 fn extract_client_ip(headers: &axum::http::HeaderMap) -> String {
-    // Check common proxy headers first
+    // check common proxy headers first
     if let Some(forwarded_for) = headers.get("x-forwarded-for")
         && let Ok(value) = forwarded_for.to_str()
         && let Some(ip) = value.split(',').next()
@@ -241,7 +241,7 @@ fn extract_client_ip(headers: &axum::http::HeaderMap) -> String {
         return value.to_string();
     }
 
-    // Fallback to connection info (set by router)
+    // fallback to connection info (set by router)
     "unknown".to_string()
 }
 
@@ -257,4 +257,16 @@ fn hash_state(state: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(state.as_bytes());
     hex::encode(hasher.finalize())
+}
+
+/// Returns the canonical client IP for rate limiting, logging, and audit trails.
+///
+/// Strategy: always trust the real TCP peer from `ConnectInfo`. If your deployment
+/// sits behind a trusted reverse proxy, swap this for a whitelist-gated
+/// `X-Forwarded-For` parser — but never read XFF unconditionally, because
+/// clients can forge it.
+pub fn canonical_client_ip(req: &Request) -> String {
+    req.extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map_or_else(|| "unknown".to_string(), |ConnectInfo(addr)| addr.ip().to_string())
 }

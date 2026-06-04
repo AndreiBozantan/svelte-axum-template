@@ -7,7 +7,7 @@ edition = "2024"
 
 [[bin]]
 name = "svelaxum"
-path = "main.rs"
+path = "app.rs"
 
 [dependencies]
 platform = { workspace = true }

@@ -8,7 +8,7 @@ use platform::common::ArcContext;
 use platform::migrations;
 use platform::password;
 
-use platform::identity::queries;
+use platform::identity::db;
 
 // TODO: add support for secret rotation (should mark all tokens as invalid)
 // TODO: add support for expired tokens cleanup
@@ -156,7 +156,7 @@ async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
         .map_or(Ok(()), Err)?;
 
     let password_hash = password::hash_password(&password)?;
-    queries::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
+    db::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
         .await
         .map_err(|e| CliError::Other(e.to_string()))?;
 

@@ -6,13 +6,13 @@ use crate::db::SqlContext;
 use crate::db::SqlError;
 use crate::utils;
 
-use super::models::NewRefreshToken;
-use super::models::NewUser;
-use super::models::RefreshToken;
-use super::models::Tenant;
-use super::models::TenantStatus;
-use super::models::User;
-use super::models::UserStatus;
+use super::model::NewRefreshToken;
+use super::model::NewUser;
+use super::model::RefreshToken;
+use super::model::Tenant;
+use super::model::TenantStatus;
+use super::model::User;
+use super::model::UserStatus;
 
 // ==================== Users ====================
 
