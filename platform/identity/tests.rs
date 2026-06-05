@@ -15,7 +15,7 @@ use crate::common;
 use crate::config;
 use crate::identity::auth;
 use crate::identity::users;
-use crate::internal::tokens;
+use crate::identity::tokens;
 use crate::jwt;
 use crate::migrations;
 
@@ -347,7 +347,7 @@ async fn decode_access_token_from_req_cookie_success() -> anyhow::Result<()> {
         http::header::COOKIE,
         HeaderValue::from_str(&format!("access_token={}", token.value))?,
     );
-    let claims = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access)?;
+    let claims = tokens::utils::decode_token_from_req(&ctx, &req, jwt::TokenType::Access)?;
     assert_eq!(claims.sub, "123");
     assert_eq!(claims.email, "test_user");
     Ok(())
@@ -362,7 +362,7 @@ async fn decode_access_token_from_req_success() -> anyhow::Result<()> {
         http::header::AUTHORIZATION,
         HeaderValue::from_str(&format!("Bearer {}", token.value))?,
     );
-    let claims = tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access)?;
+    let claims = tokens::utils::decode_token_from_req(&ctx, &req, jwt::TokenType::Access)?;
     assert_eq!(claims.sub, "123");
     assert_eq!(claims.email, "test_user");
     Ok(())
@@ -372,7 +372,7 @@ async fn decode_access_token_from_req_success() -> anyhow::Result<()> {
 async fn decode_access_token_from_req_missing_header() -> anyhow::Result<()> {
     let ctx = create_test_context(default_config()).await?;
     let req = Request::new(Body::empty());
-    assert!(tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).is_err());
+    assert!(tokens::utils::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).is_err());
     Ok(())
 }
 
@@ -382,7 +382,7 @@ async fn decode_access_token_from_req_wrong_format() -> anyhow::Result<()> {
     let mut req = Request::new(Body::empty());
     req.headers_mut()
         .insert(http::header::AUTHORIZATION, HeaderValue::from_str("some_token")?);
-    assert!(tokens::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).is_err());
+    assert!(tokens::utils::decode_token_from_req(&ctx, &req, jwt::TokenType::Access).is_err());
     Ok(())
 }
 

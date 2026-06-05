@@ -10,7 +10,6 @@
 
 pub(crate) mod internal {
     pub mod logger;
-    pub mod tokens;
 }
 
 pub mod shared {
@@ -56,6 +55,7 @@ pub mod identity {
 
     pub(crate) mod tokens {
         pub mod db;
+        pub mod utils;
         mod service;
 
         pub use service::*;

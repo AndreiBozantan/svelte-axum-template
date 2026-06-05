@@ -11,15 +11,14 @@ use serde::Serialize;
 
 use crate::common;
 use crate::identity::auth;
-use crate::identity::tokens as identity_tokens;
+use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
-use crate::internal::tokens;
 
 pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
     UR: users::Repository + Clone + 'static,
-    TR: identity_tokens::Repository + Clone + 'static,
+    TR: tokens::Repository + Clone + 'static,
 {
     use axum::routing::post;
     Router::new()
@@ -33,7 +32,7 @@ where
 struct AppState<UR, TR>
 where
     UR: users::Repository + Clone + 'static,
-    TR: identity_tokens::Repository + Clone + 'static,
+    TR: tokens::Repository + Clone + 'static,
 {
     pub context: common::ArcContext,
     pub service: auth::Service<UR, TR>,
@@ -97,7 +96,7 @@ async fn login<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: identity_tokens::Repository + Clone,
+    TR: tokens::Repository + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
     let email = common::Email::parse(&request.email).map_err(|_| common::ApiError::invalid_credentials())?;
@@ -116,7 +115,7 @@ where
     let body = LoginResponse {
         user: session.user.into(),
     };
-    Ok(tokens::create_response_with_auth_cookies(
+    Ok(tokens::utils::create_response_with_auth_cookies(
         &context,
         &body,
         Some(&session.access_token.value),
@@ -130,16 +129,16 @@ async fn logout<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: identity_tokens::Repository + Clone,
+    TR: tokens::Repository + Clone,
 {
-    let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
+    let refresh_token = tokens::utils::get_refresh_token_from_cookie(&req).ok();
     service.revoke_refresh_from_request(&context, refresh_token).await?;
 
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
         .map_err(|_| common::ApiError::internal())?;
-    Ok(tokens::add_auth_cookies(&context, response, None, None)?)
+    Ok(tokens::utils::add_auth_cookies(&context, response, None, None)?)
 }
 
 async fn refresh<UR, TR>(
@@ -148,9 +147,9 @@ async fn refresh<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: identity_tokens::Repository + Clone,
+    TR: tokens::Repository + Clone,
 {
-    let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
+    let refresh_token = tokens::utils::get_refresh_token_from_cookie(&req)?;
     let session = service
         .refresh(&context, refresh_token)
         .await
@@ -167,7 +166,7 @@ where
         expires_in: session.expires_in,
         user: session.user.into(),
     };
-    Ok(tokens::create_response_with_auth_cookies(
+    Ok(tokens::utils::create_response_with_auth_cookies(
         &context,
         &body,
         Some(&session.access_token.value),

@@ -8,7 +8,7 @@ use axum::response::Response;
 use crate::common;
 use crate::identity::oauth;
 use crate::internal::logger;
-use crate::internal::tokens;
+use crate::identity::tokens;
 use crate::jwt;
 
 pub fn check_oauth_config(config: &crate::config::OAuthSettings) {
@@ -22,7 +22,7 @@ pub async fn middleware(
     mut req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Result<Response, common::ApiError> {
-    let claims = tokens::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|error| {
+    let claims = tokens::utils::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|error| {
         logger::log_auth_rejection(&error);
         error.into_api_error()
     })?;

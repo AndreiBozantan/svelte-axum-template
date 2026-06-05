@@ -6,10 +6,9 @@ use axum::response::IntoResponse;
 use crate::common;
 use crate::identity::auth;
 use crate::identity::oauth;
-use crate::identity::tokens as identity_tokens;
+use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
-use crate::internal::tokens;
 
 pub fn router<UR, TR>(
     ctx: common::ArcContext,
@@ -18,7 +17,7 @@ pub fn router<UR, TR>(
 ) -> Router<common::ArcContext>
 where
     UR: users::Repository + Clone + 'static,
-    TR: identity_tokens::Repository + Clone + 'static,
+    TR: tokens::Repository + Clone + 'static,
 {
     use axum::routing::get;
     Router::new()
@@ -35,7 +34,7 @@ where
 struct AppState<UR, TR>
 where
     UR: users::Repository + Clone + 'static,
-    TR: identity_tokens::Repository + Clone + 'static,
+    TR: tokens::Repository + Clone + 'static,
 {
     pub ctx: common::ArcContext,
     pub auth_service: auth::Service<UR, TR>,
@@ -66,7 +65,7 @@ async fn google_auth_init<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: identity_tokens::Repository + Clone,
+    TR: tokens::Repository + Clone,
 {
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
@@ -97,9 +96,9 @@ async fn google_auth_callback<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: identity_tokens::Repository + Clone,
+    TR: tokens::Repository + Clone,
 {
-    let oauth_state_cookie = tokens::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
+    let oauth_state_cookie = tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
         logger::log_cookie_error(&headers, "missing_oauth_state");
         common::ApiError::sso_failed()
     })?;
@@ -131,7 +130,7 @@ where
 
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
-    let mut response = tokens::add_auth_cookies(
+    let mut response = tokens::utils::add_auth_cookies(
         &ctx,
         response,
         Some(&session.access_token.value),

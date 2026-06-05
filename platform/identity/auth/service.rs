@@ -7,8 +7,6 @@ use crate::identity::tokens;
 use crate::identity::users;
 use crate::jwt;
 
-use crate::internal::tokens as token_utils;
-
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
     pub email: common::Email,
@@ -49,7 +47,7 @@ pub enum AuthError {
     JwtOperationFailed(#[from] jwt::JwtError),
 
     #[error("token operation failed: {0}")]
-    TokenOperationFailed(#[from] token_utils::TokenError),
+    TokenOperationFailed(#[from] tokens::utils::TokenError),
 
     #[error("database error: {0}")]
     Database(#[from] common::RepoError),
@@ -102,7 +100,7 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
     pub async fn issue_session(&self, ctx: &common::ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
-        let refresh_token_hash = token_utils::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         let cmd = tokens::CreateRefreshTokenCommand {
@@ -158,7 +156,7 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
             return Err(AuthError::InvalidToken);
         }
 
-        let token_hash = token_utils::get_token_hash_as_hex(refresh_token_value);
+        let token_hash = tokens::utils::get_token_hash_as_hex(refresh_token_value);
         if stored_token.token_hash != token_hash {
             return Err(AuthError::InvalidToken);
         }
@@ -168,7 +166,7 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
         let user = self.users.get_user(&ctx.db, stored_token.user_id).await?;
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
-        let refresh_token_hash = token_utils::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         self.refresh_tokens

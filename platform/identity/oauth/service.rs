@@ -9,7 +9,7 @@ use url::Url;
 use crate::common;
 use crate::config;
 use crate::internal::logger;
-use crate::internal::tokens;
+use crate::identity::tokens;
 
 #[derive(Debug, Error)]
 pub enum OAuthError {
@@ -162,7 +162,7 @@ pub fn begin_google_flow(
     let now = Utc::now().timestamp();
     let timeout_minutes = i64::from(context.settings.oauth.session_timeout_minutes);
     let claims = OAuthStateClaims {
-        csrf_token_hash: tokens::get_token_hash_as_hex(csrf_token.secret()),
+        csrf_token_hash: tokens::utils::get_token_hash_as_hex(csrf_token.secret()),
         iat: now,
         exp: now + (timeout_minutes * 60),
         redirect_url,
@@ -201,7 +201,7 @@ pub async fn complete_google_callback(
             },
         )?;
 
-    let incoming_hash = tokens::get_token_hash_as_hex(state);
+    let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
     if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
         logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
         return Err(OAuthError::CsrfValidationFailed);
