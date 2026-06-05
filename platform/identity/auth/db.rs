@@ -3,7 +3,6 @@ use sqlx::FromRow;
 
 use crate::common::RepoError;
 use crate::common::SqlContext;
-
 use crate::identity::auth;
 use crate::identity::users;
 

@@ -6,11 +6,10 @@ use axum::response::IntoResponse;
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::identity::auth;
+use crate::identity::oauth;
 use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
-
-use super::service::{GoogleCallbackRequest, OAuthError, begin_google_flow, complete_google_callback};
 
 pub fn router<UR, TR>(
     ctx: ArcContext,
@@ -39,16 +38,16 @@ where
     pub user_service: users::Service<UR>,
 }
 
-impl From<OAuthError> for ApiError {
-    fn from(error: OAuthError) -> Self {
+impl From<oauth::OAuthError> for ApiError {
+    fn from(error: oauth::OAuthError) -> Self {
         match error {
-            OAuthError::UnverifiedEmail | OAuthError::InvalidUserInfo => Self::invalid_credentials(),
-            OAuthError::CsrfValidationFailed
-            | OAuthError::SessionExpired
-            | OAuthError::OAuth2RequestFailed(_)
-            | OAuthError::InvalidConfig(_)
-            | OAuthError::InvalidRedirectUrl => Self::sso_failed(),
-            OAuthError::UserInfoRetrievalFailed(_) | OAuthError::Internal(_) => {
+            oauth::OAuthError::UnverifiedEmail | oauth::OAuthError::InvalidUserInfo => Self::invalid_credentials(),
+            oauth::OAuthError::CsrfValidationFailed
+            | oauth::OAuthError::SessionExpired
+            | oauth::OAuthError::OAuth2RequestFailed(_)
+            | oauth::OAuthError::InvalidConfig(_)
+            | oauth::OAuthError::InvalidRedirectUrl => Self::sso_failed(),
+            oauth::OAuthError::UserInfoRetrievalFailed(_) | oauth::OAuthError::Internal(_) => {
                 tracing::error!("oauth error: {error}");
                 Self::internal()
             }
@@ -68,7 +67,7 @@ where
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
 
-    let (auth_url, state_jwt) = begin_google_flow(&ctx, redirect_url)?;
+    let (auth_url, state_jwt) = oauth::begin_google_flow(&ctx, redirect_url)?;
     logger::log_oauth_redirecting(&headers, &auth_url, "google");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
@@ -86,7 +85,7 @@ where
 async fn google_auth_callback<UR, TR>(
     State(AppState { ctx, auth_service, user_service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
-    axum::extract::Query(params): axum::extract::Query<GoogleCallbackRequest>,
+    axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, ApiError>
 where
     UR: users::UserRepo + Clone,
@@ -98,7 +97,7 @@ where
     })?;
 
     let (user_info, redirect_url) =
-        complete_google_callback(&ctx, &headers, &params.code, &params.state, oauth_state_cookie).await?;
+        oauth::complete_google_callback(&ctx, &headers, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");

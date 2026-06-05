@@ -4,8 +4,6 @@ use thiserror::Error;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UserId(pub i64);
 

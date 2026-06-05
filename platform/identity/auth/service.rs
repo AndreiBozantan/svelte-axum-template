@@ -5,11 +5,11 @@ use crate::common::ArcContext;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 use crate::constants;
+use crate::identity::auth;
 use crate::identity::users;
 use crate::jwt;
 
 use crate::internal::tokens;
-use crate::identity::auth;
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {

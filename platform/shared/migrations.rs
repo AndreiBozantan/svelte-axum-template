@@ -4,8 +4,6 @@ use std::io::Write;
 use std::path::Path;
 
 use chrono;
-use sqlx::Error as SqlxError;
-use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
 use crate::common::ArcContext;
@@ -15,13 +13,13 @@ use crate::common::SqlContext;
 #[derive(Debug, Error)]
 pub enum MigrationError {
     #[error("Failed to run embedded migrations")]
-    EmbeddedMigrationFailed { source: SqlxMigrateError },
+    EmbeddedMigrationFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to create migrator")]
-    MigratorCreationFailed { source: SqlxMigrateError },
+    MigratorCreationFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to run migrations")]
-    MigrationRunFailed { source: SqlxMigrateError },
+    MigrationRunFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to create timestamp")]
     TimestampConversionFailed,
@@ -30,7 +28,7 @@ pub enum MigrationError {
     NoMigrationsApplied,
 
     #[error("Failed to fetch applied migrations")]
-    FetchAppliedMigrationsFailed { #[from] source: SqlxError },
+    FetchAppliedMigrationsFailed { #[from] source: sqlx::Error },
 
     #[error("File system error")]
     FileSystemOperationFailed { #[from] source: std::io::Error },

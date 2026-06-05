@@ -16,10 +16,10 @@ use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-pub fn router<UR, TR>(context: ArcContext, service: auth::service::Service<UR, TR>) -> Router<ArcContext>
+pub fn router<UR, TR>(context: ArcContext, service: auth::Service<UR, TR>) -> Router<ArcContext>
 where
     UR: users::UserRepo + Clone + 'static,
-    TR: auth::service::RefreshTokenRepo + Clone + 'static,
+    TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     use axum::routing::post;
     Router::new()
@@ -33,10 +33,10 @@ where
 struct AppState<UR, TR> 
 where
     UR: users::UserRepo + Clone + 'static,
-    TR: auth::service::RefreshTokenRepo + Clone + 'static,
+    TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     pub context: ArcContext,
-    pub service: auth::service::Service<UR, TR>,
+    pub service: auth::Service<UR, TR>,
 }
 
 #[derive(Deserialize)]

@@ -1,7 +1,7 @@
 use super::{DUMMY_HASH, hash_password, verify_password};
 use argon2::Argon2;
-use argon2::password_hash::rand_core::OsRng;
-use argon2::password_hash::{PasswordHasher, SaltString};
+use argon2::PasswordHasher;
+use argon2::password_hash as ar2;
 
 #[test]
 fn hash_password_creates_valid_hash() -> anyhow::Result<()> {
@@ -49,7 +49,7 @@ fn hash_empty_password() -> anyhow::Result<()> {
 #[test]
 fn dummy_hash_parameters_match_argon2_default() -> anyhow::Result<()> {
     let dummy = argon2::PasswordHash::new(DUMMY_HASH)?;
-    let salt = SaltString::generate(OsRng);
+    let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
     let reference = Argon2::default().hash_password(b"dummy-password-for-timing", &salt)?;
     assert_eq!(dummy.algorithm, reference.algorithm);
     Ok(())
