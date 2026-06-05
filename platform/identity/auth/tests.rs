@@ -35,9 +35,8 @@ fn verify_password_failure() -> anyhow::Result<()> {
 }
 
 #[test]
-fn verify_password_with_invalid_hash() -> anyhow::Result<()> {
+fn verify_password_with_invalid_hash() {
     assert!(auth::verify_password("password", "not_a_valid_hash").is_err());
-    Ok(())
 }
 
 #[test]

@@ -1,34 +1,18 @@
-use chrono::NaiveDateTime;
 use thiserror::Error;
 
 use crate::common;
 use crate::constants;
 use crate::identity::auth;
+use crate::identity::tokens;
 use crate::identity::users;
 use crate::jwt;
 
-use crate::internal::tokens;
+use crate::internal::tokens as token_utils;
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
     pub email: common::Email,
     pub password: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct CreateRefreshTokenCommand {
-    pub jti: String,
-    pub tenant_id: common::TenantId,
-    pub user_id: common::UserId,
-    pub token_hash: String,
-    pub expires_at: NaiveDateTime,
-}
-
-#[derive(Debug, Clone)]
-pub struct RefreshToken {
-    pub user_id: common::UserId,
-    pub token_hash: String,
-    pub revoked_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +49,7 @@ pub enum AuthError {
     JwtOperationFailed(#[from] jwt::JwtError),
 
     #[error("token operation failed: {0}")]
-    TokenOperationFailed(#[from] tokens::TokenError),
+    TokenOperationFailed(#[from] token_utils::TokenError),
 
     #[error("database error: {0}")]
     Database(#[from] common::RepoError),
@@ -74,41 +58,13 @@ pub enum AuthError {
     Internal(String),
 }
 
-pub trait RefreshTokenRepo: Send + Sync {
-    fn create(
-        &self,
-        db: &common::SqlContext,
-        command: CreateRefreshTokenCommand,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
-
-    fn revoke_by_jti(
-        &self,
-        db: &common::SqlContext,
-        jti: &str,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
-
-    fn find_by_jti(
-        &self,
-        db: &common::SqlContext,
-        tenant_id: common::TenantId,
-        jti: &str,
-    ) -> impl std::future::Future<Output = Result<RefreshToken, common::RepoError>> + Send;
-
-    fn revoke_all_for_user(
-        &self,
-        db: &common::SqlContext,
-        tenant_id: common::TenantId,
-        user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
-}
-
 #[derive(Clone)]
-pub struct Service<UR: users::Repository, TR: RefreshTokenRepo> {
+pub struct Service<UR: users::Repository, TR: tokens::Repository> {
     users: users::Service<UR>,
     refresh_tokens: TR,
 }
 
-impl<UR: users::Repository, TR: RefreshTokenRepo> Service<UR, TR> {
+impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
     #[must_use]
     pub const fn new(users: users::Service<UR>, refresh_tokens: TR) -> Self {
         Self { users, refresh_tokens }
@@ -146,10 +102,10 @@ impl<UR: users::Repository, TR: RefreshTokenRepo> Service<UR, TR> {
     pub async fn issue_session(&self, ctx: &common::ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
-        let refresh_token_hash = tokens::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = token_utils::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
-        let cmd = CreateRefreshTokenCommand {
+        let cmd = tokens::CreateRefreshTokenCommand {
             jti: refresh_token.claims.jti.clone(),
             tenant_id: user.tenant_id,
             user_id: user.id,
@@ -202,7 +158,7 @@ impl<UR: users::Repository, TR: RefreshTokenRepo> Service<UR, TR> {
             return Err(AuthError::InvalidToken);
         }
 
-        let token_hash = tokens::get_token_hash_as_hex(refresh_token_value);
+        let token_hash = token_utils::get_token_hash_as_hex(refresh_token_value);
         if stored_token.token_hash != token_hash {
             return Err(AuthError::InvalidToken);
         }
@@ -212,13 +168,13 @@ impl<UR: users::Repository, TR: RefreshTokenRepo> Service<UR, TR> {
         let user = self.users.get_user(&ctx.db, stored_token.user_id).await?;
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
-        let refresh_token_hash = tokens::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = token_utils::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         self.refresh_tokens
             .create(
                 &ctx.db,
-                CreateRefreshTokenCommand {
+                tokens::CreateRefreshTokenCommand {
                     jti: refresh_token.claims.jti.clone(),
                     tenant_id: user.tenant_id,
                     user_id: user.id,

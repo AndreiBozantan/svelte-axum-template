@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::common;
 use crate::identity::auth;
+use crate::identity::tokens as identity_tokens;
 use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
@@ -18,7 +19,7 @@ use crate::internal::tokens;
 pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
     UR: users::Repository + Clone + 'static,
-    TR: auth::RefreshTokenRepo + Clone + 'static,
+    TR: identity_tokens::Repository + Clone + 'static,
 {
     use axum::routing::post;
     Router::new()
@@ -32,7 +33,7 @@ where
 struct AppState<UR, TR>
 where
     UR: users::Repository + Clone + 'static,
-    TR: auth::RefreshTokenRepo + Clone + 'static,
+    TR: identity_tokens::Repository + Clone + 'static,
 {
     pub context: common::ArcContext,
     pub service: auth::Service<UR, TR>,
@@ -96,7 +97,7 @@ async fn login<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: auth::RefreshTokenRepo + Clone,
+    TR: identity_tokens::Repository + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
     let email = common::Email::parse(&request.email).map_err(|_| common::ApiError::invalid_credentials())?;
@@ -129,7 +130,7 @@ async fn logout<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: auth::RefreshTokenRepo + Clone,
+    TR: identity_tokens::Repository + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
     service.revoke_refresh_from_request(&context, refresh_token).await?;
@@ -147,7 +148,7 @@ async fn refresh<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: auth::RefreshTokenRepo + Clone,
+    TR: identity_tokens::Repository + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
     let session = service

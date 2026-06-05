@@ -31,7 +31,6 @@ pub use shared::*;
 pub mod identity {
     pub(crate) mod auth {
         pub mod api;
-        pub mod db;
         mod service;
 
         pub use service::*;
@@ -55,12 +54,19 @@ pub mod identity {
         pub use service::*;
     }
 
+    pub(crate) mod tokens {
+        pub mod db;
+        mod service;
+
+        pub use service::*;
+    }
+
     #[cfg(test)]
     mod tests;
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
         let user_service = users::Service::new(users::db::Repository);
-        let auth_service = auth::Service::new(user_service.clone(), auth::db::Repository);
+        let auth_service = auth::Service::new(user_service.clone(), tokens::db::Repository);
 
         axum::Router::new()
             .merge(auth::api::router(ctx.clone(), auth_service.clone()))

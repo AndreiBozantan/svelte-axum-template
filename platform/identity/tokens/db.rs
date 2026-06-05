@@ -2,7 +2,7 @@ use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
 use crate::common;
-use crate::identity::auth;
+use crate::identity::tokens;
 
 #[derive(Debug, FromRow)]
 #[allow(dead_code)]
@@ -16,7 +16,7 @@ struct RefreshTokenRow {
     revoked_at: Option<NaiveDateTime>,
 }
 
-impl From<RefreshTokenRow> for auth::RefreshToken {
+impl From<RefreshTokenRow> for tokens::RefreshToken {
     fn from(row: RefreshTokenRow) -> Self {
         Self {
             user_id: common::UserId(row.user_id),
@@ -29,11 +29,11 @@ impl From<RefreshTokenRow> for auth::RefreshToken {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl auth::RefreshTokenRepo for Repository {
+impl tokens::Repository for Repository {
     async fn create(
         &self,
         db: &common::SqlContext,
-        command: auth::CreateRefreshTokenCommand,
+        command: tokens::CreateRefreshTokenCommand,
     ) -> Result<(), common::RepoError> {
         sqlx::query!(
             r#"
@@ -70,7 +70,7 @@ impl auth::RefreshTokenRepo for Repository {
         db: &common::SqlContext,
         tenant_id: common::TenantId,
         jti: &str,
-    ) -> Result<auth::RefreshToken, common::RepoError> {
+    ) -> Result<tokens::RefreshToken, common::RepoError> {
         let row = sqlx::query_as!(
             RefreshTokenRow,
             r#"

@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use crate::common;
 use crate::identity::auth;
 use crate::identity::oauth;
+use crate::identity::tokens as identity_tokens;
 use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
@@ -17,7 +18,7 @@ pub fn router<UR, TR>(
 ) -> Router<common::ArcContext>
 where
     UR: users::Repository + Clone + 'static,
-    TR: auth::RefreshTokenRepo + Clone + 'static,
+    TR: identity_tokens::Repository + Clone + 'static,
 {
     use axum::routing::get;
     Router::new()
@@ -34,7 +35,7 @@ where
 struct AppState<UR, TR>
 where
     UR: users::Repository + Clone + 'static,
-    TR: auth::RefreshTokenRepo + Clone + 'static,
+    TR: identity_tokens::Repository + Clone + 'static,
 {
     pub ctx: common::ArcContext,
     pub auth_service: auth::Service<UR, TR>,
@@ -65,7 +66,7 @@ async fn google_auth_init<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: auth::RefreshTokenRepo + Clone,
+    TR: identity_tokens::Repository + Clone,
 {
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
@@ -96,7 +97,7 @@ async fn google_auth_callback<UR, TR>(
 ) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::Repository + Clone,
-    TR: auth::RefreshTokenRepo + Clone,
+    TR: identity_tokens::Repository + Clone,
 {
     let oauth_state_cookie = tokens::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
         logger::log_cookie_error(&headers, "missing_oauth_state");
