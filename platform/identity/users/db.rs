@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
+use crate::common;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 use crate::constants;
@@ -18,12 +19,11 @@ enum UserStatusRow {
 /// Full `users` table projection. Some columns are only used for specific conversions
 /// (e.g. auth lockout fields) or reserved for future API fields (names).
 #[derive(Debug, Clone, FromRow)]
+#[allow(dead_code)]
 struct UserRow {
     id: i64,
     tenant_id: i64,
-    #[allow(dead_code)]
     created_at: NaiveDateTime,
-    #[allow(dead_code)]
     updated_at: NaiveDateTime,
     status: UserStatusRow,
     email: String,
@@ -31,9 +31,7 @@ struct UserRow {
     middle_name: Option<String>,
     last_name: Option<String>,
     password_hash: Option<String>,
-    #[allow(dead_code)]
     sso_provider: Option<String>,
-    #[allow(dead_code)]
     sso_id: Option<String>,
     failed_login_count: i64,
     last_failed_login: Option<NaiveDateTime>,
@@ -66,9 +64,9 @@ impl TryFrom<UserRow> for users::User {
 
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self {
-            id: users::UserId(row.id),
-            tenant_id: users::TenantId(row.tenant_id),
-            email: users::Email::parse(&row.email)?,
+            id: common::UserId(row.id),
+            tenant_id: common::TenantId(row.tenant_id),
+            email: common::Email::parse(&row.email)?,
             status: row.status.into(),
             first_name: row.first_name,
             middle_name: row.middle_name,
@@ -131,7 +129,7 @@ impl users::UserRepo for Repository {
             .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))
     }
 
-    async fn find_by_id(&self, db: &SqlContext, id: users::UserId) -> Result<users::User, RepoError> {
+    async fn find_by_id(&self, db: &SqlContext, id: common::UserId) -> Result<users::User, RepoError> {
         let row = sqlx::query_as!(
             UserRow,
             r#"
@@ -161,7 +159,11 @@ impl users::UserRepo for Repository {
             .map_err(|e: users::UserError| RepoError::RowConversionFailed(e.to_string()))
     }
 
-    async fn find_auth_by_email(&self, db: &SqlContext, email: &users::Email) -> Result<Option<users::UserAuthRecord>, RepoError> {
+    async fn find_auth_by_email(
+        &self,
+        db: &SqlContext,
+        email: &common::Email,
+    ) -> Result<Option<users::UserAuthRecord>, RepoError> {
         let email_str = email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -194,7 +196,11 @@ impl users::UserRepo for Repository {
             .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))
     }
 
-    async fn list_by_tenant(&self, db: &SqlContext, query: users::ListUsersQuery) -> Result<users::UserList, RepoError> {
+    async fn list_by_tenant(
+        &self,
+        db: &SqlContext,
+        query: users::ListUsersQuery,
+    ) -> Result<users::UserList, RepoError> {
         let rows = sqlx::query_as!(
             UserRow,
             r#"
@@ -244,7 +250,11 @@ impl users::UserRepo for Repository {
         })
     }
 
-    async fn link_sso_user(&self, db: &SqlContext, command: users::LinkSsoUserCommand) -> Result<users::User, RepoError> {
+    async fn link_sso_user(
+        &self,
+        db: &SqlContext,
+        command: users::LinkSsoUserCommand,
+    ) -> Result<users::User, RepoError> {
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -307,7 +317,7 @@ impl users::UserRepo for Repository {
         Ok(())
     }
 
-    async fn increment_failed_login(&self, db: &SqlContext, user_id: users::UserId) -> Result<(), RepoError> {
+    async fn increment_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), RepoError> {
         let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
         sqlx::query!(
             r#"
@@ -327,7 +337,7 @@ impl users::UserRepo for Repository {
         Ok(())
     }
 
-    async fn reset_failed_login(&self, db: &SqlContext, user_id: users::UserId) -> Result<(), RepoError> {
+    async fn reset_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), RepoError> {
         sqlx::query!(
             r#"
             UPDATE users SET

@@ -9,6 +9,7 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::common;
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::identity::auth;
@@ -26,11 +27,11 @@ where
         .route("/auth/login", post(login::<UR, TR>))
         .route("/auth/logout", post(logout::<UR, TR>))
         .route("/auth/refresh", post(refresh::<UR, TR>))
-        .with_state(AppState{context, service})
+        .with_state(AppState { context, service })
 }
 
 #[derive(Clone)]
-struct AppState<UR, TR> 
+struct AppState<UR, TR>
 where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
@@ -91,7 +92,7 @@ impl From<auth::AuthError> for ApiError {
 }
 
 async fn login<UR, TR>(
-    State(AppState{context, service}): State<AppState<UR, TR>>,
+    State(AppState { context, service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, ApiError>
@@ -100,7 +101,7 @@ where
     TR: auth::RefreshTokenRepo + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
-    let email = users::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
+    let email = common::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
@@ -125,7 +126,7 @@ where
 }
 
 async fn logout<UR, TR>(
-    State(AppState{context, service}): State<AppState<UR, TR>>,
+    State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
@@ -133,9 +134,7 @@ where
     TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
-    service
-        .revoke_refresh_from_request(&context, refresh_token)
-        .await?;
+    service.revoke_refresh_from_request(&context, refresh_token).await?;
 
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
@@ -145,7 +144,7 @@ where
 }
 
 async fn refresh<UR, TR>(
-    State(AppState{context, service}): State<AppState<UR, TR>>,
+    State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
@@ -153,10 +152,7 @@ where
     TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
-    let session = service
-        .refresh(&context, refresh_token)
-        .await
-        .map_err(ApiError::from)?;
+    let session = service.refresh(&context, refresh_token).await.map_err(ApiError::from)?;
 
     logger::log_token_refresh(
         req.headers(),

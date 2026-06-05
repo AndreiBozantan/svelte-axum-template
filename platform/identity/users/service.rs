@@ -1,32 +1,9 @@
 use chrono::NaiveDateTime;
 use thiserror::Error;
 
+use crate::common;
 use crate::common::RepoError;
 use crate::common::SqlContext;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UserId(pub i64);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TenantId(pub i64);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Email(String);
-
-impl Email {
-    pub fn parse(raw: &str) -> Result<Self, UserError> {
-        let normalized = raw.trim().to_ascii_lowercase();
-        if normalized.is_empty() || !normalized.contains('@') {
-            return Err(UserError::InvalidEmail);
-        }
-        Ok(Self(normalized))
-    }
-
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserStatus {
@@ -37,17 +14,14 @@ pub enum UserStatus {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct User {
-    pub id: UserId,
-    pub tenant_id: TenantId,
-    pub email: Email,
-    #[allow(dead_code)]
+    pub id: common::UserId,
+    pub tenant_id: common::TenantId,
+    pub email: common::Email,
     pub status: UserStatus,
-    #[allow(dead_code)]
     pub first_name: Option<String>,
-    #[allow(dead_code)]
     pub middle_name: Option<String>,
-    #[allow(dead_code)]
     pub last_name: Option<String>,
 }
 
@@ -60,15 +34,13 @@ pub struct UserAuthRecord {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct CreateUserCommand {
-    pub tenant_id: TenantId,
+    pub tenant_id: common::TenantId,
     pub status: UserStatus,
-    pub email: Email,
-    #[allow(dead_code)]
+    pub email: common::Email,
     pub first_name: Option<String>,
-    #[allow(dead_code)]
     pub middle_name: Option<String>,
-    #[allow(dead_code)]
     pub last_name: Option<String>,
     pub password_hash: Option<String>,
     pub sso_provider: Option<String>,
@@ -77,22 +49,22 @@ pub struct CreateUserCommand {
 
 #[derive(Debug, Clone)]
 pub struct LinkSsoUserCommand {
-    pub email: Email,
-    pub tenant_id: TenantId,
+    pub email: common::Email,
+    pub tenant_id: common::TenantId,
     pub sso_provider: String,
     pub sso_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct UpdateAdminCredentialsCommand {
-    pub user_id: UserId,
-    pub email: Email,
+    pub user_id: common::UserId,
+    pub email: common::Email,
     pub password_hash: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct ListUsersQuery {
-    pub tenant_id: TenantId,
+    pub tenant_id: common::TenantId,
     pub limit: i64,
     pub offset: i64,
 }
@@ -106,7 +78,7 @@ pub struct UserList {
 #[derive(Debug, Error)]
 pub enum UserError {
     #[error("invalid email address")]
-    InvalidEmail,
+    InvalidEmail(#[from] common::DataValidationError),
 
     #[error("user not found")]
     NotFound,
@@ -138,13 +110,13 @@ pub trait UserRepo: Send + Sync {
     fn find_by_id(
         &self,
         db: &SqlContext,
-        id: UserId,
+        id: common::UserId,
     ) -> impl std::future::Future<Output = Result<User, RepoError>> + Send;
 
     fn find_auth_by_email(
         &self,
         db: &SqlContext,
-        email: &Email,
+        email: &common::Email,
     ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, RepoError>> + Send;
 
     fn list_by_tenant(
@@ -168,13 +140,13 @@ pub trait UserRepo: Send + Sync {
     fn increment_failed_login(
         &self,
         db: &SqlContext,
-        user_id: UserId,
+        user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 
     fn reset_failed_login(
         &self,
         db: &SqlContext,
-        user_id: UserId,
+        user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 }
 
@@ -194,11 +166,15 @@ impl<UR: UserRepo> Service<UR> {
         self.repo.create_user(db, command).await.map_err(Into::into)
     }
 
-    pub async fn get_user(&self, db: &SqlContext, id: UserId) -> Result<User, UserError> {
+    pub async fn get_user(&self, db: &SqlContext, id: common::UserId) -> Result<User, UserError> {
         self.repo.find_by_id(db, id).await.map_err(Into::into)
     }
 
-    pub async fn get_user_for_auth(&self, db: &SqlContext, email: &Email) -> Result<Option<UserAuthRecord>, UserError> {
+    pub async fn get_user_for_auth(
+        &self,
+        db: &SqlContext,
+        email: &common::Email,
+    ) -> Result<Option<UserAuthRecord>, UserError> {
         self.repo.find_auth_by_email(db, email).await.map_err(Into::into)
     }
 
@@ -221,11 +197,11 @@ impl<UR: UserRepo> Service<UR> {
             .map_err(Into::into)
     }
 
-    pub async fn record_failed_login(&self, db: &SqlContext, user_id: UserId) -> Result<(), UserError> {
+    pub async fn record_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), UserError> {
         self.repo.increment_failed_login(db, user_id).await.map_err(Into::into)
     }
 
-    pub async fn reset_failed_login(&self, db: &SqlContext, user_id: UserId) -> Result<(), UserError> {
+    pub async fn reset_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), UserError> {
         self.repo.reset_failed_login(db, user_id).await.map_err(Into::into)
     }
 }

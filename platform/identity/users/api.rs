@@ -3,11 +3,12 @@ use axum::Router;
 use axum::extract::State;
 use serde::Serialize;
 
+use crate::common;
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::common::Pagination;
-use crate::jwt;
 use crate::identity::users;
+use crate::jwt;
 
 pub fn router<UR>(ctx: ArcContext, user_service: users::Service<UR>) -> Router<ArcContext>
 where
@@ -17,12 +18,15 @@ where
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
-        .with_state(AppState{context: ctx.clone(), service: user_service})
+        .with_state(AppState {
+            context: ctx.clone(),
+            service: user_service,
+        })
         .route_layer(axum::middleware::from_fn_with_state(ctx, crate::auth::middleware))
 }
 
 #[derive(Clone)]
-struct AppState<UR> 
+struct AppState<UR>
 where
     UR: users::UserRepo + Clone + 'static,
 {
@@ -65,7 +69,7 @@ impl From<users::UserError> for ApiError {
         match error {
             users::UserError::NotFound => Self::not_found(),
             users::UserError::AlreadyExists => Self::user_already_exists(),
-            users::UserError::InvalidEmail => Self::validation_failed(serde_json::json!({
+            users::UserError::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
                 "field": "email",
                 "message": "invalid email address"
             })),
@@ -78,7 +82,7 @@ impl From<users::UserError> for ApiError {
 }
 
 async fn list_users<UR>(
-    State(AppState{context, service}): State<AppState<UR>>,
+    State(AppState { context, service }): State<AppState<UR>>,
     axum::extract::Query(pagination): axum::extract::Query<Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, ApiError>
@@ -90,7 +94,7 @@ where
         .list_users(
             &context.db,
             users::ListUsersQuery {
-                tenant_id: users::TenantId(claims.tenant_id),
+                tenant_id: common::TenantId(claims.tenant_id),
                 limit,
                 offset,
             },
@@ -106,13 +110,13 @@ where
 }
 
 async fn user_info<UR>(
-    State(AppState{context, service}): State<AppState<UR>>,
+    State(AppState { context, service }): State<AppState<UR>>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, ApiError>
 where
     UR: users::UserRepo + Clone,
 {
     let user_id = claims.user_id().map_err(|_| ApiError::not_authenticated())?;
-    let user = service.get_user(&context.db, users::UserId(user_id)).await?;
+    let user = service.get_user(&context.db, common::UserId(user_id)).await?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))
 }

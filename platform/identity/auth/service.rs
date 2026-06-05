@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 use thiserror::Error;
 
+use crate::common;
 use crate::common::ArcContext;
 use crate::common::RepoError;
 use crate::common::SqlContext;
@@ -13,22 +14,22 @@ use crate::internal::tokens;
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
-    pub email: users::Email,
+    pub email: common::Email,
     pub password: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct CreateRefreshTokenCommand {
     pub jti: String,
-    pub tenant_id: users::TenantId,
-    pub user_id: users::UserId,
+    pub tenant_id: common::TenantId,
+    pub user_id: common::UserId,
     pub token_hash: String,
     pub expires_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone)]
 pub struct RefreshToken {
-    pub user_id: users::UserId,
+    pub user_id: common::UserId,
     pub token_hash: String,
     pub revoked_at: Option<NaiveDateTime>,
 }
@@ -92,23 +93,20 @@ pub trait RefreshTokenRepo: Send + Sync {
     fn find_by_jti(
         &self,
         db: &SqlContext,
-        tenant_id: users::TenantId,
+        tenant_id: common::TenantId,
         jti: &str,
     ) -> impl std::future::Future<Output = Result<RefreshToken, RepoError>> + Send;
 
     fn revoke_all_for_user(
         &self,
         db: &SqlContext,
-        tenant_id: users::TenantId,
-        user_id: users::UserId,
+        tenant_id: common::TenantId,
+        user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 }
 
 #[derive(Clone)]
-pub struct Service<
-    UR: crate::identity::users::UserRepo,
-    TR: RefreshTokenRepo,
-> {
+pub struct Service<UR: crate::identity::users::UserRepo, TR: RefreshTokenRepo> {
     users: users::Service<UR>,
     refresh_tokens: TR,
 }
@@ -192,17 +190,13 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
         let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .refresh_tokens
-            .find_by_jti(&ctx.db, users::TenantId(claims.tenant_id), &claims.jti)
+            .find_by_jti(&ctx.db, common::TenantId(claims.tenant_id), &claims.jti)
             .await?;
 
         if stored_token.revoked_at.is_some() {
             let _ = self
                 .refresh_tokens
-                .revoke_all_for_user(
-                    &ctx.db,
-                    users::TenantId(claims.tenant_id),
-                    stored_token.user_id,
-                )
+                .revoke_all_for_user(&ctx.db, common::TenantId(claims.tenant_id), stored_token.user_id)
                 .await;
             return Err(AuthError::InvalidToken);
         }
@@ -243,8 +237,6 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
     }
 }
 
-
-
 fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
     if record.failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
         return false;
@@ -282,7 +274,7 @@ impl From<users::UserError> for AuthError {
         match error {
             users::UserError::NotFound => Self::InvalidCredentials,
             users::UserError::AlreadyExists => Self::UserAlreadyExists,
-            users::UserError::InvalidEmail => Self::InvalidCredentials,
+            users::UserError::InvalidEmail(_) => Self::InvalidCredentials,
             users::UserError::Database(e) => Self::Database(e),
         }
     }

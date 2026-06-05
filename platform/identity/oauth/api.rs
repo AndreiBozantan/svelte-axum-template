@@ -3,6 +3,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 
+use crate::common;
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::identity::auth;
@@ -24,11 +25,15 @@ where
     Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
         .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))
-        .with_state(AppState { ctx, auth_service, user_service })
+        .with_state(AppState {
+            ctx,
+            auth_service,
+            user_service,
+        })
 }
 
 #[derive(Clone)]
-struct AppState<UR, TR> 
+struct AppState<UR, TR>
 where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
@@ -83,7 +88,11 @@ where
 }
 
 async fn google_auth_callback<UR, TR>(
-    State(AppState { ctx, auth_service, user_service }): State<AppState<UR, TR>>,
+    State(AppState {
+        ctx,
+        auth_service,
+        user_service,
+    }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, ApiError>
@@ -106,13 +115,13 @@ where
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = users::Email::parse(&user_info.email).map_err(|_| ApiError::invalid_credentials())?;
+    let email = common::Email::parse(&user_info.email).map_err(|_| ApiError::invalid_credentials())?;
     let user = user_service
         .link_sso_user(
             &ctx.db,
             users::LinkSsoUserCommand {
                 email,
-                tenant_id: users::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
+                tenant_id: common::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
                 sso_provider: "google".to_string(),
                 sso_id: user_info.id,
             },

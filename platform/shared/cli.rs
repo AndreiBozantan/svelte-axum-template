@@ -4,6 +4,7 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
+use crate::common;
 use crate::common::ArcContext;
 use crate::identity::auth;
 use crate::identity::users;
@@ -140,13 +141,13 @@ async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
     }
 
     let password_hash = auth::hash_password(password.trim())?;
-    let parsed_email = users::Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
+    let parsed_email = common::Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
 
     users::Service::new(users::db::Repository)
         .update_admin_credentials(
             &ctx.db,
             users::UpdateAdminCredentialsCommand {
-                user_id: users::UserId(0),
+                user_id: common::UserId(0),
                 email: parsed_email,
                 password_hash,
             },

@@ -1,10 +1,10 @@
 use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
+use crate::common;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 use crate::identity::auth;
-use crate::identity::users;
 
 #[derive(Debug, FromRow)]
 #[allow(dead_code)]
@@ -21,7 +21,7 @@ struct RefreshTokenRow {
 impl From<RefreshTokenRow> for auth::RefreshToken {
     fn from(row: RefreshTokenRow) -> Self {
         Self {
-            user_id: users::UserId(row.user_id),
+            user_id: common::UserId(row.user_id),
             token_hash: row.token_hash,
             revoked_at: row.revoked_at,
         }
@@ -63,7 +63,12 @@ impl auth::RefreshTokenRepo for Repository {
         Ok(())
     }
 
-    async fn find_by_jti(&self, db: &SqlContext, tenant_id: users::TenantId, jti: &str) -> Result<auth::RefreshToken, RepoError> {
+    async fn find_by_jti(
+        &self,
+        db: &SqlContext,
+        tenant_id: common::TenantId,
+        jti: &str,
+    ) -> Result<auth::RefreshToken, RepoError> {
         let row = sqlx::query_as!(
             RefreshTokenRow,
             r#"
@@ -89,8 +94,8 @@ impl auth::RefreshTokenRepo for Repository {
     async fn revoke_all_for_user(
         &self,
         db: &SqlContext,
-        tenant_id: users::TenantId,
-        user_id: users::UserId,
+        tenant_id: common::TenantId,
+        user_id: common::UserId,
     ) -> Result<(), RepoError> {
         let now = chrono::Utc::now().naive_utc();
         sqlx::query!(

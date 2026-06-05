@@ -11,6 +11,7 @@ use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::str::FromStr;
 
+use crate::common;
 use crate::common::ArcContext;
 use crate::common::Context;
 use crate::config;
@@ -69,9 +70,9 @@ async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestS
         .create_user(
             &ctx.db,
             users::CreateUserCommand {
-                tenant_id: users::TenantId(0),
+                tenant_id: common::TenantId(0),
                 status: users::UserStatus::Active,
-                email: users::Email::parse(TEST_USER_EMAIL)?,
+                email: common::Email::parse(TEST_USER_EMAIL)?,
                 first_name: Some("Test".to_string()),
                 middle_name: None,
                 last_name: Some("User".to_string()),
@@ -82,8 +83,7 @@ async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestS
         )
         .await?;
 
-    let platform_router = crate::identity::router(ctx.clone())
-        .with_state(ctx);
+    let platform_router = crate::identity::router(ctx.clone()).with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);
     Ok(TestServer::new(
         api_router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
