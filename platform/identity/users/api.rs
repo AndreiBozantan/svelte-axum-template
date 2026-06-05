@@ -38,8 +38,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<&crate::identity::users::User> for UserResponse {
-    fn from(user: &crate::identity::users::User) -> Self {
+impl From<users::User> for UserResponse {
+    fn from(user: users::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),
@@ -99,7 +99,7 @@ where
         .await?;
 
     Ok(Json(ListUsersResponse {
-        users: result.users.iter().map(Into::into).collect(),
+        users: result.users.into_iter().map(Into::into).collect(),
         total: result.total,
         limit,
         offset,
@@ -115,5 +115,5 @@ where
 {
     let user_id = claims.user_id().map_err(|_| common::ApiError::not_authenticated())?;
     let user = service.get_user(&context.db, common::UserId(user_id)).await?;
-    Ok(Json(UserInfoResponse { user: (&user).into() }))
+    Ok(Json(UserInfoResponse { user: user.into() }))
 }

@@ -63,8 +63,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<&crate::identity::users::User> for UserResponse {
-    fn from(user: &crate::identity::users::User) -> Self {
+impl From<users::User> for UserResponse {
+    fn from(user: users::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),
@@ -114,7 +114,7 @@ where
 
     logger::log_user_login_success(&headers, session.user.email.as_str());
     let body = LoginResponse {
-        user: (&session.user).into(),
+        user: session.user.into(),
     };
     Ok(tokens::create_response_with_auth_cookies(
         &context,
@@ -165,7 +165,7 @@ where
 
     let body = RefreshResponse {
         expires_in: session.expires_in,
-        user: (&session.user).into(),
+        user: session.user.into(),
     };
     Ok(tokens::create_response_with_auth_cookies(
         &context,

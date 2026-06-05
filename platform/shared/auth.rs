@@ -6,12 +6,13 @@ use axum::http::request::Parts;
 use axum::response::Response;
 
 use crate::common;
+use crate::identity::oauth;
 use crate::internal::logger;
 use crate::internal::tokens;
 use crate::jwt;
 
 pub fn check_oauth_config(config: &crate::config::OAuthSettings) {
-    if let Err(error) = crate::identity::oauth::validate_google_config(config) {
+    if let Err(error) = oauth::validate_google_config(config) {
         tracing::warn!("Google OAuth config is incomplete. {error}");
     }
 }
