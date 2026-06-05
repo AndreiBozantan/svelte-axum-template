@@ -8,6 +8,7 @@ use sha2::Digest;
 use thiserror::Error;
 
 use crate::common;
+use crate::internal::logger;
 use crate::jwt;
 
 #[derive(Debug, Error)]
@@ -22,18 +23,13 @@ pub enum TokenError {
     TokenInvalid,
 }
 
-impl TokenError {
-    pub fn into_api_error(self) -> common::ApiError {
-        match self {
-            Self::JwtOperationFailed(jwt::JwtError::TokenExpired) => common::ApiError::expired_token(),
-            _ => common::ApiError::invalid_token(),
-        }
-    }
-}
-
 impl From<TokenError> for common::ApiError {
     fn from(error: TokenError) -> Self {
-        error.into_api_error()
+        logger::log_auth_rejection(&error);
+        match error {
+            TokenError::JwtOperationFailed(jwt::JwtError::TokenExpired) => Self::expired_token(),
+            _ => Self::invalid_token(),
+        }
     }
 }
 

@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use crate::config;
 use crate::jwt::JwtContext;
+use crate::jwt::JwtError;
 
 pub type SqlContext = sqlx::SqlitePool;
 pub type SqlError = sqlx::Error;
@@ -45,10 +46,18 @@ pub enum DataValidationError {
     InvalidEmail,
 }
 
+impl From<DataValidationError> for ApiError {
+    fn from(error: DataValidationError) -> Self {
+        match error {
+            DataValidationError::InvalidEmail => Self::invalid_credentials(),
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RepoError {
     #[error("entity not found")]
-    NotFound,
+    RowNotFound,
 
     #[error("unique constraint violation: {0}")]
     UniqueViolation(String),
@@ -66,6 +75,14 @@ pub enum RepoError {
     RowConversionFailed(String),
 }
 
+impl From<DataValidationError> for RepoError {
+    fn from(error: DataValidationError) -> Self {
+        match error {
+            DataValidationError::InvalidEmail => Self::RowConversionFailed("invalid email address".to_string()),
+        }
+    }
+}
+
 impl From<SqlError> for RepoError {
     fn from(error: SqlError) -> Self {
         if let SqlError::Database(db_err) = &error {
@@ -81,8 +98,25 @@ impl From<SqlError> for RepoError {
             }
         }
         match error {
-            SqlError::RowNotFound => Self::NotFound,
+            SqlError::RowNotFound => Self::RowNotFound,
             other => Self::Database(other),
+        }
+    }
+}
+
+impl From<RepoError> for ApiError {
+    fn from(error: RepoError) -> Self {
+        // TODO: use structured logging here
+        tracing::error!("database error: {error}");
+
+        #[allow(clippy::match_same_arms)]
+        match error {
+            RepoError::RowNotFound => Self::not_found(),
+            RepoError::UniqueViolation(_) => Self::repo_conflict("unique_violation"),
+            RepoError::ForeignKeyViolation(_) => Self::repo_conflict("foreign_key_violation"),
+            RepoError::CheckViolation(_) => Self::repo_conflict("check_violation"),
+            RepoError::Database(_) => Self::internal(),
+            RepoError::RowConversionFailed(_) => Self::internal(),
         }
     }
 }
@@ -124,6 +158,17 @@ pub enum ApiError {
 
     #[error("{message}")]
     Conflict { code: &'static str, message: String },
+}
+
+impl From<JwtError> for ApiError {
+    fn from(error: JwtError) -> Self {
+        tracing::error!("JWT error: {error}");
+        match error {
+            JwtError::TokenExpired => Self::expired_token(),
+            JwtError::InvalidToken => Self::invalid_token(),
+            _ => Self::internal(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -183,6 +228,11 @@ impl ApiError {
     #[must_use]
     pub fn user_already_exists() -> Self {
         Self::conflict("user_already_exists", "A user with the given email already exists.")
+    }
+
+    #[must_use]
+    pub fn repo_conflict(code: &'static str) -> Self {
+        Self::conflict(code, "A data validation error occurred.")
     }
 
     #[must_use]

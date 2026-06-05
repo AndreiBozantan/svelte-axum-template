@@ -10,7 +10,6 @@ use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::common;
 use crate::config;
 
 #[rustfmt::skip]
@@ -26,7 +25,7 @@ pub enum JwtError {
     FileSystemOperationFailed { #[from] source: std::io::Error },
 
     #[error("Random number generation operation failed")]
-    RngOperationFailed { source: rand::rngs::SysError },
+    RngOperationFailed { #[from] source: rand::rngs::SysError },
 
     #[error("Token has expired")]
     TokenExpired,
@@ -44,21 +43,6 @@ impl From<jwt::errors::Error> for JwtError {
             jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
             jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
             _ => Self::DecodingFailed(e),
-        }
-    }
-}
-
-impl JwtError {
-    #[must_use]
-    pub fn into_api_error(self) -> common::ApiError {
-        #[allow(clippy::match_same_arms)]
-        match self {
-            Self::RngOperationFailed { .. } => common::ApiError::internal(),
-            Self::FileSystemOperationFailed { .. } => common::ApiError::internal(),
-            Self::EncodingFailed(_) => common::ApiError::internal(),
-            Self::DecodingFailed(_) => common::ApiError::invalid_token(),
-            Self::InvalidToken => common::ApiError::invalid_token(),
-            Self::TokenExpired => common::ApiError::expired_token(),
         }
     }
 }
@@ -98,8 +82,8 @@ pub struct JwtContext {
     pub encoding_key: jwt::EncodingKey,
     pub decoding_key: jwt::DecodingKey,
     pub validation: jwt::Validation,
-    pub access_token_expiry: i64,
-    pub refresh_token_expiry: i64,
+    pub access_token_expiry: u32,
+    pub refresh_token_expiry: u32,
 }
 
 impl JwtContext {
@@ -114,8 +98,8 @@ impl JwtContext {
             encoding_key,
             decoding_key,
             validation,
-            access_token_expiry: 60 * i64::from(settings.access_token_expiry_minutes),
-            refresh_token_expiry: 60 * 60 * 24 * i64::from(settings.refresh_token_expiry_days),
+            access_token_expiry: 60 * settings.access_token_expiry_minutes,
+            refresh_token_expiry: 60 * 60 * 24 * settings.refresh_token_expiry_days,
         })
     }
 }
@@ -127,15 +111,18 @@ pub fn generate_token(
     tenant_id: i64,
     email: &str,
     token_type: TokenType,
-    expiry: i64,
 ) -> Result<TokenWithClaims, JwtError> {
     let now = Utc::now().timestamp();
+    let expiry = match token_type {
+        TokenType::Access => ctx.access_token_expiry,
+        TokenType::Refresh => ctx.refresh_token_expiry,
+    };
     let header = jwt::Header::new(jwt::Algorithm::HS256);
     let claims = TokenClaims {
         sub: user_id.to_string(),
         tenant_id,
         email: email.to_string(),
-        exp: now + expiry,
+        exp: now + i64::from(expiry),
         iat: now,
         jti: Uuid::new_v4().to_string(),
         token_type,
@@ -187,8 +174,6 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
 /// Generates a cryptographically secure random secret
 fn generate_secure_secret() -> Result<String, JwtError> {
     let mut bytes = [0u8; 32];
-    rand::rngs::SysRng
-        .try_fill_bytes(&mut bytes)
-        .map_err(|e| JwtError::RngOperationFailed { source: e })?;
+    rand::rngs::SysRng.try_fill_bytes(&mut bytes)?;
     Ok(hex::encode(bytes))
 }

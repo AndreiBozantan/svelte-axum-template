@@ -131,6 +131,7 @@ async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), CliError> {
 }
 
 async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), CliError> {
+    use crate::identity::users::TRepository;
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 
@@ -142,7 +143,7 @@ async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Cli
     let password_hash = auth::hash_password(password.trim())?;
     let parsed_email = common::Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
 
-    users::Service::new(users::db::Repository)
+    users::db::Repository
         .update_admin_credentials(
             &ctx.db,
             users::UpdateAdminCredentialsCommand {

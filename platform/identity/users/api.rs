@@ -7,28 +7,26 @@ use crate::common;
 use crate::identity::users;
 use crate::jwt;
 
-pub fn router<UR>(ctx: common::ArcContext, user_service: users::Service<UR>) -> Router<common::ArcContext>
+pub fn router<UR>(ctx: common::ArcContext, repo: UR) -> Router<common::ArcContext>
 where
-    UR: users::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
 {
     use axum::routing::get;
+    let context = ctx.clone();
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
-        .with_state(AppState {
-            context: ctx.clone(),
-            service: user_service,
-        })
+        .with_state(AppState { context, repo })
         .route_layer(axum::middleware::from_fn_with_state(ctx, crate::auth::middleware))
 }
 
 #[derive(Clone)]
 struct AppState<UR>
 where
-    UR: users::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
 {
     pub context: common::ArcContext,
-    pub service: users::Service<UR>,
+    pub repo: UR,
 }
 
 #[derive(Serialize)]
@@ -79,24 +77,21 @@ impl From<users::UserError> for common::ApiError {
 }
 
 async fn list_users<UR>(
-    State(AppState { context, service }): State<AppState<UR>>,
+    State(AppState { context, repo }): State<AppState<UR>>,
     axum::extract::Query(pagination): axum::extract::Query<common::Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, common::ApiError>
 where
-    UR: users::Repository + Clone,
+    UR: users::TRepository + Clone,
 {
     let (limit, offset) = pagination.sanitize();
-    let result = service
-        .list_users(
-            &context.db,
-            users::ListUsersQuery {
-                tenant_id: common::TenantId(claims.tenant_id),
-                limit,
-                offset,
-            },
-        )
-        .await?;
+    let query = users::ListUsersQuery {
+        tenant_id: common::TenantId(claims.tenant_id),
+        limit,
+        offset,
+    };
+
+    let result = repo.list_by_tenant(&context.db, query).await?;
 
     Ok(Json(ListUsersResponse {
         users: result.users.into_iter().map(Into::into).collect(),
@@ -107,13 +102,13 @@ where
 }
 
 async fn user_info<UR>(
-    State(AppState { context, service }): State<AppState<UR>>,
+    State(AppState { context, repo }): State<AppState<UR>>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, common::ApiError>
 where
-    UR: users::Repository + Clone,
+    UR: users::TRepository + Clone,
 {
-    let user_id = claims.user_id().map_err(|_| common::ApiError::not_authenticated())?;
-    let user = service.get_user(&context.db, common::UserId(user_id)).await?;
+    let user_id = claims.user_id()?;
+    let user = repo.find_by_id(&context.db, common::UserId(user_id)).await?;
     Ok(Json(UserInfoResponse { user: user.into() }))
 }

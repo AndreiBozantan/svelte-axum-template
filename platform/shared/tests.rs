@@ -12,10 +12,36 @@ fn test_context() -> anyhow::Result<JwtContext> {
     Ok(JwtContext::new(&settings, secret)?)
 }
 
+fn generate_expired_token(
+    ctx: &JwtContext,
+    user_id: i64,
+    tenant_id: i64,
+    email: &str,
+    token_type: jwt::TokenType,
+) -> Result<String, JwtError> {
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    let now = Utc::now().timestamp();
+    let exp = now - 60; // 60s in the past (exceeds validation leeway of 5s)
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
+    let claims = jwt::TokenClaims {
+        sub: user_id.to_string(),
+        tenant_id,
+        email: email.to_string(),
+        exp,
+        iat: now - 3600,
+        jti: Uuid::new_v4().to_string(),
+        token_type,
+    };
+    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)?;
+    Ok(token)
+}
+
 #[test]
 fn generate_access_token_success() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access, 1)?;
+    let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access)?;
     assert_eq!(token.value.split('.').count(), 3);
     Ok(())
 }
@@ -23,7 +49,7 @@ fn generate_access_token_success() -> anyhow::Result<()> {
 #[test]
 fn generate_refresh_token_success() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh, 1)?;
+    let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
     assert_eq!(token.value.split('.').count(), 3);
     Ok(())
 }
@@ -31,7 +57,7 @@ fn generate_refresh_token_success() -> anyhow::Result<()> {
 #[test]
 fn decode_access_token_success() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access, 1)?;
+    let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access)?;
     let claims = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Access)?;
     assert_eq!(claims.sub, "123");
     assert_eq!(claims.email, "test_user@example.com");
@@ -43,7 +69,7 @@ fn decode_access_token_success() -> anyhow::Result<()> {
 #[test]
 fn decode_refresh_token_success() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh, 1)?;
+    let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
     let claims = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Refresh)?;
     assert_eq!(claims.sub, "123");
     assert_eq!(claims.token_type, jwt::TokenType::Refresh);
@@ -58,7 +84,7 @@ fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
         refresh_token_expiry_days: 1,
     };
     let wrong_ctx = JwtContext::new(&settings, "wrong_secret_key_for_jwt_testing")?;
-    let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, 1)?;
+    let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&wrong_ctx, &token.value, jwt::TokenType::Access);
     assert!(matches!(result, Err(JwtError::DecodingFailed(_))));
     Ok(())
@@ -78,7 +104,7 @@ fn decode_invalid_token() -> anyhow::Result<()> {
     let result = jwt::decode_token(&ctx, "invalid.token.here", jwt::TokenType::Access);
     assert!(matches!(
         result,
-        Err(JwtError::InvalidToken) | Err(JwtError::DecodingFailed(_))
+        Err(JwtError::InvalidToken | JwtError::DecodingFailed(_))
     ));
     Ok(())
 }
@@ -86,9 +112,8 @@ fn decode_invalid_token() -> anyhow::Result<()> {
 #[test]
 fn token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    // Must exceed validation leeway (5s) so decode fails as expired.
-    let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, -60)?;
-    let result = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Access);
+    let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
+    let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Access);
     assert!(matches!(result, Err(JwtError::TokenExpired)));
     Ok(())
 }
@@ -96,8 +121,8 @@ fn token_expiry() -> anyhow::Result<()> {
 #[test]
 fn refresh_token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
-    let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Refresh, -60)?;
-    let result = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Refresh);
+    let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Refresh)?;
+    let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Refresh);
     assert!(matches!(result, Err(JwtError::TokenExpired)));
     Ok(())
 }

@@ -123,16 +123,6 @@ pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
     );
 }
 
-pub fn log_invalid_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Invalid password attempt",
-        email,
-    );
-}
-
 pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &str, subject: &str) {
     tracing::info!(
         event_type = "auth",

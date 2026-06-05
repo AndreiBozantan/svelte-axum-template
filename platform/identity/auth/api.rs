@@ -17,8 +17,8 @@ use crate::internal::logger;
 
 pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
-    UR: users::Repository + Clone + 'static,
-    TR: tokens::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
+    TR: tokens::TRepository + Clone + 'static,
 {
     use axum::routing::post;
     Router::new()
@@ -31,8 +31,8 @@ where
 #[derive(Clone)]
 struct AppState<UR, TR>
 where
-    UR: users::Repository + Clone + 'static,
-    TR: tokens::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
+    TR: tokens::TRepository + Clone + 'static,
 {
     pub context: common::ArcContext,
     pub service: auth::Service<UR, TR>,
@@ -74,17 +74,14 @@ impl From<users::User> for UserResponse {
 
 impl From<auth::AuthError> for common::ApiError {
     fn from(error: auth::AuthError) -> Self {
+        // TODO: use structured logging here
+        tracing::error!("auth error: {error}");
         match error {
             auth::AuthError::InvalidCredentials => Self::invalid_credentials(),
             auth::AuthError::InvalidToken => Self::invalid_token(),
-            auth::AuthError::TokenOperationFailed(token_error) => token_error.into_api_error(),
-            auth::AuthError::JwtOperationFailed(jwt_error) => jwt_error.into_api_error(),
-            auth::AuthError::UserAlreadyExists => Self::user_already_exists(),
-            // AuthError::UserOperationFailed(user_error) => user_error.into(),
-            auth::AuthError::PasswordHashingFailed(_) | auth::AuthError::Database(_) | auth::AuthError::Internal(_) => {
-                tracing::error!("auth error: {error}");
-                Self::internal()
-            }
+            auth::AuthError::TokenOperationFailed(token_error) => token_error.into(),
+            auth::AuthError::JwtOperationFailed(jwt_error) => jwt_error.into(),
+            _ => Self::internal(),
         }
     }
 }
@@ -95,23 +92,20 @@ async fn login<UR, TR>(
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::Repository + Clone,
-    TR: tokens::Repository + Clone,
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
-    let email = common::Email::parse(&request.email).map_err(|_| common::ApiError::invalid_credentials())?;
+
+    let email = common::Email::parse(&request.email)?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
     };
-    let session = service.login(&context, cmd).await.map_err(|error| {
-        if matches!(error, auth::AuthError::InvalidCredentials) {
-            logger::log_invalid_password(&headers, email.as_str());
-        }
-        common::ApiError::from(error)
-    })?;
+    let session = service.login(&context, cmd).await?;
 
     logger::log_user_login_success(&headers, session.user.email.as_str());
+
     let body = LoginResponse {
         user: session.user.into(),
     };
@@ -128,11 +122,12 @@ async fn logout<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::Repository + Clone,
-    TR: tokens::Repository + Clone,
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
 {
-    let refresh_token = tokens::utils::get_refresh_token_from_cookie(&req).ok();
-    service.revoke_refresh_from_request(&context, refresh_token).await?;
+    if let Ok(refresh_token) = tokens::utils::get_refresh_token_from_cookie(&req) {
+        let _ = service.revoke_refresh_token(&context, refresh_token).await;
+    }
 
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
@@ -146,24 +141,21 @@ async fn refresh<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::Repository + Clone,
-    TR: tokens::Repository + Clone,
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
 {
     let refresh_token = tokens::utils::get_refresh_token_from_cookie(&req)?;
-    let session = service
-        .refresh(&context, refresh_token)
-        .await
-        .map_err(common::ApiError::from)?;
+    let session = service.refresh(&context, refresh_token).await?;
 
     logger::log_token_refresh(
         req.headers(),
         session.user.id.0,
-        &session.old_jti,
+        session.old_jti.as_deref().unwrap_or(""),
         &session.user.id.0.to_string(),
     );
 
     let body = RefreshResponse {
-        expires_in: session.expires_in,
+        expires_in: context.jwt.access_token_expiry,
         user: session.user.into(),
     };
     Ok(tokens::utils::create_response_with_auth_cookies(

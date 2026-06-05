@@ -29,7 +29,7 @@ impl From<RefreshTokenRow> for tokens::RefreshToken {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl tokens::Repository for Repository {
+impl tokens::TRepository for Repository {
     async fn create(
         &self,
         db: &common::SqlContext,

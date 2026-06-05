@@ -10,35 +10,26 @@ use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
 
-pub fn router<UR, TR>(
-    ctx: common::ArcContext,
-    auth_service: auth::Service<UR, TR>,
-    user_service: users::Service<UR>,
-) -> Router<common::ArcContext>
+pub fn router<UR, TR>(ctx: common::ArcContext, auth_service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
-    UR: users::Repository + Clone + 'static,
-    TR: tokens::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
+    TR: tokens::TRepository + Clone + 'static,
 {
     use axum::routing::get;
     Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
         .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))
-        .with_state(AppState {
-            ctx,
-            auth_service,
-            user_service,
-        })
+        .with_state(AppState { ctx, auth_service })
 }
 
 #[derive(Clone)]
 struct AppState<UR, TR>
 where
-    UR: users::Repository + Clone + 'static,
-    TR: tokens::Repository + Clone + 'static,
+    UR: users::TRepository + Clone + 'static,
+    TR: tokens::TRepository + Clone + 'static,
 {
     pub ctx: common::ArcContext,
     pub auth_service: auth::Service<UR, TR>,
-    pub user_service: users::Service<UR>,
 }
 
 impl From<oauth::OAuthError> for common::ApiError {
@@ -64,8 +55,8 @@ async fn google_auth_init<UR, TR>(
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::Repository + Clone,
-    TR: tokens::Repository + Clone,
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
 {
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
@@ -86,22 +77,19 @@ where
 }
 
 async fn google_auth_callback<UR, TR>(
-    State(AppState {
-        ctx,
-        auth_service,
-        user_service,
-    }): State<AppState<UR, TR>>,
+    State(AppState { ctx, auth_service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::Repository + Clone,
-    TR: tokens::Repository + Clone,
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
 {
-    let oauth_state_cookie = tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
-        logger::log_cookie_error(&headers, "missing_oauth_state");
-        common::ApiError::sso_failed()
-    })?;
+    let oauth_state_cookie =
+        tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
+            logger::log_cookie_error(&headers, "missing_oauth_state");
+            common::ApiError::sso_failed()
+        })?;
 
     let (user_info, redirect_url) =
         oauth::complete_google_callback(&ctx, &headers, &params.code, &params.state, oauth_state_cookie).await?;
@@ -113,21 +101,14 @@ where
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = common::Email::parse(&user_info.email).map_err(|_| common::ApiError::invalid_credentials())?;
-    let user = user_service
-        .link_sso_user(
-            &ctx.db,
-            users::LinkSsoUserCommand {
-                email,
-                tenant_id: common::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
-                sso_provider: "google".to_string(),
-                sso_id: user_info.id,
-            },
-        )
-        .await?;
+    let email = common::Email::parse(&user_info.email)?;
+    let cmd = auth::OAuthLoginCommand {
+        email,
+        sso_provider: "google".to_string(),
+        sso_id: user_info.id,
+    };
 
-    let session = auth_service.issue_session(&ctx, user).await?;
-
+    let session = auth_service.login_oauth(&ctx, cmd).await?;
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = tokens::utils::add_auth_cookies(
@@ -137,6 +118,7 @@ where
         Some(&session.refresh_token.value),
     )?;
 
+    // clear oauth_state cookie by setting Max-Age=0
     let clear_cookie = "oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age=0";
     let cookie_val = axum::http::HeaderValue::from_static(clear_cookie);
     response

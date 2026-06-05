@@ -8,8 +8,8 @@ use url::Url;
 
 use crate::common;
 use crate::config;
-use crate::internal::logger;
 use crate::identity::tokens;
+use crate::internal::logger;
 
 #[derive(Debug, Error)]
 pub enum OAuthError {

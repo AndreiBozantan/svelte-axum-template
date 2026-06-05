@@ -14,8 +14,8 @@ use std::str::FromStr;
 use crate::common;
 use crate::config;
 use crate::identity::auth;
-use crate::identity::users;
 use crate::identity::tokens;
+use crate::identity::users;
 use crate::jwt;
 use crate::migrations;
 
@@ -62,9 +62,11 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<comm
 }
 
 async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestServer> {
+    use crate::identity::users::TRepository;
+
     let ctx = create_test_context(config).await?;
     let password_hash = auth::hash_password(TEST_PASSWORD)?;
-    users::Service::new(users::db::Repository)
+    users::db::Repository
         .create_user(
             &ctx.db,
             users::CreateUserCommand {
@@ -341,7 +343,7 @@ async fn access_token_expiry() -> anyhow::Result<()> {
 #[tokio::test]
 async fn decode_access_token_from_req_cookie_success() -> anyhow::Result<()> {
     let ctx = create_test_context(default_config()).await?;
-    let token = jwt::generate_token(&ctx.jwt, 123, 0, "test_user", jwt::TokenType::Access, 1)?;
+    let token = jwt::generate_token(&ctx.jwt, 123, 0, "test_user", jwt::TokenType::Access)?;
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::COOKIE,
@@ -356,7 +358,7 @@ async fn decode_access_token_from_req_cookie_success() -> anyhow::Result<()> {
 #[tokio::test]
 async fn decode_access_token_from_req_success() -> anyhow::Result<()> {
     let ctx = create_test_context(default_config()).await?;
-    let token = jwt::generate_token(&ctx.jwt, 123, 0, "test_user", jwt::TokenType::Access, 1)?;
+    let token = jwt::generate_token(&ctx.jwt, 123, 0, "test_user", jwt::TokenType::Access)?;
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::AUTHORIZATION,

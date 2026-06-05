@@ -18,7 +18,7 @@ pub struct RefreshToken {
     pub revoked_at: Option<NaiveDateTime>,
 }
 
-pub trait Repository: Send + Sync {
+pub trait TRepository: Send + Sync {
     fn create(
         &self,
         db: &common::SqlContext,

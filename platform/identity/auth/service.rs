@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::common;
 use crate::constants;
 use crate::identity::auth;
@@ -14,31 +12,27 @@ pub struct LoginCommand {
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthSession {
-    pub user: users::User,
-    pub access_token: jwt::TokenWithClaims,
-    pub refresh_token: jwt::TokenWithClaims,
+pub struct OAuthLoginCommand {
+    pub email: common::Email,
+    pub sso_provider: String,
+    pub sso_id: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct RefreshSession {
+pub struct AuthResult {
     pub user: users::User,
     pub access_token: jwt::TokenWithClaims,
     pub refresh_token: jwt::TokenWithClaims,
-    pub expires_in: u32,
-    pub old_jti: String,
+    pub old_jti: Option<String>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum AuthError {
     #[error("invalid credentials")]
     InvalidCredentials,
 
     #[error("token expired or invalid")]
     InvalidToken,
-
-    #[error("user already exists")]
-    UserAlreadyExists,
 
     #[error("password hashing failed: {0}")]
     PasswordHashingFailed(#[from] argon2::password_hash::Error),
@@ -50,26 +44,26 @@ pub enum AuthError {
     TokenOperationFailed(#[from] tokens::utils::TokenError),
 
     #[error("database error: {0}")]
-    Database(#[from] common::RepoError),
+    DatabaseOperationFailed(#[from] common::RepoError),
 
     #[error("internal error: {0}")]
     Internal(String),
 }
 
 #[derive(Clone)]
-pub struct Service<UR: users::Repository, TR: tokens::Repository> {
-    users: users::Service<UR>,
-    refresh_tokens: TR,
+pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
+    users: UR,
+    tokens: TR,
 }
 
-impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
+impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     #[must_use]
-    pub const fn new(users: users::Service<UR>, refresh_tokens: TR) -> Self {
-        Self { users, refresh_tokens }
+    pub const fn new(users: UR, tokens: TR) -> Self {
+        Self { users, tokens }
     }
 
-    pub async fn login(&self, ctx: &common::ArcContext, command: LoginCommand) -> Result<AuthSession, AuthError> {
-        let maybe_user = self.users.get_user_for_auth(&ctx.db, &command.email).await?;
+    pub async fn login(&self, ctx: &common::ArcContext, command: LoginCommand) -> Result<AuthResult, AuthError> {
+        let maybe_user = self.users.find_auth_details_by_email(&ctx.db, &command.email).await?;
 
         if let Some(ref record) = maybe_user
             && is_temporarily_locked(record)
@@ -87,17 +81,33 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
 
         if !auth::verify_password(&command.password, password_hash)? {
             if let Some(record) = &maybe_user {
-                self.users.record_failed_login(&ctx.db, record.user.id).await?;
+                self.users.increment_failed_login_count(&ctx.db, record.user.id).await?;
             }
             return Err(AuthError::InvalidCredentials);
         }
 
         let record = maybe_user.ok_or(AuthError::InvalidCredentials)?;
-        self.users.reset_failed_login(&ctx.db, record.user.id).await?;
+        self.users.reset_failed_login_count(&ctx.db, record.user.id).await?;
         self.issue_session(ctx, record.user).await
     }
 
-    pub async fn issue_session(&self, ctx: &common::ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
+    pub async fn login_oauth(
+        &self,
+        ctx: &common::ArcContext,
+        command: OAuthLoginCommand,
+    ) -> Result<AuthResult, AuthError> {
+        let cmd = users::LinkSsoUserCommand {
+            email: command.email,
+            tenant_id: common::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
+            sso_provider: command.sso_provider,
+            sso_id: command.sso_id,
+        };
+        let user = self.users.link_sso_user(&ctx.db, cmd).await?;
+        self.users.reset_failed_login_count(&ctx.db, user.id).await?;
+        self.issue_session(ctx, user).await
+    }
+
+    pub async fn issue_session(&self, ctx: &common::ArcContext, user: users::User) -> Result<AuthResult, AuthError> {
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
         let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
@@ -111,46 +121,38 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
             expires_at: refresh_token_expires_at,
         };
 
-        self.refresh_tokens.create(&ctx.db, cmd).await?;
+        self.tokens.create(&ctx.db, cmd).await?;
 
-        Ok(AuthSession {
+        Ok(AuthResult {
             user,
             access_token,
             refresh_token,
+            old_jti: None,
         })
     }
 
-    pub async fn revoke_refresh_from_request(
-        &self,
-        ctx: &common::ArcContext,
-        refresh_token_value: Option<&str>,
-    ) -> Result<(), AuthError> {
-        let Some(refresh_token_value) = refresh_token_value else {
-            return Ok(());
-        };
-
-        let Ok(claims) = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh) else {
-            return Ok(());
-        };
-
-        self.refresh_tokens.revoke_by_jti(&ctx.db, &claims.jti).await?;
-        Ok(())
-    }
-
-    pub async fn refresh(
+    pub async fn revoke_refresh_token(
         &self,
         ctx: &common::ArcContext,
         refresh_token_value: &str,
-    ) -> Result<RefreshSession, AuthError> {
+    ) -> Result<(), AuthError> {
+        let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
+        self.tokens.revoke_by_jti(&ctx.db, &claims.jti).await?;
+        Ok(())
+    }
+
+    pub async fn refresh(&self, ctx: &common::ArcContext, refresh_token_value: &str) -> Result<AuthResult, AuthError> {
         let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
-            .refresh_tokens
+            .tokens
             .find_by_jti(&ctx.db, common::TenantId(claims.tenant_id), &claims.jti)
             .await?;
 
+        // re-using a revoked refresh token suggests token theft or session hijacking
+        // as a security precaution, all active refresh tokens for this user are invalidated
         if stored_token.revoked_at.is_some() {
             let _ = self
-                .refresh_tokens
+                .tokens
                 .revoke_all_for_user(&ctx.db, common::TenantId(claims.tenant_id), stored_token.user_id)
                 .await;
             return Err(AuthError::InvalidToken);
@@ -161,15 +163,15 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
             return Err(AuthError::InvalidToken);
         }
 
-        self.refresh_tokens.revoke_by_jti(&ctx.db, &claims.jti).await?;
+        self.tokens.revoke_by_jti(&ctx.db, &claims.jti).await?;
 
-        let user = self.users.get_user(&ctx.db, stored_token.user_id).await?;
+        let user = self.users.find_by_id(&ctx.db, stored_token.user_id).await?;
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
         let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
-        self.refresh_tokens
+        self.tokens
             .create(
                 &ctx.db,
                 tokens::CreateRefreshTokenCommand {
@@ -182,12 +184,11 @@ impl<UR: users::Repository, TR: tokens::Repository> Service<UR, TR> {
             )
             .await?;
 
-        Ok(RefreshSession {
-            expires_in: ctx.settings.jwt.access_token_expiry_minutes * 60,
+        Ok(AuthResult {
             user,
             access_token,
             refresh_token,
-            old_jti: claims.jti,
+            old_jti: Some(claims.jti),
         })
     }
 }
@@ -208,7 +209,6 @@ fn generate_refresh_token(ctx: &common::ArcContext, user: &users::User) -> Resul
         user.tenant_id.0,
         user.email.as_str(),
         jwt::TokenType::Refresh,
-        ctx.jwt.refresh_token_expiry,
     )?)
 }
 
@@ -219,7 +219,6 @@ fn generate_access_token(ctx: &common::ArcContext, user: &users::User) -> Result
         user.tenant_id.0,
         user.email.as_str(),
         jwt::TokenType::Access,
-        ctx.jwt.access_token_expiry,
     )?)
 }
 
@@ -228,19 +227,19 @@ impl From<users::UserError> for AuthError {
     fn from(error: users::UserError) -> Self {
         match error {
             users::UserError::NotFound => Self::InvalidCredentials,
-            users::UserError::AlreadyExists => Self::UserAlreadyExists,
             users::UserError::InvalidEmail(_) => Self::InvalidCredentials,
-            users::UserError::Database(e) => Self::Database(e),
+            users::UserError::Database(e) => Self::DatabaseOperationFailed(e),
+            users::UserError::AlreadyExists => Self::Internal("auth UserError::AlreadyExists".into()),
         }
     }
 }
 
-use argon2::Argon2;
 use argon2::password_hash as ar2;
 
 /// Hash a password using Argon2
 pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
-    use argon2::password_hash::PasswordHasher;
+    use ar2::PasswordHasher;
+    use argon2::Argon2;
     let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
     let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
     Ok(hash.to_string())
@@ -248,7 +247,8 @@ pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
 
 /// Verify a password against a hash
 pub fn verify_password(password: &str, hash: &str) -> Result<bool, ar2::Error> {
-    use argon2::password_hash::PasswordVerifier;
+    use ar2::PasswordVerifier;
+    use argon2::Argon2;
     let parsed_hash = ar2::PasswordHash::new(hash)?;
     match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
         Ok(()) => Ok(true),

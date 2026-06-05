@@ -58,8 +58,7 @@ impl From<users::UserStatus> for UserStatusRow {
 }
 
 impl TryFrom<UserRow> for users::User {
-    type Error = users::UserError;
-
+    type Error = common::DataValidationError;
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self {
             id: common::UserId(row.id),
@@ -74,8 +73,7 @@ impl TryFrom<UserRow> for users::User {
 }
 
 impl TryFrom<UserRow> for users::UserAuthRecord {
-    type Error = users::UserError;
-
+    type Error = common::DataValidationError;
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self {
             user: row.clone().try_into()?,
@@ -89,7 +87,7 @@ impl TryFrom<UserRow> for users::UserAuthRecord {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl users::Repository for Repository {
+impl users::TRepository for Repository {
     async fn create_user(
         &self,
         db: &common::SqlContext,
@@ -127,8 +125,7 @@ impl users::Repository for Repository {
         )
         .fetch_one(db)
         .await?;
-        row.try_into()
-            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
+        Ok(row.try_into()?)
     }
 
     async fn find_by_id(&self, db: &common::SqlContext, id: common::UserId) -> Result<users::User, common::RepoError> {
@@ -157,11 +154,10 @@ impl users::Repository for Repository {
         )
         .fetch_one(db)
         .await?;
-        row.try_into()
-            .map_err(|e: users::UserError| common::RepoError::RowConversionFailed(e.to_string()))
+        Ok(row.try_into()?)
     }
 
-    async fn find_auth_by_email(
+    async fn find_auth_details_by_email(
         &self,
         db: &common::SqlContext,
         email: &common::Email,
@@ -192,10 +188,7 @@ impl users::Repository for Repository {
         )
         .fetch_optional(db)
         .await?;
-
-        row.map(TryInto::try_into)
-            .transpose()
-            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
+        Ok(row.map(TryInto::try_into).transpose()?)
     }
 
     async fn list_by_tenant(
@@ -243,8 +236,7 @@ impl users::Repository for Repository {
         let users = rows
             .into_iter()
             .map(users::User::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))?;
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(users::UserList {
             users,
@@ -290,8 +282,7 @@ impl users::Repository for Repository {
         )
         .fetch_one(db)
         .await?;
-        row.try_into()
-            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
+        Ok(row.try_into()?)
     }
 
     async fn update_admin_credentials(
@@ -314,12 +305,12 @@ impl users::Repository for Repository {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(common::RepoError::NotFound);
+            return Err(common::RepoError::RowNotFound);
         }
         Ok(())
     }
 
-    async fn increment_failed_login(
+    async fn increment_failed_login_count(
         &self,
         db: &common::SqlContext,
         user_id: common::UserId,
@@ -343,7 +334,7 @@ impl users::Repository for Repository {
         Ok(())
     }
 
-    async fn reset_failed_login(
+    async fn reset_failed_login_count(
         &self,
         db: &common::SqlContext,
         user_id: common::UserId,
