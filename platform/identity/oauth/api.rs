@@ -16,7 +16,7 @@ pub fn router<UR, TR>(
     user_service: users::Service<UR>,
 ) -> Router<common::ArcContext>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     use axum::routing::get;
@@ -33,7 +33,7 @@ where
 #[derive(Clone)]
 struct AppState<UR, TR>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     pub ctx: common::ArcContext,
@@ -64,7 +64,7 @@ async fn google_auth_init<UR, TR>(
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let redirect_url = params.get("redirect_url").cloned();
@@ -95,7 +95,7 @@ async fn google_auth_callback<UR, TR>(
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let oauth_state_cookie = tokens::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {

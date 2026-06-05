@@ -98,7 +98,7 @@ impl From<common::RepoError> for UserError {
     }
 }
 
-pub trait UserRepo: Send + Sync {
+pub trait Repository: Send + Sync {
     fn create_user(
         &self,
         db: &common::SqlContext,
@@ -149,11 +149,11 @@ pub trait UserRepo: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct Service<R: UserRepo> {
+pub struct Service<R: Repository> {
     repo: R,
 }
 
-impl<UR: UserRepo> Service<UR> {
+impl<UR: Repository> Service<UR> {
     #[must_use]
     pub const fn new(repo: UR) -> Self {
         Self { repo }

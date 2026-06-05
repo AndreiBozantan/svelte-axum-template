@@ -9,7 +9,7 @@ use crate::jwt;
 
 pub fn router<UR>(ctx: common::ArcContext, user_service: users::Service<UR>) -> Router<common::ArcContext>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
 {
     use axum::routing::get;
     Router::new()
@@ -25,7 +25,7 @@ where
 #[derive(Clone)]
 struct AppState<UR>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
 {
     pub context: common::ArcContext,
     pub service: users::Service<UR>,
@@ -84,7 +84,7 @@ async fn list_users<UR>(
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
 {
     let (limit, offset) = pagination.sanitize();
     let result = service
@@ -111,7 +111,7 @@ async fn user_info<UR>(
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
 {
     let user_id = claims.user_id().map_err(|_| common::ApiError::not_authenticated())?;
     let user = service.get_user(&context.db, common::UserId(user_id)).await?;

@@ -89,7 +89,7 @@ impl TryFrom<UserRow> for users::UserAuthRecord {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl users::UserRepo for Repository {
+impl users::Repository for Repository {
     async fn create_user(
         &self,
         db: &common::SqlContext,

@@ -17,7 +17,7 @@ use crate::internal::tokens;
 
 pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     use axum::routing::post;
@@ -31,7 +31,7 @@ where
 #[derive(Clone)]
 struct AppState<UR, TR>
 where
-    UR: users::UserRepo + Clone + 'static,
+    UR: users::Repository + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     pub context: common::ArcContext,
@@ -95,7 +95,7 @@ async fn login<UR, TR>(
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
@@ -128,7 +128,7 @@ async fn logout<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
@@ -146,7 +146,7 @@ async fn refresh<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, common::ApiError>
 where
-    UR: users::UserRepo + Clone,
+    UR: users::Repository + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
