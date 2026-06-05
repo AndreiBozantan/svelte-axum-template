@@ -36,6 +36,10 @@ use platform::migrations;
 
 #[tokio::main]
 async fn main() {
+    #[cfg(debug_assertions)]
+    {
+        dotenvy::dotenv().ok();
+    }
     if let Err(error) = run_app().await {
         eprintln!("❌ {error}\n");
         let mut source = error.source();

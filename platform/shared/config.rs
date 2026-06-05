@@ -126,8 +126,6 @@ impl Default for ServerSettings {
 
 impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
-        dotenvy::dotenv().ok();
-
         let config_dir = Self::get_config_dir()
             .map_err(|e| ConfigError::Message(format!("Failed to get the config dir path: {e}")))?;
         let mut builder = ::config::Config::builder();
