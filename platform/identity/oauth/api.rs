@@ -2,7 +2,6 @@ use axum::Router;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
-use axum::routing::get;
 
 use crate::common::ApiError;
 use crate::common::ArcContext;
@@ -22,6 +21,7 @@ where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
+    use axum::routing::get;
     Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
         .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))

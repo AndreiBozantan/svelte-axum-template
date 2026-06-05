@@ -5,7 +5,6 @@ use axum::extract::Request;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
-use axum::routing::post;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
@@ -22,6 +21,7 @@ where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::service::RefreshTokenRepo + Clone + 'static,
 {
+    use axum::routing::post;
     Router::new()
         .route("/auth/login", post(login::<UR, TR>))
         .route("/auth/logout", post(logout::<UR, TR>))

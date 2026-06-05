@@ -1,7 +1,6 @@
 use axum::Json;
 use axum::Router;
 use axum::extract::State;
-use axum::routing::get;
 use serde::Serialize;
 
 use crate::common::ApiError;
@@ -16,6 +15,7 @@ pub fn router<UR>(ctx: ArcContext, user_service: users::service::Service<UR>) ->
 where
     UR: UserRepo + Clone + 'static,
 {
+    use axum::routing::get;
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
