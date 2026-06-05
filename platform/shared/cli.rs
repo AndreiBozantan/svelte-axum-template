@@ -5,8 +5,7 @@ use clap::Parser;
 use clap::Subcommand;
 
 use crate::common::ArcContext;
-use crate::identity::auth::util;
-use crate::identity::users::db::Repository;
+use crate::identity::auth;
 use crate::identity::users;
 use crate::migrations;
 
@@ -140,7 +139,7 @@ async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
         return Err(CliError::Other("Password cannot be empty".to_string()));
     }
 
-    let password_hash = util::hash_password(password.trim())?;
+    let password_hash = auth::hash_password(password.trim())?;
     let parsed_email = users::Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
 
     users::Service::new(users::db::Repository)

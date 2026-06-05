@@ -9,8 +9,7 @@ use crate::identity::users;
 use crate::jwt;
 
 use crate::internal::tokens;
-
-use super::util::{self, DUMMY_HASH};
+use crate::identity::auth;
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
@@ -114,7 +113,7 @@ pub struct Service<
     refresh_tokens: TR,
 }
 
-impl<UR: crate::identity::users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
+impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
     #[must_use]
     pub const fn new(users: users::Service<UR>, refresh_tokens: TR) -> Self {
         Self { users, refresh_tokens }
@@ -133,11 +132,11 @@ impl<UR: crate::identity::users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR>
             .as_ref()
             .and_then(|record| record.password_hash.as_deref())
             .ok_or_else(|| {
-                let _ = util::verify_password(&command.password, DUMMY_HASH);
+                let _ = auth::verify_password(&command.password, DUMMY_HASH);
                 AuthError::InvalidCredentials
             })?;
 
-        if !util::verify_password(&command.password, password_hash)? {
+        if !auth::verify_password(&command.password, password_hash)? {
             if let Some(record) = &maybe_user {
                 self.users.record_failed_login(&ctx.db, record.user.id).await?;
             }
@@ -288,3 +287,32 @@ impl From<users::UserError> for AuthError {
         }
     }
 }
+
+use argon2::Argon2;
+use argon2::password_hash as ar2;
+
+/// Hash a password using Argon2
+pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
+    use argon2::password_hash::PasswordHasher;
+    let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
+    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    Ok(hash.to_string())
+}
+
+/// Verify a password against a hash
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, ar2::Error> {
+    use argon2::password_hash::PasswordVerifier;
+    let parsed_hash = ar2::PasswordHash::new(hash)?;
+    match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
+        Ok(()) => Ok(true),
+        Err(ar2::Error::Password) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// A pre-computed Argon2 hash of a dummy password, used to perform a
+/// constant-time "wasted" verify when the requested user does not exist,
+/// preventing user-enumeration via response-time differences.
+pub static DUMMY_HASH: &str = "$argon2id$\
+    v=19$m=19456,t=2,p=1$\
+    HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore

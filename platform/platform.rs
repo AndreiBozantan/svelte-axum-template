@@ -33,9 +33,11 @@ pub mod identity {
         pub mod api;
         pub mod db;
         mod service;
-        pub mod util;
 
         pub use service::*;
+
+        #[cfg(test)]
+        mod tests;
     }
 
     pub(crate) mod oauth {

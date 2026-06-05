@@ -14,7 +14,7 @@ use std::str::FromStr;
 use crate::common::ArcContext;
 use crate::common::Context;
 use crate::config;
-use crate::identity::auth::util::hash_password;
+use crate::identity::auth;
 use crate::identity::users;
 use crate::internal::tokens;
 use crate::jwt;
@@ -64,7 +64,7 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<ArcC
 
 async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestServer> {
     let ctx = create_test_context(config).await?;
-    let password_hash = hash_password(TEST_PASSWORD)?;
+    let password_hash = auth::hash_password(TEST_PASSWORD)?;
     users::Service::new(users::db::Repository)
         .create_user(
             &ctx.db,
