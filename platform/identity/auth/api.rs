@@ -17,16 +17,26 @@ use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-pub fn router<UR, R>(ctx: ArcContext, auth_service: auth::domain::Service<UR, R>) -> Router<ArcContext>
+pub fn router<UR, TR>(context: ArcContext, service: auth::domain::Service<UR, TR>) -> Router<ArcContext>
 where
     UR: users::domain::UserRepo + Clone + 'static,
-    R: auth::domain::RefreshTokenRepo + Clone + 'static,
+    TR: auth::domain::RefreshTokenRepo + Clone + 'static,
 {
     Router::new()
-        .route("/auth/login", post(login::<UR, R>))
-        .route("/auth/logout", post(logout::<UR, R>))
-        .route("/auth/refresh", post(refresh::<UR, R>))
-        .with_state((ctx, auth_service))
+        .route("/auth/login", post(login::<UR, TR>))
+        .route("/auth/logout", post(logout::<UR, TR>))
+        .route("/auth/refresh", post(refresh::<UR, TR>))
+        .with_state(AppState{context, service})
+}
+
+#[derive(Clone)]
+struct AppState<UR, TR> 
+where
+    UR: users::domain::UserRepo + Clone + 'static,
+    TR: auth::domain::RefreshTokenRepo + Clone + 'static,
+{
+    pub context: ArcContext,
+    pub service: auth::domain::Service<UR, TR>,
 }
 
 #[derive(Deserialize)]
@@ -80,14 +90,14 @@ impl From<auth::domain::AuthError> for ApiError {
     }
 }
 
-pub async fn login<UR, R>(
-    State((context, service)): State<(ArcContext, auth::domain::Service<UR, R>)>,
+async fn login<UR, TR>(
+    State(AppState{context, service}): State<AppState<UR, TR>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, ApiError>
 where
     UR: users::domain::UserRepo + Clone,
-    R: auth::domain::RefreshTokenRepo + Clone,
+    TR: auth::domain::RefreshTokenRepo + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
     let email = users::domain::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
@@ -114,13 +124,13 @@ where
     )?)
 }
 
-pub async fn logout<UR, R>(
-    State((context, service)): State<(ArcContext, auth::domain::Service<UR, R>)>,
+async fn logout<UR, TR>(
+    State(AppState{context, service}): State<AppState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
     UR: users::domain::UserRepo + Clone,
-    R: auth::domain::RefreshTokenRepo + Clone,
+    TR: auth::domain::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
     service
@@ -134,13 +144,13 @@ where
     Ok(tokens::add_auth_cookies(&context, response, None, None)?)
 }
 
-pub async fn refresh<UR, R>(
-    State((context, service)): State<(ArcContext, auth::domain::Service<UR, R>)>,
+async fn refresh<UR, TR>(
+    State(AppState{context, service}): State<AppState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
     UR: users::domain::UserRepo + Clone,
-    R: auth::domain::RefreshTokenRepo + Clone,
+    TR: auth::domain::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
     let session = service

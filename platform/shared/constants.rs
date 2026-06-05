@@ -14,3 +14,7 @@ pub mod env {
     pub const DEVELOPMENT: &str = "development";
     pub const TEST: &str = "test";
 }
+
+pub mod db {
+    pub const DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS: i64 = 0;
+}

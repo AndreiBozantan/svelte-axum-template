@@ -110,15 +110,15 @@ pub trait RefreshTokenRepo: Send + Sync {
 #[derive(Clone)]
 pub struct Service<
     UR: crate::identity::users::domain::UserRepo,
-    R: RefreshTokenRepo,
+    TR: RefreshTokenRepo,
 > {
     users: users::domain::Service<UR>,
-    refresh_tokens: R,
+    refresh_tokens: TR,
 }
 
-impl<UR: crate::identity::users::domain::UserRepo, R: RefreshTokenRepo> Service<UR, R> {
+impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
     #[must_use]
-    pub const fn new(users: users::domain::Service<UR>, refresh_tokens: R) -> Self {
+    pub const fn new(users: users::domain::Service<UR>, refresh_tokens: TR) -> Self {
         Self { users, refresh_tokens }
     }
 

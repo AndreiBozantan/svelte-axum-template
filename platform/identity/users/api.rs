@@ -4,24 +4,32 @@ use axum::extract::State;
 use axum::routing::get;
 use serde::Serialize;
 
-use crate::auth;
 use crate::common::ApiError;
 use crate::common::ArcContext;
 use crate::common::Pagination;
 use crate::jwt;
+use crate::identity::users;
 
 use super::domain::{ListUsersQuery, TenantId, UserError, UserId, UserRepo};
-use super::domain::Service as UserService;
 
-pub fn router<UR>(ctx: ArcContext, user_service: UserService<UR>) -> Router<ArcContext>
+pub fn router<UR>(ctx: ArcContext, user_service: users::domain::Service<UR>) -> Router<ArcContext>
 where
     UR: UserRepo + Clone + 'static,
 {
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
-        .with_state((ctx.clone(), user_service))
-        .route_layer(axum::middleware::from_fn_with_state(ctx, auth::middleware))
+        .with_state(AppState{context: ctx.clone(), service: user_service})
+        .route_layer(axum::middleware::from_fn_with_state(ctx, crate::auth::middleware))
+}
+
+#[derive(Clone)]
+struct AppState<UR> 
+where
+    UR: users::domain::UserRepo + Clone + 'static,
+{
+    pub context: ArcContext,
+    pub service: users::domain::Service<UR>,
 }
 
 #[derive(Serialize)]
@@ -71,8 +79,8 @@ impl From<UserError> for ApiError {
     }
 }
 
-pub async fn list_users<UR>(
-    State((context, service)): State<(ArcContext, UserService<UR>)>,
+async fn list_users<UR>(
+    State(AppState{context, service}): State<AppState<UR>>,
     axum::extract::Query(pagination): axum::extract::Query<Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, ApiError>
@@ -99,8 +107,8 @@ where
     }))
 }
 
-pub async fn user_info<UR>(
-    State((context, service)): State<(ArcContext, UserService<UR>)>,
+async fn user_info<UR>(
+    State(AppState{context, service}): State<AppState<UR>>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, ApiError>
 where

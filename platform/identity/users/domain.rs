@@ -185,9 +185,9 @@ pub struct Service<R: UserRepo> {
     repo: R,
 }
 
-impl<R: UserRepo> Service<R> {
+impl<UR: UserRepo> Service<UR> {
     #[must_use]
-    pub const fn new(repo: R) -> Self {
+    pub const fn new(repo: UR) -> Self {
         Self { repo }
     }
 
