@@ -14,36 +14,36 @@ use super::util::{self, DUMMY_HASH};
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
-    pub email: users::domain::Email,
+    pub email: users::Email,
     pub password: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct CreateRefreshTokenCommand {
     pub jti: String,
-    pub tenant_id: users::domain::TenantId,
-    pub user_id: users::domain::UserId,
+    pub tenant_id: users::TenantId,
+    pub user_id: users::UserId,
     pub token_hash: String,
     pub expires_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone)]
 pub struct RefreshToken {
-    pub user_id: users::domain::UserId,
+    pub user_id: users::UserId,
     pub token_hash: String,
     pub revoked_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone)]
 pub struct AuthSession {
-    pub user: users::domain::User,
+    pub user: users::User,
     pub access_token: jwt::TokenWithClaims,
     pub refresh_token: jwt::TokenWithClaims,
 }
 
 #[derive(Debug, Clone)]
 pub struct RefreshSession {
-    pub user: users::domain::User,
+    pub user: users::User,
     pub access_token: jwt::TokenWithClaims,
     pub refresh_token: jwt::TokenWithClaims,
     pub expires_in: u32,
@@ -70,8 +70,6 @@ pub enum AuthError {
     #[error("token operation failed: {0}")]
     TokenOperationFailed(#[from] tokens::TokenError),
 
-    // #[error("user operation failed: {0}")]
-    // UserOperationFailed(#[from] users::service::UserError),
     #[error("database error: {0}")]
     Database(#[from] RepoError),
 
@@ -95,30 +93,30 @@ pub trait RefreshTokenRepo: Send + Sync {
     fn find_by_jti(
         &self,
         db: &SqlContext,
-        tenant_id: users::domain::TenantId,
+        tenant_id: users::TenantId,
         jti: &str,
     ) -> impl std::future::Future<Output = Result<RefreshToken, RepoError>> + Send;
 
     fn revoke_all_for_user(
         &self,
         db: &SqlContext,
-        tenant_id: users::domain::TenantId,
-        user_id: users::domain::UserId,
+        tenant_id: users::TenantId,
+        user_id: users::UserId,
     ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
 }
 
 #[derive(Clone)]
 pub struct Service<
-    UR: crate::identity::users::domain::UserRepo,
+    UR: crate::identity::users::UserRepo,
     TR: RefreshTokenRepo,
 > {
-    users: users::domain::Service<UR>,
+    users: users::Service<UR>,
     refresh_tokens: TR,
 }
 
-impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
+impl<UR: crate::identity::users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
     #[must_use]
-    pub const fn new(users: users::domain::Service<UR>, refresh_tokens: TR) -> Self {
+    pub const fn new(users: users::Service<UR>, refresh_tokens: TR) -> Self {
         Self { users, refresh_tokens }
     }
 
@@ -151,7 +149,7 @@ impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service
         self.issue_session(ctx, record.user).await
     }
 
-    pub async fn issue_session(&self, ctx: &ArcContext, user: users::domain::User) -> Result<AuthSession, AuthError> {
+    pub async fn issue_session(&self, ctx: &ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
         let refresh_token_hash = tokens::get_token_hash_as_hex(&refresh_token.value);
@@ -195,7 +193,7 @@ impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service
         let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .refresh_tokens
-            .find_by_jti(&ctx.db, users::domain::TenantId(claims.tenant_id), &claims.jti)
+            .find_by_jti(&ctx.db, users::TenantId(claims.tenant_id), &claims.jti)
             .await?;
 
         if stored_token.revoked_at.is_some() {
@@ -203,7 +201,7 @@ impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service
                 .refresh_tokens
                 .revoke_all_for_user(
                     &ctx.db,
-                    users::domain::TenantId(claims.tenant_id),
+                    users::TenantId(claims.tenant_id),
                     stored_token.user_id,
                 )
                 .await;
@@ -248,7 +246,7 @@ impl<UR: crate::identity::users::domain::UserRepo, TR: RefreshTokenRepo> Service
 
 
 
-fn is_temporarily_locked(record: &users::domain::UserAuthRecord) -> bool {
+fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
     if record.failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
         return false;
     }
@@ -257,7 +255,7 @@ fn is_temporarily_locked(record: &users::domain::UserAuthRecord) -> bool {
     })
 }
 
-fn generate_refresh_token(ctx: &ArcContext, user: &users::domain::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_refresh_token(ctx: &ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -268,7 +266,7 @@ fn generate_refresh_token(ctx: &ArcContext, user: &users::domain::User) -> Resul
     )?)
 }
 
-fn generate_access_token(ctx: &ArcContext, user: &users::domain::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_access_token(ctx: &ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -280,13 +278,13 @@ fn generate_access_token(ctx: &ArcContext, user: &users::domain::User) -> Result
 }
 
 #[allow(clippy::match_same_arms)]
-impl From<users::domain::UserError> for AuthError {
-    fn from(error: users::domain::UserError) -> Self {
+impl From<users::UserError> for AuthError {
+    fn from(error: users::UserError) -> Self {
         match error {
-            users::domain::UserError::NotFound => Self::InvalidCredentials,
-            users::domain::UserError::AlreadyExists => Self::UserAlreadyExists,
-            users::domain::UserError::InvalidEmail => Self::InvalidCredentials,
-            users::domain::UserError::Database(e) => Self::Database(e),
+            users::UserError::NotFound => Self::InvalidCredentials,
+            users::UserError::AlreadyExists => Self::UserAlreadyExists,
+            users::UserError::InvalidEmail => Self::InvalidCredentials,
+            users::UserError::Database(e) => Self::Database(e),
         }
     }
 }

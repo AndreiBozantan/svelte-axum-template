@@ -5,7 +5,7 @@ use crate::common::RepoError;
 use crate::common::SqlContext;
 use crate::constants::auth;
 
-use super::domain::{
+use super::service::{
     CreateUserCommand, Email, LinkSsoUserCommand, ListUsersQuery, TenantId, UpdateAdminCredentialsCommand, User,
     UserAuthRecord, UserError, UserId, UserList, UserRepo, UserStatus,
 };

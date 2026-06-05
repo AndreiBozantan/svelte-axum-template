@@ -4,8 +4,8 @@ use sqlx::FromRow;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 
-use super::domain::{CreateRefreshTokenCommand, RefreshToken, RefreshTokenRepo};
-use crate::identity::users::domain::{TenantId, UserId};
+use crate::identity::auth;
+use crate::identity::users;
 
 #[derive(Debug, FromRow)]
 #[allow(dead_code)]
@@ -19,10 +19,10 @@ struct RefreshTokenRow {
     revoked_at: Option<NaiveDateTime>,
 }
 
-impl From<RefreshTokenRow> for RefreshToken {
+impl From<RefreshTokenRow> for auth::RefreshToken {
     fn from(row: RefreshTokenRow) -> Self {
         Self {
-            user_id: UserId(row.user_id),
+            user_id: users::UserId(row.user_id),
             token_hash: row.token_hash,
             revoked_at: row.revoked_at,
         }
@@ -32,8 +32,8 @@ impl From<RefreshTokenRow> for RefreshToken {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl RefreshTokenRepo for Repository {
-    async fn create(&self, db: &SqlContext, command: CreateRefreshTokenCommand) -> Result<(), RepoError> {
+impl auth::RefreshTokenRepo for Repository {
+    async fn create(&self, db: &SqlContext, command: auth::CreateRefreshTokenCommand) -> Result<(), RepoError> {
         sqlx::query!(
             r#"
             INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
@@ -64,7 +64,7 @@ impl RefreshTokenRepo for Repository {
         Ok(())
     }
 
-    async fn find_by_jti(&self, db: &SqlContext, tenant_id: TenantId, jti: &str) -> Result<RefreshToken, RepoError> {
+    async fn find_by_jti(&self, db: &SqlContext, tenant_id: users::TenantId, jti: &str) -> Result<auth::RefreshToken, RepoError> {
         let row = sqlx::query_as!(
             RefreshTokenRow,
             r#"
@@ -90,8 +90,8 @@ impl RefreshTokenRepo for Repository {
     async fn revoke_all_for_user(
         &self,
         db: &SqlContext,
-        tenant_id: TenantId,
-        user_id: UserId,
+        tenant_id: users::TenantId,
+        user_id: users::UserId,
     ) -> Result<(), RepoError> {
         let now = chrono::Utc::now().naive_utc();
         sqlx::query!(

@@ -6,23 +6,21 @@ use axum::routing::get;
 
 use crate::common::ApiError;
 use crate::common::ArcContext;
-use crate::identity::auth::domain::Service as AuthService;
-use crate::identity::auth::domain::RefreshTokenRepo;
-use crate::identity::users::domain::{Email, LinkSsoUserCommand, TenantId, UserRepo};
-use crate::identity::users::domain::Service as UserService;
+use crate::identity::auth;
+use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-use super::domain::{GoogleCallbackRequest, OAuthError, begin_google_flow, complete_google_callback};
+use super::service::{GoogleCallbackRequest, OAuthError, begin_google_flow, complete_google_callback};
 
 pub fn router<UR, TR>(
     ctx: ArcContext,
-    auth_service: AuthService<UR, TR>,
-    user_service: UserService<UR>,
+    auth_service: auth::Service<UR, TR>,
+    user_service: users::Service<UR>,
 ) -> Router<ArcContext>
 where
-    UR: UserRepo + Clone + 'static,
-    TR: RefreshTokenRepo + Clone + 'static,
+    UR: users::UserRepo + Clone + 'static,
+    TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
@@ -33,12 +31,12 @@ where
 #[derive(Clone)]
 struct AppState<UR, TR> 
 where
-    UR: UserRepo + Clone + 'static,
-    TR: RefreshTokenRepo + Clone + 'static,
+    UR: users::UserRepo + Clone + 'static,
+    TR: auth::RefreshTokenRepo + Clone + 'static,
 {
     pub ctx: ArcContext,
-    pub auth_service: AuthService<UR, TR>,
-    pub user_service: UserService<UR>,
+    pub auth_service: auth::Service<UR, TR>,
+    pub user_service: users::Service<UR>,
 }
 
 impl From<OAuthError> for ApiError {
@@ -64,8 +62,8 @@ async fn google_auth_init<UR, TR>(
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, ApiError>
 where
-    UR: UserRepo + Clone,
-    TR: RefreshTokenRepo + Clone,
+    UR: users::UserRepo + Clone,
+    TR: auth::RefreshTokenRepo + Clone,
 {
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
@@ -91,8 +89,8 @@ async fn google_auth_callback<UR, TR>(
     axum::extract::Query(params): axum::extract::Query<GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, ApiError>
 where
-    UR: UserRepo + Clone,
-    TR: RefreshTokenRepo + Clone,
+    UR: users::UserRepo + Clone,
+    TR: auth::RefreshTokenRepo + Clone,
 {
     let oauth_state_cookie = tokens::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
         logger::log_cookie_error(&headers, "missing_oauth_state");
@@ -109,13 +107,13 @@ where
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = Email::parse(&user_info.email).map_err(|_| ApiError::invalid_credentials())?;
+    let email = users::Email::parse(&user_info.email).map_err(|_| ApiError::invalid_credentials())?;
     let user = user_service
         .link_sso_user(
             &ctx.db,
-            LinkSsoUserCommand {
+            users::LinkSsoUserCommand {
                 email,
-                tenant_id: TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
+                tenant_id: users::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
                 sso_provider: "google".to_string(),
                 sso_id: user_info.id,
             },

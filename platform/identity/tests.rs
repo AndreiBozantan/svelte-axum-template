@@ -15,9 +15,7 @@ use crate::common::ArcContext;
 use crate::common::Context;
 use crate::config;
 use crate::identity::auth::util::hash_password;
-use crate::identity::users::db::Repository;
-use crate::identity::users::domain::{CreateUserCommand, Email, TenantId, UserStatus};
-use crate::identity::users::domain::Service as UserService;
+use crate::identity::users;
 use crate::internal::tokens;
 use crate::jwt;
 use crate::migrations;
@@ -67,13 +65,13 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<ArcC
 async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestServer> {
     let ctx = create_test_context(config).await?;
     let password_hash = hash_password(TEST_PASSWORD)?;
-    UserService::new(Repository)
+    users::Service::new(users::db::Repository)
         .create_user(
             &ctx.db,
-            CreateUserCommand {
-                tenant_id: TenantId(0),
-                status: UserStatus::Active,
-                email: Email::parse(TEST_USER_EMAIL)?,
+            users::CreateUserCommand {
+                tenant_id: users::TenantId(0),
+                status: users::UserStatus::Active,
+                email: users::Email::parse(TEST_USER_EMAIL)?,
                 first_name: Some("Test".to_string()),
                 middle_name: None,
                 last_name: Some("User".to_string()),

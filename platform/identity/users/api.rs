@@ -10,9 +10,9 @@ use crate::common::Pagination;
 use crate::jwt;
 use crate::identity::users;
 
-use super::domain::{ListUsersQuery, TenantId, UserError, UserId, UserRepo};
+use super::service::{ListUsersQuery, TenantId, UserError, UserId, UserRepo};
 
-pub fn router<UR>(ctx: ArcContext, user_service: users::domain::Service<UR>) -> Router<ArcContext>
+pub fn router<UR>(ctx: ArcContext, user_service: users::service::Service<UR>) -> Router<ArcContext>
 where
     UR: UserRepo + Clone + 'static,
 {
@@ -26,10 +26,10 @@ where
 #[derive(Clone)]
 struct AppState<UR> 
 where
-    UR: users::domain::UserRepo + Clone + 'static,
+    UR: users::service::UserRepo + Clone + 'static,
 {
     pub context: ArcContext,
-    pub service: users::domain::Service<UR>,
+    pub service: users::service::Service<UR>,
 }
 
 #[derive(Serialize)]
@@ -39,8 +39,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<&crate::identity::users::domain::User> for UserResponse {
-    fn from(user: &crate::identity::users::domain::User) -> Self {
+impl From<&crate::identity::users::service::User> for UserResponse {
+    fn from(user: &crate::identity::users::service::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),

@@ -17,10 +17,10 @@ use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-pub fn router<UR, TR>(context: ArcContext, service: auth::domain::Service<UR, TR>) -> Router<ArcContext>
+pub fn router<UR, TR>(context: ArcContext, service: auth::service::Service<UR, TR>) -> Router<ArcContext>
 where
-    UR: users::domain::UserRepo + Clone + 'static,
-    TR: auth::domain::RefreshTokenRepo + Clone + 'static,
+    UR: users::UserRepo + Clone + 'static,
+    TR: auth::service::RefreshTokenRepo + Clone + 'static,
 {
     Router::new()
         .route("/auth/login", post(login::<UR, TR>))
@@ -32,11 +32,11 @@ where
 #[derive(Clone)]
 struct AppState<UR, TR> 
 where
-    UR: users::domain::UserRepo + Clone + 'static,
-    TR: auth::domain::RefreshTokenRepo + Clone + 'static,
+    UR: users::UserRepo + Clone + 'static,
+    TR: auth::service::RefreshTokenRepo + Clone + 'static,
 {
     pub context: ArcContext,
-    pub service: auth::domain::Service<UR, TR>,
+    pub service: auth::service::Service<UR, TR>,
 }
 
 #[derive(Deserialize)]
@@ -63,8 +63,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<&crate::identity::users::domain::User> for UserResponse {
-    fn from(user: &crate::identity::users::domain::User) -> Self {
+impl From<&crate::identity::users::User> for UserResponse {
+    fn from(user: &crate::identity::users::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),
@@ -73,16 +73,16 @@ impl From<&crate::identity::users::domain::User> for UserResponse {
     }
 }
 
-impl From<auth::domain::AuthError> for ApiError {
-    fn from(error: auth::domain::AuthError) -> Self {
+impl From<auth::AuthError> for ApiError {
+    fn from(error: auth::AuthError) -> Self {
         match error {
-            auth::domain::AuthError::InvalidCredentials => Self::invalid_credentials(),
-            auth::domain::AuthError::InvalidToken => Self::invalid_token(),
-            auth::domain::AuthError::TokenOperationFailed(token_error) => token_error.into_api_error(),
-            auth::domain::AuthError::JwtOperationFailed(jwt_error) => jwt_error.into_api_error(),
-            auth::domain::AuthError::UserAlreadyExists => Self::user_already_exists(),
+            auth::AuthError::InvalidCredentials => Self::invalid_credentials(),
+            auth::AuthError::InvalidToken => Self::invalid_token(),
+            auth::AuthError::TokenOperationFailed(token_error) => token_error.into_api_error(),
+            auth::AuthError::JwtOperationFailed(jwt_error) => jwt_error.into_api_error(),
+            auth::AuthError::UserAlreadyExists => Self::user_already_exists(),
             // AuthError::UserOperationFailed(user_error) => user_error.into(),
-            auth::domain::AuthError::PasswordHashingFailed(_) | auth::domain::AuthError::Database(_) | auth::domain::AuthError::Internal(_) => {
+            auth::AuthError::PasswordHashingFailed(_) | auth::AuthError::Database(_) | auth::AuthError::Internal(_) => {
                 tracing::error!("auth error: {error}");
                 Self::internal()
             }
@@ -96,17 +96,17 @@ async fn login<UR, TR>(
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, ApiError>
 where
-    UR: users::domain::UserRepo + Clone,
-    TR: auth::domain::RefreshTokenRepo + Clone,
+    UR: users::UserRepo + Clone,
+    TR: auth::RefreshTokenRepo + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
-    let email = users::domain::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
-    let cmd = auth::domain::LoginCommand {
+    let email = users::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
+    let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
     };
     let session = service.login(&context, cmd).await.map_err(|error| {
-        if matches!(error, auth::domain::AuthError::InvalidCredentials) {
+        if matches!(error, auth::AuthError::InvalidCredentials) {
             logger::log_invalid_password(&headers, email.as_str());
         }
         ApiError::from(error)
@@ -129,8 +129,8 @@ async fn logout<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
-    UR: users::domain::UserRepo + Clone,
-    TR: auth::domain::RefreshTokenRepo + Clone,
+    UR: users::UserRepo + Clone,
+    TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req).ok();
     service
@@ -149,8 +149,8 @@ async fn refresh<UR, TR>(
     req: Request<Body>,
 ) -> Result<impl IntoResponse, ApiError>
 where
-    UR: users::domain::UserRepo + Clone,
-    TR: auth::domain::RefreshTokenRepo + Clone,
+    UR: users::UserRepo + Clone,
+    TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
     let session = service
