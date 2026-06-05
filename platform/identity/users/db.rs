@@ -2,8 +2,6 @@ use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
 use crate::common;
-use crate::common::RepoError;
-use crate::common::SqlContext;
 use crate::constants;
 use crate::identity::users;
 
@@ -92,7 +90,11 @@ impl TryFrom<UserRow> for users::UserAuthRecord {
 pub struct Repository;
 
 impl users::UserRepo for Repository {
-    async fn create_user(&self, db: &SqlContext, command: users::CreateUserCommand) -> Result<users::User, RepoError> {
+    async fn create_user(
+        &self,
+        db: &common::SqlContext,
+        command: users::CreateUserCommand,
+    ) -> Result<users::User, common::RepoError> {
         let status: UserStatusRow = command.status.into();
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
@@ -126,10 +128,10 @@ impl users::UserRepo for Repository {
         .fetch_one(db)
         .await?;
         row.try_into()
-            .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))
+            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
     }
 
-    async fn find_by_id(&self, db: &SqlContext, id: common::UserId) -> Result<users::User, RepoError> {
+    async fn find_by_id(&self, db: &common::SqlContext, id: common::UserId) -> Result<users::User, common::RepoError> {
         let row = sqlx::query_as!(
             UserRow,
             r#"
@@ -156,14 +158,14 @@ impl users::UserRepo for Repository {
         .fetch_one(db)
         .await?;
         row.try_into()
-            .map_err(|e: users::UserError| RepoError::RowConversionFailed(e.to_string()))
+            .map_err(|e: users::UserError| common::RepoError::RowConversionFailed(e.to_string()))
     }
 
     async fn find_auth_by_email(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         email: &common::Email,
-    ) -> Result<Option<users::UserAuthRecord>, RepoError> {
+    ) -> Result<Option<users::UserAuthRecord>, common::RepoError> {
         let email_str = email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -193,14 +195,14 @@ impl users::UserRepo for Repository {
 
         row.map(TryInto::try_into)
             .transpose()
-            .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))
+            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
     }
 
     async fn list_by_tenant(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         query: users::ListUsersQuery,
-    ) -> Result<users::UserList, RepoError> {
+    ) -> Result<users::UserList, common::RepoError> {
         let rows = sqlx::query_as!(
             UserRow,
             r#"
@@ -242,7 +244,7 @@ impl users::UserRepo for Repository {
             .into_iter()
             .map(users::User::try_from)
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))?;
+            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))?;
 
         Ok(users::UserList {
             users,
@@ -252,9 +254,9 @@ impl users::UserRepo for Repository {
 
     async fn link_sso_user(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: users::LinkSsoUserCommand,
-    ) -> Result<users::User, RepoError> {
+    ) -> Result<users::User, common::RepoError> {
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -289,14 +291,14 @@ impl users::UserRepo for Repository {
         .fetch_one(db)
         .await?;
         row.try_into()
-            .map_err(|_| RepoError::Database(sqlx::Error::RowNotFound))
+            .map_err(|_| common::RepoError::Database(sqlx::Error::RowNotFound))
     }
 
     async fn update_admin_credentials(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: users::UpdateAdminCredentialsCommand,
-    ) -> Result<(), RepoError> {
+    ) -> Result<(), common::RepoError> {
         let email = command.email.as_str().to_string();
         let result = sqlx::query!(
             r#"
@@ -312,12 +314,16 @@ impl users::UserRepo for Repository {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(RepoError::NotFound);
+            return Err(common::RepoError::NotFound);
         }
         Ok(())
     }
 
-    async fn increment_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), RepoError> {
+    async fn increment_failed_login(
+        &self,
+        db: &common::SqlContext,
+        user_id: common::UserId,
+    ) -> Result<(), common::RepoError> {
         let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
         sqlx::query!(
             r#"
@@ -337,7 +343,11 @@ impl users::UserRepo for Repository {
         Ok(())
     }
 
-    async fn reset_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), RepoError> {
+    async fn reset_failed_login(
+        &self,
+        db: &common::SqlContext,
+        user_id: common::UserId,
+    ) -> Result<(), common::RepoError> {
         sqlx::query!(
             r#"
             UPDATE users SET

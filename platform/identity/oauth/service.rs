@@ -6,7 +6,7 @@ use serde::Serialize;
 use thiserror::Error;
 use url::Url;
 
-use crate::common::ArcContext;
+use crate::common;
 use crate::config;
 use crate::internal::logger;
 use crate::internal::tokens;
@@ -139,7 +139,10 @@ fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Cl
     Ok(client)
 }
 
-pub fn begin_google_flow(context: &ArcContext, redirect_url: Option<String>) -> Result<(Url, String), OAuthError> {
+pub fn begin_google_flow(
+    context: &common::ArcContext,
+    redirect_url: Option<String>,
+) -> Result<(Url, String), OAuthError> {
     let redirect_url = if let Some(url) = redirect_url
         && validate_redirect_path(&url).is_ok()
     {
@@ -175,7 +178,7 @@ pub fn begin_google_flow(context: &ArcContext, redirect_url: Option<String>) -> 
 }
 
 pub async fn complete_google_callback(
-    context: &ArcContext,
+    context: &common::ArcContext,
     headers: &axum::http::HeaderMap,
     code: &str,
     state: &str,

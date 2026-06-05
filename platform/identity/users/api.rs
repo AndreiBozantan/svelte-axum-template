@@ -4,13 +4,10 @@ use axum::extract::State;
 use serde::Serialize;
 
 use crate::common;
-use crate::common::ApiError;
-use crate::common::ArcContext;
-use crate::common::Pagination;
 use crate::identity::users;
 use crate::jwt;
 
-pub fn router<UR>(ctx: ArcContext, user_service: users::Service<UR>) -> Router<ArcContext>
+pub fn router<UR>(ctx: common::ArcContext, user_service: users::Service<UR>) -> Router<common::ArcContext>
 where
     UR: users::UserRepo + Clone + 'static,
 {
@@ -30,7 +27,7 @@ struct AppState<UR>
 where
     UR: users::UserRepo + Clone + 'static,
 {
-    pub context: ArcContext,
+    pub context: common::ArcContext,
     pub service: users::Service<UR>,
 }
 
@@ -64,7 +61,7 @@ pub struct UserInfoResponse {
     pub user: UserResponse,
 }
 
-impl From<users::UserError> for ApiError {
+impl From<users::UserError> for common::ApiError {
     fn from(error: users::UserError) -> Self {
         match error {
             users::UserError::NotFound => Self::not_found(),
@@ -83,9 +80,9 @@ impl From<users::UserError> for ApiError {
 
 async fn list_users<UR>(
     State(AppState { context, service }): State<AppState<UR>>,
-    axum::extract::Query(pagination): axum::extract::Query<Pagination>,
+    axum::extract::Query(pagination): axum::extract::Query<common::Pagination>,
     claims: jwt::TokenClaims,
-) -> Result<Json<ListUsersResponse>, ApiError>
+) -> Result<Json<ListUsersResponse>, common::ApiError>
 where
     UR: users::UserRepo + Clone,
 {
@@ -112,11 +109,11 @@ where
 async fn user_info<UR>(
     State(AppState { context, service }): State<AppState<UR>>,
     claims: jwt::TokenClaims,
-) -> Result<Json<UserInfoResponse>, ApiError>
+) -> Result<Json<UserInfoResponse>, common::ApiError>
 where
     UR: users::UserRepo + Clone,
 {
-    let user_id = claims.user_id().map_err(|_| ApiError::not_authenticated())?;
+    let user_id = claims.user_id().map_err(|_| common::ApiError::not_authenticated())?;
     let user = service.get_user(&context.db, common::UserId(user_id)).await?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))
 }

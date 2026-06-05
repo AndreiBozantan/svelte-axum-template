@@ -5,7 +5,6 @@ use clap::Parser;
 use clap::Subcommand;
 
 use crate::common;
-use crate::common::ArcContext;
 use crate::identity::auth;
 use crate::identity::users;
 use crate::migrations;
@@ -66,7 +65,7 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(ctx: &ArcContext) -> Result<bool, CliError> {
+pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -84,7 +83,7 @@ pub async fn run_cli(ctx: &ArcContext) -> Result<bool, CliError> {
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, ctx: &ArcContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), CliError> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -113,7 +112,7 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(ctx: &ArcContext) -> Result<(), CliError> {
+async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), CliError> {
     match migrations::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
@@ -123,7 +122,7 @@ async fn migrate_action_status(ctx: &ArcContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_run(ctx: &ArcContext) -> Result<(), CliError> {
+async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), CliError> {
     migrations::run_migrations(ctx)
         .await
         .map_err(|e| CliError::MigrationRunFailed { source: e })?;
@@ -131,7 +130,7 @@ async fn migrate_action_run(ctx: &ArcContext) -> Result<(), CliError> {
     Ok(())
 }
 
-async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
+async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), CliError> {
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 

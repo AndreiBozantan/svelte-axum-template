@@ -6,8 +6,7 @@ use std::path::Path;
 use chrono;
 use thiserror::Error;
 
-use crate::common::ArcContext;
-use crate::common::SqlContext;
+use crate::common;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -44,7 +43,7 @@ pub fn list_migrations() -> Vec<String> {
 }
 
 /// Runs the embedded migrations
-pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
+pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), MigrationError> {
     // run core structural migrations safely on ALL environments
     sqlx::migrate!("../migrations")
         .run(&ctx.db)
@@ -73,7 +72,7 @@ pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &SqlContext) -> Result<bool, MigrationError> {
+pub async fn check_pending_migrations(db: &common::SqlContext) -> Result<bool, MigrationError> {
     let available_migrations = list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)

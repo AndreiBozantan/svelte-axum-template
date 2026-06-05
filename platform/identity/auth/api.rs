@@ -10,14 +10,12 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::common;
-use crate::common::ApiError;
-use crate::common::ArcContext;
 use crate::identity::auth;
 use crate::identity::users;
 use crate::internal::logger;
 use crate::internal::tokens;
 
-pub fn router<UR, TR>(context: ArcContext, service: auth::Service<UR, TR>) -> Router<ArcContext>
+pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
@@ -36,7 +34,7 @@ where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
-    pub context: ArcContext,
+    pub context: common::ArcContext,
     pub service: auth::Service<UR, TR>,
 }
 
@@ -74,7 +72,7 @@ impl From<&crate::identity::users::User> for UserResponse {
     }
 }
 
-impl From<auth::AuthError> for ApiError {
+impl From<auth::AuthError> for common::ApiError {
     fn from(error: auth::AuthError) -> Self {
         match error {
             auth::AuthError::InvalidCredentials => Self::invalid_credentials(),
@@ -95,13 +93,13 @@ async fn login<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
-) -> Result<impl IntoResponse, ApiError>
+) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::UserRepo + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     logger::log_user_login_attempt(&headers, &request.email);
-    let email = common::Email::parse(&request.email).map_err(|_| ApiError::invalid_credentials())?;
+    let email = common::Email::parse(&request.email).map_err(|_| common::ApiError::invalid_credentials())?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
@@ -110,7 +108,7 @@ where
         if matches!(error, auth::AuthError::InvalidCredentials) {
             logger::log_invalid_password(&headers, email.as_str());
         }
-        ApiError::from(error)
+        common::ApiError::from(error)
     })?;
 
     logger::log_user_login_success(&headers, session.user.email.as_str());
@@ -128,7 +126,7 @@ where
 async fn logout<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
-) -> Result<impl IntoResponse, ApiError>
+) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::UserRepo + Clone,
     TR: auth::RefreshTokenRepo + Clone,
@@ -139,20 +137,23 @@ where
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
-        .map_err(|_| ApiError::internal())?;
+        .map_err(|_| common::ApiError::internal())?;
     Ok(tokens::add_auth_cookies(&context, response, None, None)?)
 }
 
 async fn refresh<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
-) -> Result<impl IntoResponse, ApiError>
+) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::UserRepo + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let refresh_token = tokens::get_refresh_token_from_cookie(&req)?;
-    let session = service.refresh(&context, refresh_token).await.map_err(ApiError::from)?;
+    let session = service
+        .refresh(&context, refresh_token)
+        .await
+        .map_err(common::ApiError::from)?;
 
     logger::log_token_refresh(
         req.headers(),

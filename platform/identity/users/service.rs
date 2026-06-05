@@ -2,8 +2,6 @@ use chrono::NaiveDateTime;
 use thiserror::Error;
 
 use crate::common;
-use crate::common::RepoError;
-use crate::common::SqlContext;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserStatus {
@@ -87,14 +85,14 @@ pub enum UserError {
     AlreadyExists,
 
     #[error("database error: {0}")]
-    Database(RepoError),
+    Database(common::RepoError),
 }
 
-impl From<RepoError> for UserError {
-    fn from(error: RepoError) -> Self {
+impl From<common::RepoError> for UserError {
+    fn from(error: common::RepoError) -> Self {
         match error {
-            RepoError::NotFound => Self::NotFound,
-            RepoError::UniqueViolation(_) => Self::AlreadyExists,
+            common::RepoError::NotFound => Self::NotFound,
+            common::RepoError::UniqueViolation(_) => Self::AlreadyExists,
             other => Self::Database(other),
         }
     }
@@ -103,51 +101,51 @@ impl From<RepoError> for UserError {
 pub trait UserRepo: Send + Sync {
     fn create_user(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: CreateUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
 
     fn find_by_id(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<User, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
 
     fn find_auth_by_email(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         email: &common::Email,
-    ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, common::RepoError>> + Send;
 
     fn list_by_tenant(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         query: ListUsersQuery,
-    ) -> impl std::future::Future<Output = Result<UserList, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<UserList, common::RepoError>> + Send;
 
     fn link_sso_user(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: LinkSsoUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
 
     fn update_admin_credentials(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: UpdateAdminCredentialsCommand,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 
     fn increment_failed_login(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 
     fn reset_failed_login(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 }
 
 #[derive(Clone)]
@@ -162,33 +160,33 @@ impl<UR: UserRepo> Service<UR> {
     }
 
     #[allow(dead_code)]
-    pub async fn create_user(&self, db: &SqlContext, command: CreateUserCommand) -> Result<User, UserError> {
+    pub async fn create_user(&self, db: &common::SqlContext, command: CreateUserCommand) -> Result<User, UserError> {
         self.repo.create_user(db, command).await.map_err(Into::into)
     }
 
-    pub async fn get_user(&self, db: &SqlContext, id: common::UserId) -> Result<User, UserError> {
+    pub async fn get_user(&self, db: &common::SqlContext, id: common::UserId) -> Result<User, UserError> {
         self.repo.find_by_id(db, id).await.map_err(Into::into)
     }
 
     pub async fn get_user_for_auth(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         email: &common::Email,
     ) -> Result<Option<UserAuthRecord>, UserError> {
         self.repo.find_auth_by_email(db, email).await.map_err(Into::into)
     }
 
-    pub async fn list_users(&self, db: &SqlContext, query: ListUsersQuery) -> Result<UserList, UserError> {
+    pub async fn list_users(&self, db: &common::SqlContext, query: ListUsersQuery) -> Result<UserList, UserError> {
         self.repo.list_by_tenant(db, query).await.map_err(Into::into)
     }
 
-    pub async fn link_sso_user(&self, db: &SqlContext, command: LinkSsoUserCommand) -> Result<User, UserError> {
+    pub async fn link_sso_user(&self, db: &common::SqlContext, command: LinkSsoUserCommand) -> Result<User, UserError> {
         self.repo.link_sso_user(db, command).await.map_err(Into::into)
     }
 
     pub async fn update_admin_credentials(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: UpdateAdminCredentialsCommand,
     ) -> Result<(), UserError> {
         self.repo
@@ -197,11 +195,11 @@ impl<UR: UserRepo> Service<UR> {
             .map_err(Into::into)
     }
 
-    pub async fn record_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), UserError> {
+    pub async fn record_failed_login(&self, db: &common::SqlContext, user_id: common::UserId) -> Result<(), UserError> {
         self.repo.increment_failed_login(db, user_id).await.map_err(Into::into)
     }
 
-    pub async fn reset_failed_login(&self, db: &SqlContext, user_id: common::UserId) -> Result<(), UserError> {
+    pub async fn reset_failed_login(&self, db: &common::SqlContext, user_id: common::UserId) -> Result<(), UserError> {
         self.repo.reset_failed_login(db, user_id).await.map_err(Into::into)
     }
 }

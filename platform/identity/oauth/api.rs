@@ -4,8 +4,6 @@ use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 
 use crate::common;
-use crate::common::ApiError;
-use crate::common::ArcContext;
 use crate::identity::auth;
 use crate::identity::oauth;
 use crate::identity::users;
@@ -13,10 +11,10 @@ use crate::internal::logger;
 use crate::internal::tokens;
 
 pub fn router<UR, TR>(
-    ctx: ArcContext,
+    ctx: common::ArcContext,
     auth_service: auth::Service<UR, TR>,
     user_service: users::Service<UR>,
-) -> Router<ArcContext>
+) -> Router<common::ArcContext>
 where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
@@ -38,12 +36,12 @@ where
     UR: users::UserRepo + Clone + 'static,
     TR: auth::RefreshTokenRepo + Clone + 'static,
 {
-    pub ctx: ArcContext,
+    pub ctx: common::ArcContext,
     pub auth_service: auth::Service<UR, TR>,
     pub user_service: users::Service<UR>,
 }
 
-impl From<oauth::OAuthError> for ApiError {
+impl From<oauth::OAuthError> for common::ApiError {
     fn from(error: oauth::OAuthError) -> Self {
         match error {
             oauth::OAuthError::UnverifiedEmail | oauth::OAuthError::InvalidUserInfo => Self::invalid_credentials(),
@@ -64,7 +62,7 @@ async fn google_auth_init<UR, TR>(
     State(AppState { ctx, .. }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
-) -> Result<impl IntoResponse, ApiError>
+) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::UserRepo + Clone,
     TR: auth::RefreshTokenRepo + Clone,
@@ -80,7 +78,7 @@ where
     let cookie = format!(
         "oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}"
     );
-    let cookie_val = axum::http::HeaderValue::from_str(&cookie).map_err(|_| ApiError::internal())?;
+    let cookie_val = axum::http::HeaderValue::from_str(&cookie).map_err(|_| common::ApiError::internal())?;
     response
         .headers_mut()
         .insert(axum::http::header::SET_COOKIE, cookie_val);
@@ -95,14 +93,14 @@ async fn google_auth_callback<UR, TR>(
     }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
-) -> Result<impl IntoResponse, ApiError>
+) -> Result<impl IntoResponse, common::ApiError>
 where
     UR: users::UserRepo + Clone,
     TR: auth::RefreshTokenRepo + Clone,
 {
     let oauth_state_cookie = tokens::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
         logger::log_cookie_error(&headers, "missing_oauth_state");
-        ApiError::sso_failed()
+        common::ApiError::sso_failed()
     })?;
 
     let (user_info, redirect_url) =
@@ -110,12 +108,12 @@ where
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
-        return Err(ApiError::InvalidCredentials);
+        return Err(common::ApiError::InvalidCredentials);
     }
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = common::Email::parse(&user_info.email).map_err(|_| ApiError::invalid_credentials())?;
+    let email = common::Email::parse(&user_info.email).map_err(|_| common::ApiError::invalid_credentials())?;
     let user = user_service
         .link_sso_user(
             &ctx.db,

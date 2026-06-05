@@ -12,8 +12,6 @@ use sqlx::sqlite::SqlitePoolOptions;
 use std::str::FromStr;
 
 use crate::common;
-use crate::common::ArcContext;
-use crate::common::Context;
 use crate::config;
 use crate::identity::auth;
 use crate::identity::users;
@@ -38,7 +36,7 @@ fn default_config() -> config::AppSettings {
     }
 }
 
-async fn create_test_context(config: config::AppSettings) -> anyhow::Result<ArcContext> {
+async fn create_test_context(config: config::AppSettings) -> anyhow::Result<common::ArcContext> {
     let db_config = config::DatabaseSettings {
         url: "sqlite::memory:".to_string(),
         max_connections: 5,
@@ -58,7 +56,7 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<ArcC
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
 
-    let ctx = Context::new(db, jwt, config, http_client).into();
+    let ctx = common::Context::new(db, jwt, config, http_client).into();
     migrations::run_migrations(&ctx).await?;
     Ok(ctx)
 }

@@ -5,8 +5,7 @@ use axum::http::Request;
 use axum::http::request::Parts;
 use axum::response::Response;
 
-use crate::common::ApiError;
-use crate::common::ArcContext;
+use crate::common;
 use crate::internal::logger;
 use crate::internal::tokens;
 use crate::jwt;
@@ -18,10 +17,10 @@ pub fn check_oauth_config(config: &crate::config::OAuthSettings) {
 }
 
 pub async fn middleware(
-    State(context): State<ArcContext>,
+    State(context): State<common::ArcContext>,
     mut req: Request<Body>,
     next: axum::middleware::Next,
-) -> Result<Response, ApiError> {
+) -> Result<Response, common::ApiError> {
     let claims = tokens::decode_token_from_req(&context, &req, jwt::TokenType::Access).map_err(|error| {
         logger::log_auth_rejection(&error);
         error.into_api_error()
@@ -42,9 +41,9 @@ impl<S> FromRequestParts<S> for jwt::TokenClaims
 where
     S: Send + Sync,
 {
-    type Rejection = ApiError;
+    type Rejection = common::ApiError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts.extensions.get().cloned().ok_or(ApiError::invalid_token())
+        parts.extensions.get().cloned().ok_or(common::ApiError::invalid_token())
     }
 }

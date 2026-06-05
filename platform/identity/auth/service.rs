@@ -2,9 +2,6 @@ use chrono::NaiveDateTime;
 use thiserror::Error;
 
 use crate::common;
-use crate::common::ArcContext;
-use crate::common::RepoError;
-use crate::common::SqlContext;
 use crate::constants;
 use crate::identity::auth;
 use crate::identity::users;
@@ -71,7 +68,7 @@ pub enum AuthError {
     TokenOperationFailed(#[from] tokens::TokenError),
 
     #[error("database error: {0}")]
-    Database(#[from] RepoError),
+    Database(#[from] common::RepoError),
 
     #[error("internal error: {0}")]
     Internal(String),
@@ -80,29 +77,29 @@ pub enum AuthError {
 pub trait RefreshTokenRepo: Send + Sync {
     fn create(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         command: CreateRefreshTokenCommand,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 
     fn revoke_by_jti(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         jti: &str,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 
     fn find_by_jti(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         tenant_id: common::TenantId,
         jti: &str,
-    ) -> impl std::future::Future<Output = Result<RefreshToken, RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<RefreshToken, common::RepoError>> + Send;
 
     fn revoke_all_for_user(
         &self,
-        db: &SqlContext,
+        db: &common::SqlContext,
         tenant_id: common::TenantId,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
 }
 
 #[derive(Clone)]
@@ -117,7 +114,7 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
         Self { users, refresh_tokens }
     }
 
-    pub async fn login(&self, ctx: &ArcContext, command: LoginCommand) -> Result<AuthSession, AuthError> {
+    pub async fn login(&self, ctx: &common::ArcContext, command: LoginCommand) -> Result<AuthSession, AuthError> {
         let maybe_user = self.users.get_user_for_auth(&ctx.db, &command.email).await?;
 
         if let Some(ref record) = maybe_user
@@ -146,7 +143,7 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
         self.issue_session(ctx, record.user).await
     }
 
-    pub async fn issue_session(&self, ctx: &ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
+    pub async fn issue_session(&self, ctx: &common::ArcContext, user: users::User) -> Result<AuthSession, AuthError> {
         let access_token = generate_access_token(ctx, &user)?;
         let refresh_token = generate_refresh_token(ctx, &user)?;
         let refresh_token_hash = tokens::get_token_hash_as_hex(&refresh_token.value);
@@ -171,7 +168,7 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
 
     pub async fn revoke_refresh_from_request(
         &self,
-        ctx: &ArcContext,
+        ctx: &common::ArcContext,
         refresh_token_value: Option<&str>,
     ) -> Result<(), AuthError> {
         let Some(refresh_token_value) = refresh_token_value else {
@@ -186,7 +183,11 @@ impl<UR: users::UserRepo, TR: RefreshTokenRepo> Service<UR, TR> {
         Ok(())
     }
 
-    pub async fn refresh(&self, ctx: &ArcContext, refresh_token_value: &str) -> Result<RefreshSession, AuthError> {
+    pub async fn refresh(
+        &self,
+        ctx: &common::ArcContext,
+        refresh_token_value: &str,
+    ) -> Result<RefreshSession, AuthError> {
         let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .refresh_tokens
@@ -246,7 +247,7 @@ fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
     })
 }
 
-fn generate_refresh_token(ctx: &ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_refresh_token(ctx: &common::ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -257,7 +258,7 @@ fn generate_refresh_token(ctx: &ArcContext, user: &users::User) -> Result<jwt::T
     )?)
 }
 
-fn generate_access_token(ctx: &ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
+fn generate_access_token(ctx: &common::ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, AuthError> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,

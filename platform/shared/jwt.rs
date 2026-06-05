@@ -10,7 +10,7 @@ use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::common::ApiError;
+use crate::common;
 use crate::config;
 
 #[rustfmt::skip]
@@ -50,15 +50,15 @@ impl From<jwt::errors::Error> for JwtError {
 
 impl JwtError {
     #[must_use]
-    pub fn into_api_error(self) -> ApiError {
+    pub fn into_api_error(self) -> common::ApiError {
         #[allow(clippy::match_same_arms)]
         match self {
-            Self::RngOperationFailed { .. } => ApiError::internal(),
-            Self::FileSystemOperationFailed { .. } => ApiError::internal(),
-            Self::EncodingFailed(_) => ApiError::internal(),
-            Self::DecodingFailed(_) => ApiError::invalid_token(),
-            Self::InvalidToken => ApiError::invalid_token(),
-            Self::TokenExpired => ApiError::expired_token(),
+            Self::RngOperationFailed { .. } => common::ApiError::internal(),
+            Self::FileSystemOperationFailed { .. } => common::ApiError::internal(),
+            Self::EncodingFailed(_) => common::ApiError::internal(),
+            Self::DecodingFailed(_) => common::ApiError::invalid_token(),
+            Self::InvalidToken => common::ApiError::invalid_token(),
+            Self::TokenExpired => common::ApiError::expired_token(),
         }
     }
 }

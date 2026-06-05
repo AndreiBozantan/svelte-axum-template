@@ -7,8 +7,7 @@ use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
-use crate::common::ApiError;
-use crate::common::ArcContext;
+use crate::common;
 use crate::jwt;
 
 #[derive(Debug, Error)]
@@ -24,15 +23,15 @@ pub enum TokenError {
 }
 
 impl TokenError {
-    pub fn into_api_error(self) -> ApiError {
+    pub fn into_api_error(self) -> common::ApiError {
         match self {
-            Self::JwtOperationFailed(jwt::JwtError::TokenExpired) => ApiError::expired_token(),
-            _ => ApiError::invalid_token(),
+            Self::JwtOperationFailed(jwt::JwtError::TokenExpired) => common::ApiError::expired_token(),
+            _ => common::ApiError::invalid_token(),
         }
     }
 }
 
-impl From<TokenError> for ApiError {
+impl From<TokenError> for common::ApiError {
     fn from(error: TokenError) -> Self {
         error.into_api_error()
     }
@@ -46,7 +45,7 @@ pub fn get_token_hash_as_hex(token: &str) -> String {
 }
 
 pub fn decode_token_from_req(
-    context: &ArcContext,
+    context: &common::ArcContext,
     req: &Request,
     token_type: jwt::TokenType,
 ) -> Result<jwt::TokenClaims, TokenError> {
@@ -70,7 +69,7 @@ pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenE
 }
 
 pub fn add_auth_cookies(
-    context: &ArcContext,
+    context: &common::ArcContext,
     response: Response<Body>,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
@@ -95,7 +94,7 @@ pub fn add_auth_cookies(
 
 /// Build a JSON response and attach auth cookies in one step.
 pub fn create_response_with_auth_cookies(
-    context: &ArcContext,
+    context: &common::ArcContext,
     body: &impl Serialize,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
