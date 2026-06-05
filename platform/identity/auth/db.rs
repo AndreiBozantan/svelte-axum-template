@@ -4,8 +4,8 @@ use sqlx::FromRow;
 use crate::common::RepoError;
 use crate::common::SqlContext;
 
-use super::service::{CreateRefreshTokenCommand, RefreshToken, RefreshTokenRepo};
-use crate::identity::users::service::{TenantId, UserId};
+use super::domain::{CreateRefreshTokenCommand, RefreshToken, RefreshTokenRepo};
+use crate::identity::users::domain::{TenantId, UserId};
 
 #[derive(Debug, FromRow)]
 #[allow(dead_code)]
@@ -30,9 +30,9 @@ impl From<RefreshTokenRow> for RefreshToken {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct SqliteRefreshTokenRepo;
+pub struct Repository;
 
-impl RefreshTokenRepo for SqliteRefreshTokenRepo {
+impl RefreshTokenRepo for Repository {
     async fn create(&self, db: &SqlContext, command: CreateRefreshTokenCommand) -> Result<(), RepoError> {
         sqlx::query!(
             r#"

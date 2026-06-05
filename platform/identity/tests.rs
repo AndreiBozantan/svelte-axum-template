@@ -15,8 +15,9 @@ use crate::common::ArcContext;
 use crate::common::Context;
 use crate::config;
 use crate::identity::auth::util::hash_password;
-use crate::identity::users::repo::SqliteUserRepo;
-use crate::identity::users::service::{CreateUserCommand, Email, TenantId, UserService, UserStatus};
+use crate::identity::users::db::Repository;
+use crate::identity::users::domain::{CreateUserCommand, Email, TenantId, UserStatus};
+use crate::identity::users::domain::Service as UserService;
 use crate::internal::tokens;
 use crate::jwt;
 use crate::migrations;
@@ -66,7 +67,7 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<ArcC
 async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestServer> {
     let ctx = create_test_context(config).await?;
     let password_hash = hash_password(TEST_PASSWORD)?;
-    UserService::new(SqliteUserRepo)
+    UserService::new(Repository)
         .create_user(
             &ctx.db,
             CreateUserCommand {

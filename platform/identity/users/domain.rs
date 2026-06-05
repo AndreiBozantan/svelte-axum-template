@@ -181,11 +181,11 @@ pub trait UserRepo: Send + Sync {
 }
 
 #[derive(Clone)]
-pub struct UserService<R: UserRepo> {
+pub struct Service<R: UserRepo> {
     repo: R,
 }
 
-impl<R: UserRepo> UserService<R> {
+impl<R: UserRepo> Service<R> {
     #[must_use]
     pub const fn new(repo: R) -> Self {
         Self { repo }

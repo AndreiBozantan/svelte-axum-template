@@ -31,31 +31,28 @@ pub use shared::*;
 pub mod identity {
     pub(crate) mod auth {
         pub mod api;
-        pub mod repo;
-        pub mod service;
+        pub mod db;
+        pub mod domain;
         pub mod util;
     }
 
     pub(crate) mod oauth {
         pub mod api;
-        pub mod service;
+        pub mod domain;
     }
 
     pub(crate) mod users {
         pub mod api;
-        pub mod repo;
-        pub mod service;
+        pub mod db;
+        pub mod domain;
     }
 
     #[cfg(test)]
     mod tests;
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
-        let user_repo = users::repo::SqliteUserRepo;
-        let refresh_token_repo = auth::repo::SqliteRefreshTokenRepo;
-
-        let user_service = users::service::UserService::new(user_repo);
-        let auth_service = auth::service::AuthService::new(user_service.clone(), refresh_token_repo);
+        let user_service = users::domain::Service::new(users::db::Repository);
+        let auth_service = auth::domain::Service::new(user_service.clone(), auth::db::Repository);
 
         axum::Router::new()
             .merge(auth::api::router(ctx.clone(), auth_service.clone()))

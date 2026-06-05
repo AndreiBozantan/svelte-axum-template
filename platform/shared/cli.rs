@@ -6,8 +6,9 @@ use clap::Subcommand;
 
 use crate::common::ArcContext;
 use crate::identity::auth::util;
-use crate::identity::users::repo::SqliteUserRepo;
-use crate::identity::users::service::{Email, UpdateAdminCredentialsCommand, UserId, UserService};
+use crate::identity::users::db::Repository;
+use crate::identity::users::domain::{Email, UpdateAdminCredentialsCommand, UserId};
+use crate::identity::users::domain::Service as UserService;
 use crate::migrations;
 
 #[derive(Debug, thiserror::Error)]
@@ -143,7 +144,7 @@ async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
     let password_hash = util::hash_password(password.trim())?;
     let parsed_email = Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
 
-    UserService::new(SqliteUserRepo)
+    UserService::new(Repository)
         .update_admin_credentials(
             &ctx.db,
             UpdateAdminCredentialsCommand {

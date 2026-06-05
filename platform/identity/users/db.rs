@@ -5,7 +5,7 @@ use crate::common::RepoError;
 use crate::common::SqlContext;
 use crate::constants::auth;
 
-use super::service::{
+use super::domain::{
     CreateUserCommand, Email, LinkSsoUserCommand, ListUsersQuery, TenantId, UpdateAdminCredentialsCommand, User,
     UserAuthRecord, UserError, UserId, UserList, UserRepo, UserStatus,
 };
@@ -95,9 +95,9 @@ impl TryFrom<UserRow> for UserAuthRecord {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct SqliteUserRepo;
+pub struct Repository;
 
-impl UserRepo for SqliteUserRepo {
+impl UserRepo for Repository {
     async fn create_user(&self, db: &SqlContext, command: CreateUserCommand) -> Result<User, RepoError> {
         let status: UserStatusRow = command.status.into();
         let email = command.email.as_str().to_string();

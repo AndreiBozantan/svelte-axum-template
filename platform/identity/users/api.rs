@@ -10,27 +10,18 @@ use crate::common::ArcContext;
 use crate::common::Pagination;
 use crate::jwt;
 
-use super::service::{ListUsersQuery, TenantId, UserError, UserId, UserRepo, UserService};
-
-#[derive(Clone)]
-pub struct UsersState<UR: UserRepo> {
-    pub context: ArcContext,
-    pub service: UserService<UR>,
-}
+use super::domain::{ListUsersQuery, TenantId, UserError, UserId, UserRepo};
+use super::domain::Service as UserService;
 
 pub fn router<UR>(ctx: ArcContext, user_service: UserService<UR>) -> Router<ArcContext>
 where
     UR: UserRepo + Clone + 'static,
 {
-    let state = UsersState {
-        context: ctx.clone(),
-        service: user_service,
-    };
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
+        .with_state((ctx.clone(), user_service))
         .route_layer(axum::middleware::from_fn_with_state(ctx, auth::middleware))
-        .with_state(state)
 }
 
 #[derive(Serialize)]
@@ -40,8 +31,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<&crate::identity::users::service::User> for UserResponse {
-    fn from(user: &crate::identity::users::service::User) -> Self {
+impl From<&crate::identity::users::domain::User> for UserResponse {
+    fn from(user: &crate::identity::users::domain::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),
@@ -81,7 +72,7 @@ impl From<UserError> for ApiError {
 }
 
 pub async fn list_users<UR>(
-    State(state): State<UsersState<UR>>,
+    State((context, service)): State<(ArcContext, UserService<UR>)>,
     axum::extract::Query(pagination): axum::extract::Query<Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, ApiError>
@@ -89,10 +80,9 @@ where
     UR: UserRepo + Clone,
 {
     let (limit, offset) = pagination.sanitize();
-    let result = state
-        .service
+    let result = service
         .list_users(
-            &state.context.db,
+            &context.db,
             ListUsersQuery {
                 tenant_id: TenantId(claims.tenant_id),
                 limit,
@@ -110,13 +100,13 @@ where
 }
 
 pub async fn user_info<UR>(
-    State(state): State<UsersState<UR>>,
+    State((context, service)): State<(ArcContext, UserService<UR>)>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, ApiError>
 where
     UR: UserRepo + Clone,
 {
     let user_id = claims.user_id().map_err(|_| ApiError::not_authenticated())?;
-    let user = state.service.get_user(&state.context.db, UserId(user_id)).await?;
+    let user = service.get_user(&context.db, UserId(user_id)).await?;
     Ok(Json(UserInfoResponse { user: (&user).into() }))
 }
