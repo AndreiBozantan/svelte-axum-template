@@ -96,7 +96,7 @@ where
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
-        return Err(common::ApiError::InvalidCredentials);
+        return Err(common::ApiError::invalid_credentials());
     }
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");

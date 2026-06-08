@@ -41,6 +41,6 @@ where
     type Rejection = common::ApiError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts.extensions.get().cloned().ok_or(common::ApiError::invalid_token())
+        parts.extensions.get().cloned().ok_or_else(common::ApiError::invalid_token)
     }
 }

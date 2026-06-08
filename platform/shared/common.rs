@@ -112,9 +112,9 @@ impl From<RepoError> for ApiError {
         #[allow(clippy::match_same_arms)]
         match error {
             RepoError::RowNotFound => Self::not_found(),
-            RepoError::UniqueViolation(_) => Self::repo_conflict("unique_violation"),
-            RepoError::ForeignKeyViolation(_) => Self::repo_conflict("foreign_key_violation"),
-            RepoError::CheckViolation(_) => Self::repo_conflict("check_violation"),
+            RepoError::UniqueViolation(_) => Self::db_key_violation("unique_violation"),
+            RepoError::ForeignKeyViolation(_) => Self::db_key_violation("foreign_key_violation"),
+            RepoError::CheckViolation(_) => Self::db_key_violation("check_violation"),
             RepoError::Database(_) => Self::internal(),
             RepoError::RowConversionFailed(_) => Self::internal(),
         }
@@ -127,37 +127,13 @@ fn is_check_violation(db_err: &dyn DatabaseError) -> bool {
         .is_some_and(|code| code.as_ref() == "2067" || code.as_ref() == "275")
 }
 
-#[derive(Debug, Error)]
-pub enum ApiError {
-    #[error("An unexpected error occured.")]
-    Internal,
-
-    #[error("Email or password is incorrect")]
-    InvalidCredentials,
-
-    #[error("Authentication is required.")]
-    NotAuthenticated,
-
-    #[error("Single sign-on authentication failed.")]
-    SsoFailed,
-
-    #[error("Authentication token has expired.")]
-    ExpiredToken,
-
-    #[error("Authentication token is invalid.")]
-    InvalidToken,
-
-    #[error("The requested operation is not allowed.")]
-    Forbidden,
-
-    #[error("The requested resource is not found.")]
-    NotFound,
-
-    #[error("Request validation failed.")]
-    ValidationFailed { details: serde_json::Value },
-
-    #[error("{message}")]
-    Conflict { code: &'static str, message: String },
+#[derive(Debug, Clone, Error)]
+#[error("{message}")]
+pub struct ApiError {
+    status: StatusCode,
+    code: &'static str,
+    message: String,
+    details: Option<serde_json::Value>,
 }
 
 impl From<JwtError> for ApiError {
@@ -181,48 +157,83 @@ struct ApiErrorBody {
 
 impl ApiError {
     #[must_use]
-    pub const fn internal() -> Self {
-        Self::Internal
+    pub fn new(
+        status: StatusCode,
+        code: &'static str,
+        message: impl Into<String>,
+        details: Option<serde_json::Value>,
+    ) -> Self {
+        Self {
+            status,
+            code,
+            message: message.into(),
+            details,
+        }
     }
 
     #[must_use]
-    pub const fn invalid_credentials() -> Self {
-        Self::InvalidCredentials
+    pub const fn status(&self) -> StatusCode {
+        self.status
     }
 
     #[must_use]
-    pub const fn not_authenticated() -> Self {
-        Self::NotAuthenticated
+    pub const fn code(&self) -> &'static str {
+        self.code
     }
 
     #[must_use]
-    pub const fn sso_failed() -> Self {
-        Self::SsoFailed
+    pub fn message(&self) -> String {
+        self.message.clone()
     }
 
     #[must_use]
-    pub const fn expired_token() -> Self {
-        Self::ExpiredToken
+    pub fn details(&self) -> Option<serde_json::Value> {
+        self.details.clone()
     }
 
     #[must_use]
-    pub const fn invalid_token() -> Self {
-        Self::InvalidToken
+    pub fn internal() -> Self {
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "An unexpected error occured.", None)
     }
 
     #[must_use]
-    pub const fn forbidden() -> Self {
-        Self::Forbidden
+    pub fn invalid_credentials() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "invalid_credentials", "Email or password is incorrect", None)
     }
 
     #[must_use]
-    pub const fn not_found() -> Self {
-        Self::NotFound
+    pub fn not_authenticated() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "not_authenticated", "Authentication is required.", None)
     }
 
     #[must_use]
-    pub const fn validation_failed(details: serde_json::Value) -> Self {
-        Self::ValidationFailed { details }
+    pub fn sso_failed() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "sso_failed", "Single sign-on authentication failed.", None)
+    }
+
+    #[must_use]
+    pub fn expired_token() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "expired_token", "Authentication token has expired.", None)
+    }
+
+    #[must_use]
+    pub fn invalid_token() -> Self {
+        Self::new(StatusCode::UNAUTHORIZED, "invalid_token", "Authentication token is invalid.", None)
+    }
+
+    #[must_use]
+    pub fn forbidden() -> Self {
+        Self::new(StatusCode::FORBIDDEN, "forbidden", "The requested operation is not allowed.", None)
+    }
+
+    #[must_use]
+    pub fn not_found() -> Self {
+        Self::new(StatusCode::NOT_FOUND, "not_found", "The requested resource is not found.", None)
+    }
+
+    #[must_use]
+    pub fn validation_failed(details: serde_json::Value) -> Self {
+        Self::new(StatusCode::BAD_REQUEST, "validation_failed", "Request validation failed.", Some(details))
     }
 
     #[must_use]
@@ -231,72 +242,13 @@ impl ApiError {
     }
 
     #[must_use]
-    pub fn repo_conflict(code: &'static str) -> Self {
+    pub fn db_key_violation(code: &'static str) -> Self {
         Self::conflict(code, "A data validation error occurred.")
     }
 
     #[must_use]
     pub fn conflict(code: &'static str, message: impl Into<String>) -> Self {
-        Self::Conflict {
-            code,
-            message: message.into(),
-        }
-    }
-
-    #[must_use]
-    pub const fn status(&self) -> StatusCode {
-        match self {
-            Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
-            Self::InvalidCredentials
-            | Self::NotAuthenticated
-            | Self::SsoFailed
-            | Self::ExpiredToken
-            | Self::InvalidToken => StatusCode::UNAUTHORIZED,
-            Self::Forbidden => StatusCode::FORBIDDEN,
-            Self::NotFound => StatusCode::NOT_FOUND,
-            Self::ValidationFailed { .. } => StatusCode::BAD_REQUEST,
-            Self::Conflict { .. } => StatusCode::CONFLICT,
-        }
-    }
-
-    #[must_use]
-    pub const fn code(&self) -> &'static str {
-        match self {
-            Self::Internal => "internal_error",
-            Self::InvalidCredentials => "invalid_credentials",
-            Self::NotAuthenticated => "not_authenticated",
-            Self::SsoFailed => "sso_failed",
-            Self::ExpiredToken => "expired_token",
-            Self::InvalidToken => "invalid_token",
-            Self::Forbidden => "forbidden",
-            Self::NotFound => "not_found",
-            Self::ValidationFailed { .. } => "validation_failed",
-            Self::Conflict { code, .. } => code,
-        }
-    }
-
-    #[must_use]
-    pub fn message(&self) -> String {
-        match self {
-            Self::Internal => "An unexpected error occured.".to_string(),
-            Self::InvalidCredentials => "Email or password is incorrect".to_string(),
-            Self::NotAuthenticated => "Authentication is required.".to_string(),
-            Self::SsoFailed => "Single sign-on authentication failed.".to_string(),
-            Self::ExpiredToken => "Authentication token has expired.".to_string(),
-            Self::InvalidToken => "Authentication token is invalid.".to_string(),
-            Self::Forbidden => "The requested operation is not allowed.".to_string(),
-            Self::NotFound => "The requested resource is not found.".to_string(),
-            Self::ValidationFailed { .. } => "Request validation failed.".to_string(),
-            Self::Conflict { message, .. } => message.clone(),
-        }
-    }
-
-    #[must_use]
-    pub fn details(&self) -> Option<serde_json::Value> {
-        match self {
-            Self::ValidationFailed { details } => Some(details.clone()),
-            _ => None,
-        }
+        Self::new(StatusCode::CONFLICT, code, message, None)
     }
 }
 
