@@ -32,16 +32,16 @@ where
     pub auth_service: auth::Service<UR, TR>,
 }
 
-impl From<super::OAuthError> for api::Error {
-    fn from(error: super::OAuthError) -> Self {
+impl From<super::Error> for api::Error {
+    fn from(error: super::Error) -> Self {
         match error {
-            super::OAuthError::UnverifiedEmail | super::OAuthError::InvalidUserInfo => Self::invalid_credentials(),
-            super::OAuthError::CsrfValidationFailed
-            | super::OAuthError::SessionExpired
-            | super::OAuthError::OAuth2RequestFailed(_)
-            | super::OAuthError::InvalidConfig(_)
-            | super::OAuthError::InvalidRedirectUrl => Self::sso_failed(),
-            super::OAuthError::UserInfoRetrievalFailed(_) | super::OAuthError::Internal(_) => {
+            super::Error::UnverifiedEmail | super::Error::InvalidUserInfo => Self::invalid_credentials(),
+            super::Error::CsrfValidationFailed
+            | super::Error::SessionExpired
+            | super::Error::OAuth2RequestFailed(_)
+            | super::Error::InvalidConfig(_)
+            | super::Error::InvalidRedirectUrl => Self::sso_failed(),
+            super::Error::UserInfoRetrievalFailed(_) | super::Error::Internal(_) => {
                 tracing::error!("oauth error: {error}");
                 Self::internal()
             }

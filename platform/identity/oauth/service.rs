@@ -12,7 +12,7 @@ use crate::identity::tokens;
 use crate::internal::logger;
 
 #[derive(Debug, Error)]
-pub enum OAuthError {
+pub enum Error {
     #[error("internal error: {0}")]
     Internal(String),
 
@@ -88,19 +88,19 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), OAuthError> {
+pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Error> {
     if config.google_client_id.is_empty() {
-        return Err(OAuthError::InvalidConfig(
+        return Err(Error::InvalidConfig(
             "Google Client ID is not configured".to_string(),
         ));
     }
     if config.google_client_secret.is_empty() {
-        return Err(OAuthError::InvalidConfig(
+        return Err(Error::InvalidConfig(
             "Google Client Secret is not configured".to_string(),
         ));
     }
     if config.google_redirect_uri.is_empty() {
-        return Err(OAuthError::InvalidConfig(
+        return Err(Error::InvalidConfig(
             "Google Redirect URI is not configured".to_string(),
         ));
     }
@@ -108,13 +108,13 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), OAut
     let parsed: Url = config
         .google_redirect_uri
         .parse()
-        .map_err(|_| OAuthError::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
+        .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
 
     let host = parsed.host_str().unwrap_or("");
     let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
     if parsed.scheme() != "https" && !is_localhost {
         logger::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
-        return Err(OAuthError::InvalidConfig(
+        return Err(Error::InvalidConfig(
             "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
         ));
     }
@@ -122,14 +122,14 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), OAut
     Ok(())
 }
 
-fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, OAuthError> {
+fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())
-        .map_err(|_| OAuthError::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
+        .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
     let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-        .map_err(|_| OAuthError::InvalidConfig("Invalid Google auth URL".to_string()))?;
+        .map_err(|_| Error::InvalidConfig("Invalid Google auth URL".to_string()))?;
     let token_url = oauth2::TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-        .map_err(|_| OAuthError::InvalidConfig("Invalid Google token URL".to_string()))?;
+        .map_err(|_| Error::InvalidConfig("Invalid Google token URL".to_string()))?;
 
     let client = oauth2::basic::BasicClient::new(oauth2::ClientId::new(config.google_client_id.clone()))
         .set_client_secret(oauth2::ClientSecret::new(config.google_client_secret.clone()))
@@ -142,7 +142,7 @@ fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Cl
 pub fn begin_google_flow(
     context: &common::ArcContext,
     redirect_url: Option<String>,
-) -> Result<(Url, String), OAuthError> {
+) -> Result<(Url, String), Error> {
     let redirect_url = if let Some(url) = redirect_url
         && validate_redirect_path(&url).is_ok()
     {
@@ -171,7 +171,7 @@ pub fn begin_google_flow(
     let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key).map_err(|error| {
         logger::log_internal_error(&error, "encode_oauth_state");
-        OAuthError::InvalidConfig("Failed to encode OAuth state JWT".to_string())
+        Error::InvalidConfig("Failed to encode OAuth state JWT".to_string())
     })?;
 
     Ok((auth_url, state_jwt))
@@ -183,7 +183,7 @@ pub async fn complete_google_callback(
     code: &str,
     state: &str,
     oauth_state_cookie: &str,
-) -> Result<(GoogleUserInfo, Option<String>), OAuthError> {
+) -> Result<(GoogleUserInfo, Option<String>), Error> {
     let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
     validation.validate_exp = true;
     validation.leeway = 5;
@@ -193,10 +193,10 @@ pub async fn complete_google_callback(
             |error| {
                 if matches!(error.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature) {
                     logger::log_signture_expired(headers);
-                    OAuthError::SessionExpired
+                    Error::SessionExpired
                 } else {
                     logger::log_internal_error(&error, "decode_oauth_state");
-                    OAuthError::CsrfValidationFailed
+                    Error::CsrfValidationFailed
                 }
             },
         )?;
@@ -204,13 +204,13 @@ pub async fn complete_google_callback(
     let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
     if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
         logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
-        return Err(OAuthError::CsrfValidationFailed);
+        return Err(Error::CsrfValidationFailed);
     }
 
     let client = create_google_client(&context.settings.oauth)?;
     let oauth_client = oauth2::reqwest::ClientBuilder::new().build().map_err(|error| {
         logger::log_internal_error(&error, "create_oauth_client");
-        OAuthError::Internal(format!("Failed to create HTTP client for OAuth: {error}"))
+        Error::Internal(format!("Failed to create HTTP client for OAuth: {error}"))
     })?;
 
     let token_result = client
@@ -219,7 +219,7 @@ pub async fn complete_google_callback(
         .await
         .map_err(|error| {
             logger::log_internal_error(&error, "oauth_exchange_code");
-            OAuthError::OAuth2RequestFailed(error)
+            Error::OAuth2RequestFailed(error)
         })?;
 
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
@@ -233,7 +233,7 @@ pub async fn complete_google_callback(
 
     if !response.status().is_success() {
         logger::log_provider_api_error(response.status(), "google");
-        return Err(OAuthError::InvalidConfig(
+        return Err(Error::InvalidConfig(
             "OAuth provider returned an error".to_string(),
         ));
     }
@@ -242,28 +242,28 @@ pub async fn complete_google_callback(
 
     if user_info.email.is_empty() {
         logger::log_invalid_user_info("email", &user_info.email, "google");
-        return Err(OAuthError::InvalidUserInfo);
+        return Err(Error::InvalidUserInfo);
     }
 
     if !user_info.verified_email {
         logger::log_invalid_user_info("verified_email", "false", "google");
-        return Err(OAuthError::UnverifiedEmail);
+        return Err(Error::UnverifiedEmail);
     }
 
     if user_info.id.is_empty() {
         logger::log_invalid_user_info("id", &user_info.id, "google");
-        return Err(OAuthError::InvalidUserInfo);
+        return Err(Error::InvalidUserInfo);
     }
 
     Ok((user_info, token_data.claims.redirect_url))
 }
 
-fn validate_redirect_path(path: &str) -> Result<(), OAuthError> {
+fn validate_redirect_path(path: &str) -> Result<(), Error> {
     if path.len() > 512 {
-        return Err(OAuthError::InvalidRedirectUrl);
+        return Err(Error::InvalidRedirectUrl);
     }
     if !path.starts_with('/') || path.starts_with("//") || path.contains("://") {
-        return Err(OAuthError::InvalidRedirectUrl);
+        return Err(Error::InvalidRedirectUrl);
     }
     Ok(())
 }
