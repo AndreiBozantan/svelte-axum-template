@@ -21,7 +21,7 @@ pub async fn middleware(
     State(context): State<common::ArcContext>,
     mut req: Request<Body>,
     next: axum::middleware::Next,
-) -> Result<Response, api::ApiError> {
+) -> Result<Response, api::Error> {
     let claims = tokens::utils::decode_token_from_req(&context, &req, jwt::TokenType::Access)?;
 
     tracing::debug!(
@@ -39,9 +39,9 @@ impl<S> FromRequestParts<S> for jwt::TokenClaims
 where
     S: Send + Sync,
 {
-    type Rejection = api::ApiError;
+    type Rejection = api::Error;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts.extensions.get().cloned().ok_or_else(api::ApiError::invalid_token)
+        parts.extensions.get().cloned().ok_or_else(api::Error::invalid_token)
     }
 }

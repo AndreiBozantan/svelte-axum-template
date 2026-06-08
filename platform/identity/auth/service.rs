@@ -38,7 +38,7 @@ pub enum AuthError {
     PasswordHashingFailed(#[from] argon2::password_hash::Error),
 
     #[error("jwt operation failed: {0}")]
-    JwtOperationFailed(#[from] jwt::JwtError),
+    JwtOperationFailed(#[from] jwt::Error),
 
     #[error("token operation failed: {0}")]
     TokenOperationFailed(#[from] tokens::utils::TokenError),

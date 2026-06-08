@@ -62,13 +62,13 @@ pub enum AppError {
     DatabaseOperationFailed(#[from] common::SqlError),
 
     #[error("JWT error: {0}")]
-    JwtOperationFailed(#[from] jwt::JwtError),
+    JwtOperationFailed(#[from] jwt::Error),
 
     #[error("Migration error: {0}")]
     MigrationFailed(#[from] migrations::MigrationError),
 
     #[error("CLI error: {0}")]
-    CliOperationFailed(#[from] platform::cli::CliError),
+    CliOperationFailed(#[from] platform::cli::Error),
 
     #[error("Network address parsing error: {0}")]
     AddressParsingFailed(#[from] std::net::AddrParseError),
@@ -142,10 +142,10 @@ struct HealthCheckResponse {
 }
 
 #[allow(clippy::unused_async)]
-async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, api::ApiError> {
+async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, api::Error> {
     sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
         tracing::error!("Health check database ping failed: {error}");
-        api::ApiError::internal()
+        api::Error::internal()
     })?;
 
     Ok(axum::Json(HealthCheckResponse {
@@ -162,7 +162,7 @@ fn create_router(context: ArcContext) -> Router {
     let api = Router::new()
         .merge(platform::identity::router(context.clone()))
         .merge(public)
-        .fallback(|| async { api::ApiError::not_found() });
+        .fallback(|| async { api::Error::not_found() });
 
     Router::new()
         .nest("/api", api)

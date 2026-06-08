@@ -14,7 +14,7 @@ use crate::config;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
-pub enum JwtError {
+pub enum Error {
     #[error("Failed to encode JWT token")]
     EncodingFailed(jwt::errors::Error),
 
@@ -36,7 +36,7 @@ pub enum JwtError {
 
 /// Maps jsonwebtoken errors to our custom `JwtError` type
 #[allow(clippy::match_same_arms)]
-impl From<jwt::errors::Error> for JwtError {
+impl From<jwt::errors::Error> for Error {
     fn from(e: jwt::errors::Error) -> Self {
         match e.kind() {
             jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
@@ -66,8 +66,8 @@ pub struct TokenClaims {
 }
 
 impl TokenClaims {
-    pub fn user_id(&self) -> Result<i64, JwtError> {
-        self.sub.parse::<i64>().map_err(|_| JwtError::InvalidToken)
+    pub fn user_id(&self) -> Result<i64, Error> {
+        self.sub.parse::<i64>().map_err(|_| Error::InvalidToken)
     }
 }
 
@@ -87,7 +87,7 @@ pub struct JwtContext {
 }
 
 impl JwtContext {
-    pub fn new(settings: &config::JwtSettings, secret: &str) -> Result<Self, JwtError> {
+    pub fn new(settings: &config::JwtSettings, secret: &str) -> Result<Self, Error> {
         let encoding_key = jwt::EncodingKey::from_secret(secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(secret.as_ref());
         let mut validation = jwt::Validation::new(jwt::Algorithm::HS256);
@@ -111,7 +111,7 @@ pub fn generate_token(
     tenant_id: i64,
     email: &str,
     token_type: TokenType,
-) -> Result<TokenWithClaims, JwtError> {
+) -> Result<TokenWithClaims, Error> {
     let now = Utc::now().timestamp();
     let expiry = match token_type {
         TokenType::Access => ctx.access_token_expiry,
@@ -127,25 +127,25 @@ pub fn generate_token(
         jti: Uuid::new_v4().to_string(),
         token_type,
     };
-    let token = jwt::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)?;
+    let token = jwt::encode(&header, &claims, &ctx.encoding_key).map_err(Error::EncodingFailed)?;
     Ok(TokenWithClaims { value: token, claims })
 }
 
-pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime, JwtError> {
+pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime, Error> {
     DateTime::from_timestamp(timestamp, 0)
         .map(|dt| dt.naive_utc())
-        .ok_or(JwtError::InvalidToken)
+        .ok_or(Error::InvalidToken)
 }
 
 /// Validate and decode an access or refresh token
-pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Result<TokenClaims, JwtError> {
+pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Result<TokenClaims, Error> {
     let token_data = jwt::decode::<TokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
     let valid = token_data.claims.token_type == token_type;
-    valid.then_some(token_data.claims).ok_or(JwtError::InvalidToken)
+    valid.then_some(token_data.claims).ok_or(Error::InvalidToken)
 }
 
 /// Loads or creates a JWT secret
-pub fn get_jwt_secret() -> Result<String, JwtError> {
+pub fn get_jwt_secret() -> Result<String, Error> {
     // check persisted secret file
     let secret_file_path = config::AppSettings::get_config_dir()?.join(".jwt.secret");
     if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
@@ -172,7 +172,7 @@ pub fn get_jwt_secret() -> Result<String, JwtError> {
 }
 
 /// Generates a cryptographically secure random secret
-fn generate_secure_secret() -> Result<String, JwtError> {
+fn generate_secure_secret() -> Result<String, Error> {
     let mut bytes = [0u8; 32];
     rand::rngs::SysRng.try_fill_bytes(&mut bytes)?;
     Ok(hex::encode(bytes))

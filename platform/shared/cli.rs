@@ -10,7 +10,7 @@ use crate::identity::users;
 use crate::migrations;
 
 #[derive(Debug, thiserror::Error)]
-pub enum CliError {
+pub enum Error {
     #[error("Migration creation failed")]
     MigrationCreateFailed { source: migrations::MigrationError },
 
@@ -65,7 +65,7 @@ enum MigrateAction {
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
+pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, Error> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -83,7 +83,7 @@ pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, CliError> {
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), Error> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -92,14 +92,14 @@ async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -
     }
 }
 
-fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = migrations::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
+fn migrate_action_create(name: &str) -> Result<(), Error> {
+    let file_name = migrations::create_migration(name).map_err(|e| Error::MigrationCreateFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn migrate_action_list() -> Result<(), CliError> {
+fn migrate_action_list() -> Result<(), Error> {
     let migrations = migrations::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
@@ -112,36 +112,36 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), Error> {
     match migrations::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
         Err(migrations::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
-        Err(e) => return Err(CliError::MigrationStatusCheckFailed { source: e }),
+        Err(e) => return Err(Error::MigrationStatusCheckFailed { source: e }),
     }
     Ok(())
 }
 
-async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), Error> {
     migrations::run_migrations(ctx)
         .await
-        .map_err(|e| CliError::MigrationRunFailed { source: e })?;
+        .map_err(|e| Error::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), CliError> {
+async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Error> {
     use crate::identity::users::TRepository;
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 
     let password = rpassword::read_password()?;
     if password.trim().is_empty() {
-        return Err(CliError::Other("Password cannot be empty".to_string()));
+        return Err(Error::Other("Password cannot be empty".to_string()));
     }
 
     let password_hash = auth::hash_password(password.trim())?;
-    let parsed_email = common::Email::parse(&email).map_err(|e| CliError::Other(e.to_string()))?;
+    let parsed_email = common::Email::parse(&email).map_err(|e| Error::Other(e.to_string()))?;
 
     users::db::Repository
         .update_admin_credentials(
@@ -153,7 +153,7 @@ async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Cli
             },
         )
         .await
-        .map_err(|e| CliError::Other(e.to_string()))?;
+        .map_err(|e| Error::Other(e.to_string()))?;
 
     println!("Admin user updated successfully.");
     Ok(())

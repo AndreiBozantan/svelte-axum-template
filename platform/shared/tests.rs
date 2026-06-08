@@ -1,7 +1,6 @@
 use crate::config;
 use crate::jwt;
 use crate::jwt::JwtContext;
-use crate::jwt::JwtError;
 
 fn test_context() -> anyhow::Result<JwtContext> {
     let settings = config::JwtSettings {
@@ -18,7 +17,7 @@ fn generate_expired_token(
     tenant_id: i64,
     email: &str,
     token_type: jwt::TokenType,
-) -> Result<String, JwtError> {
+) -> Result<String, jwt::Error> {
     use chrono::Utc;
     use uuid::Uuid;
 
@@ -34,7 +33,7 @@ fn generate_expired_token(
         jti: Uuid::new_v4().to_string(),
         token_type,
     };
-    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key).map_err(JwtError::EncodingFailed)?;
+    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key).map_err(jwt::Error::EncodingFailed)?;
     Ok(token)
 }
 
@@ -86,7 +85,7 @@ fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
     let wrong_ctx = JwtContext::new(&settings, "wrong_secret_key_for_jwt_testing")?;
     let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&wrong_ctx, &token.value, jwt::TokenType::Access);
-    assert!(matches!(result, Err(JwtError::DecodingFailed(_))));
+    assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
     Ok(())
 }
 
@@ -94,7 +93,7 @@ fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
 fn decode_malformed_token() -> anyhow::Result<()> {
     let ctx = test_context()?;
     let result = jwt::decode_token(&ctx, "not.a.valid.jwt.token", jwt::TokenType::Access);
-    assert!(matches!(result, Err(JwtError::DecodingFailed(_))));
+    assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
     Ok(())
 }
 
@@ -104,7 +103,7 @@ fn decode_invalid_token() -> anyhow::Result<()> {
     let result = jwt::decode_token(&ctx, "invalid.token.here", jwt::TokenType::Access);
     assert!(matches!(
         result,
-        Err(JwtError::InvalidToken | JwtError::DecodingFailed(_))
+        Err(jwt::Error::InvalidToken | jwt::Error::DecodingFailed(_))
     ));
     Ok(())
 }
@@ -114,7 +113,7 @@ fn token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Access);
-    assert!(matches!(result, Err(JwtError::TokenExpired)));
+    assert!(matches!(result, Err(jwt::Error::TokenExpired)));
     Ok(())
 }
 
@@ -123,7 +122,7 @@ fn refresh_token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Refresh)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Refresh);
-    assert!(matches!(result, Err(JwtError::TokenExpired)));
+    assert!(matches!(result, Err(jwt::Error::TokenExpired)));
     Ok(())
 }
 
@@ -170,7 +169,7 @@ fn access_token_used_as_refresh_token() -> anyhow::Result<()> {
     // try to decode access token as refresh token - should fail
     let result = jwt::decode_token(&ctx, &access_token.value, jwt::TokenType::Refresh);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), jwt::JwtError::InvalidToken));
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
     Ok(())
 }
 
@@ -182,7 +181,7 @@ fn refresh_token_used_as_access_token() -> anyhow::Result<()> {
     // try to decode refresh token as access token - should fail
     let result = jwt::decode_token(&ctx, &refresh_token.value, jwt::TokenType::Access);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), jwt::JwtError::InvalidToken));
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
     Ok(())
 }
 

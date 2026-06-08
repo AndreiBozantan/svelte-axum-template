@@ -6,11 +6,11 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::common;
-use crate::jwt::JwtError;
+use crate::jwt;
 
 #[derive(Debug, Clone, thiserror::Error, Serialize)]
 #[error("{message}")]
-pub struct ApiError {
+pub struct Error {
     #[serde(skip)]
     status: StatusCode,
     code: &'static str,
@@ -19,7 +19,7 @@ pub struct ApiError {
     details: Option<serde_json::Value>,
 }
 
-impl ApiError {
+impl Error {
     #[must_use]
     pub fn new(
         status: StatusCode,
@@ -116,25 +116,25 @@ impl ApiError {
     }
 }
 
-impl IntoResponse for ApiError {
+impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status;
         (status, Json(self)).into_response()
     }
 }
 
-impl From<JwtError> for ApiError {
-    fn from(error: JwtError) -> Self {
+impl From<jwt::Error> for Error {
+    fn from(error: jwt::Error) -> Self {
         tracing::error!("JWT error: {error}");
         match error {
-            JwtError::TokenExpired => Self::expired_token(),
-            JwtError::InvalidToken => Self::invalid_token(),
+            jwt::Error::TokenExpired => Self::expired_token(),
+            jwt::Error::InvalidToken => Self::invalid_token(),
             _ => Self::internal(),
         }
     }
 }
 
-impl From<common::RepoError> for ApiError {
+impl From<common::RepoError> for Error {
     fn from(error: common::RepoError) -> Self {
         // TODO: use structured logging here
         tracing::error!("database error: {error}");
@@ -151,7 +151,7 @@ impl From<common::RepoError> for ApiError {
     }
 }
 
-impl From<common::DataValidationError> for ApiError {
+impl From<common::DataValidationError> for Error {
     fn from(error: common::DataValidationError) -> Self {
         match error {
             common::DataValidationError::InvalidEmail => Self::invalid_credentials(),

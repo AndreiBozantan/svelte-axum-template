@@ -60,7 +60,7 @@ pub struct UserInfoResponse {
     pub user: UserResponse,
 }
 
-impl From<users::UserError> for api::ApiError {
+impl From<users::UserError> for api::Error {
     fn from(error: users::UserError) -> Self {
         match error {
             users::UserError::NotFound => Self::not_found(),
@@ -81,7 +81,7 @@ async fn list_users<UR>(
     State(AppState { context, repo }): State<AppState<UR>>,
     axum::extract::Query(pagination): axum::extract::Query<api::Pagination>,
     claims: jwt::TokenClaims,
-) -> Result<Json<ListUsersResponse>, api::ApiError>
+) -> Result<Json<ListUsersResponse>, api::Error>
 where
     UR: users::TRepository + Clone,
 {
@@ -105,7 +105,7 @@ where
 async fn user_info<UR>(
     State(AppState { context, repo }): State<AppState<UR>>,
     claims: jwt::TokenClaims,
-) -> Result<Json<UserInfoResponse>, api::ApiError>
+) -> Result<Json<UserInfoResponse>, api::Error>
 where
     UR: users::TRepository + Clone,
 {

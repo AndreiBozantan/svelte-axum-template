@@ -7,6 +7,7 @@ use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
 
+use crate::api;
 use crate::common;
 use crate::internal::logger;
 use crate::jwt;
@@ -17,17 +18,17 @@ pub enum TokenError {
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 
     #[error("JWT operation failed: {0}")]
-    JwtOperationFailed(#[from] jwt::JwtError),
+    JwtOperationFailed(#[from] jwt::Error),
 
     #[error("Token expired or invalid")]
     TokenInvalid,
 }
 
-impl From<TokenError> for crate::api::ApiError {
+impl From<TokenError> for api::Error {
     fn from(error: TokenError) -> Self {
         logger::log_auth_rejection(&error);
         match error {
-            TokenError::JwtOperationFailed(jwt::JwtError::TokenExpired) => Self::expired_token(),
+            TokenError::JwtOperationFailed(jwt::Error::TokenExpired) => Self::expired_token(),
             _ => Self::invalid_token(),
         }
     }

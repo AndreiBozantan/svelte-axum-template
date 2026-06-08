@@ -73,7 +73,7 @@ impl From<users::User> for UserResponse {
     }
 }
 
-impl From<auth::AuthError> for api::ApiError {
+impl From<auth::AuthError> for api::Error {
     fn from(error: auth::AuthError) -> Self {
         // TODO: use structured logging here
         tracing::error!("auth error: {error}");
@@ -91,7 +91,7 @@ async fn login<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
-) -> Result<impl IntoResponse, api::ApiError>
+) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
@@ -121,7 +121,7 @@ where
 async fn logout<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
-) -> Result<impl IntoResponse, api::ApiError>
+) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
@@ -133,14 +133,14 @@ where
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())
-        .map_err(|_| api::ApiError::internal())?;
+        .map_err(|_| api::Error::internal())?;
     Ok(tokens::utils::add_auth_cookies(&context, response, None, None)?)
 }
 
 async fn refresh<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     req: Request<Body>,
-) -> Result<impl IntoResponse, api::ApiError>
+) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
