@@ -98,7 +98,7 @@ async fn run_app() -> Result<(), AppError> {
     let http_client = create_http_client()?;
     let db = create_db_context(&settings.database).await?;
     let jwt_secret = jwt::get_jwt_secret()?;
-    let jwt = jwt::JwtContext::new(&settings.jwt, &jwt_secret)?;
+    let jwt = jwt::Context::new(&settings.jwt, &jwt_secret)?;
     let ctx = common::Context::new(db, jwt, settings, http_client).into();
 
     if !platform::cli::run_cli(&ctx).await? {

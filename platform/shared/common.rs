@@ -40,7 +40,7 @@ pub enum DataValidationError {
 
 pub struct Context {
     pub db: db::Context,
-    pub jwt: jwt::JwtContext,
+    pub jwt: jwt::Context,
     pub settings: config::AppSettings,
     pub http_client: reqwest::Client,
 }
@@ -50,7 +50,7 @@ impl Context {
     #[must_use]
     pub const fn new(
         db: db::Context,
-        jwt: jwt::JwtContext,
+        jwt: jwt::Context,
         settings: config::AppSettings,
         http_client: reqwest::Client,
     ) -> Self {

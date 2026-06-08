@@ -51,7 +51,7 @@ async fn create_test_context(config: config::AppSettings) -> anyhow::Result<comm
         .await?;
 
     let jwt_secret = "test__secret__key__for__jwt__testing";
-    let jwt = jwt::JwtContext::new(&config.jwt, jwt_secret)?;
+    let jwt = jwt::Context::new(&config.jwt, jwt_secret)?;
     let http_client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
@@ -314,7 +314,7 @@ async fn access_token_expiry() -> anyhow::Result<()> {
         refresh_token_expiry_days: 1,
     };
     let jwt_secret = "test__secret__key__for__jwt__testing";
-    let jwt_context = jwt::JwtContext::new(&jwt_settings, jwt_secret)?;
+    let jwt_context = jwt::Context::new(&jwt_settings, jwt_secret)?;
 
     let now = Utc::now().timestamp();
     let expired_time = now - 3600;

@@ -78,7 +78,7 @@ pub struct TokenWithClaims {
 }
 
 #[derive(Clone)]
-pub struct JwtContext {
+pub struct Context {
     pub encoding_key: jwt::EncodingKey,
     pub decoding_key: jwt::DecodingKey,
     pub validation: jwt::Validation,
@@ -86,7 +86,7 @@ pub struct JwtContext {
     pub refresh_token_expiry: u32,
 }
 
-impl JwtContext {
+impl Context {
     pub fn new(settings: &config::JwtSettings, secret: &str) -> Result<Self, Error> {
         let encoding_key = jwt::EncodingKey::from_secret(secret.as_ref());
         let decoding_key = jwt::DecodingKey::from_secret(secret.as_ref());
@@ -106,7 +106,7 @@ impl JwtContext {
 
 /// Generate a new access or refresh token.
 pub fn generate_token(
-    ctx: &JwtContext,
+    ctx: &Context,
     user_id: i64,
     tenant_id: i64,
     email: &str,
@@ -138,7 +138,7 @@ pub fn get_token_expiration_as_naive_utc(timestamp: i64) -> Result<NaiveDateTime
 }
 
 /// Validate and decode an access or refresh token
-pub fn decode_token(ctx: &JwtContext, token: &str, token_type: TokenType) -> Result<TokenClaims, Error> {
+pub fn decode_token(ctx: &Context, token: &str, token_type: TokenType) -> Result<TokenClaims, Error> {
     let token_data = jwt::decode::<TokenClaims>(token, &ctx.decoding_key, &ctx.validation)?;
     let valid = token_data.claims.token_type == token_type;
     valid.then_some(token_data.claims).ok_or(Error::InvalidToken)
