@@ -7,6 +7,7 @@ use chrono;
 use thiserror::Error;
 
 use crate::common;
+use crate::db;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -72,7 +73,7 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), MigrationErr
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &common::SqlContext) -> Result<bool, MigrationError> {
+pub async fn check_pending_migrations(db: &db::Context) -> Result<bool, MigrationError> {
     let available_migrations = list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)

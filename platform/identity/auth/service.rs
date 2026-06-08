@@ -1,5 +1,6 @@
 use crate::common;
 use crate::constants;
+use crate::db;
 use crate::identity::auth;
 use crate::identity::tokens;
 use crate::identity::users;
@@ -44,7 +45,7 @@ pub enum AuthError {
     TokenOperationFailed(#[from] tokens::utils::TokenError),
 
     #[error("database error: {0}")]
-    DatabaseOperationFailed(#[from] common::RepoError),
+    DatabaseOperationFailed(#[from] db::Error),
 
     #[error("internal error: {0}")]
     Internal(String),

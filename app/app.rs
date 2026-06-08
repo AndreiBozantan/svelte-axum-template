@@ -31,6 +31,7 @@ use platform::api;
 use platform::common;
 use platform::common::ArcContext;
 use platform::config;
+use platform::db;
 use platform::jwt;
 use platform::migrations;
 
@@ -59,7 +60,7 @@ pub enum AppError {
     ConfigLoadingFailed(#[from] ::config::ConfigError),
 
     #[error("Database error: {0}")]
-    DatabaseOperationFailed(#[from] common::SqlError),
+    DatabaseOperationFailed(#[from] sqlx::Error),
 
     #[error("JWT error: {0}")]
     JwtOperationFailed(#[from] jwt::Error),
@@ -171,7 +172,7 @@ fn create_router(context: ArcContext) -> Router {
         .with_state(context)
 }
 
-async fn create_db_context(db_config: &config::DatabaseSettings) -> Result<common::SqlContext, common::SqlError> {
+async fn create_db_context(db_config: &config::DatabaseSettings) -> Result<db::Context, sqlx::Error> {
     let options = SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)

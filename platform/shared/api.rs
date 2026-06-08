@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::common;
+use crate::db;
 use crate::jwt;
 
 #[derive(Debug, Clone, thiserror::Error, Serialize)]
@@ -134,19 +135,19 @@ impl From<jwt::Error> for Error {
     }
 }
 
-impl From<common::RepoError> for Error {
-    fn from(error: common::RepoError) -> Self {
+impl From<db::Error> for Error {
+    fn from(error: db::Error) -> Self {
         // TODO: use structured logging here
         tracing::error!("database error: {error}");
 
         #[allow(clippy::match_same_arms)]
         match error {
-            common::RepoError::RowNotFound => Self::not_found(),
-            common::RepoError::UniqueViolation(_) => Self::db_key_violation("unique_violation"),
-            common::RepoError::ForeignKeyViolation(_) => Self::db_key_violation("foreign_key_violation"),
-            common::RepoError::CheckViolation(_) => Self::db_key_violation("check_violation"),
-            common::RepoError::Database(_) => Self::internal(),
-            common::RepoError::RowConversionFailed(_) => Self::internal(),
+            db::Error::RowNotFound => Self::not_found(),
+            db::Error::UniqueViolation(_) => Self::db_key_violation("unique_violation"),
+            db::Error::ForeignKeyViolation(_) => Self::db_key_violation("foreign_key_violation"),
+            db::Error::CheckViolation(_) => Self::db_key_violation("check_violation"),
+            db::Error::DatabaseOperationFailed(_) => Self::internal(),
+            db::Error::RowConversionFailed(_) => Self::internal(),
         }
     }
 }

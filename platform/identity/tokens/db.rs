@@ -2,6 +2,7 @@ use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
 use crate::common;
+use crate::db;
 use crate::identity::tokens;
 
 #[derive(Debug, FromRow)]
@@ -32,9 +33,9 @@ pub struct Repository;
 impl tokens::TRepository for Repository {
     async fn create(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: tokens::CreateRefreshTokenCommand,
-    ) -> Result<(), common::RepoError> {
+    ) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
@@ -51,7 +52,7 @@ impl tokens::TRepository for Repository {
         Ok(())
     }
 
-    async fn revoke_by_jti(&self, db: &common::SqlContext, jti: &str) -> Result<(), common::RepoError> {
+    async fn revoke_by_jti(&self, db: &db::Context, jti: &str) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             UPDATE refresh_tokens
@@ -67,10 +68,10 @@ impl tokens::TRepository for Repository {
 
     async fn find_by_jti(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         tenant_id: common::TenantId,
         jti: &str,
-    ) -> Result<tokens::RefreshToken, common::RepoError> {
+    ) -> Result<tokens::RefreshToken, db::Error> {
         let row = sqlx::query_as!(
             RefreshTokenRow,
             r#"
@@ -95,10 +96,10 @@ impl tokens::TRepository for Repository {
 
     async fn revoke_all_for_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
-    ) -> Result<(), common::RepoError> {
+    ) -> Result<(), db::Error> {
         let now = chrono::Utc::now().naive_utc();
         sqlx::query!(
             r#"

@@ -3,6 +3,7 @@ use sqlx::FromRow;
 
 use crate::common;
 use crate::constants;
+use crate::db;
 use crate::identity::users;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
@@ -90,9 +91,9 @@ pub struct Repository;
 impl users::TRepository for Repository {
     async fn create_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: users::CreateUserCommand,
-    ) -> Result<users::User, common::RepoError> {
+    ) -> Result<users::User, db::Error> {
         let status: UserStatusRow = command.status.into();
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
@@ -128,7 +129,7 @@ impl users::TRepository for Repository {
         Ok(row.try_into()?)
     }
 
-    async fn find_by_id(&self, db: &common::SqlContext, id: common::UserId) -> Result<users::User, common::RepoError> {
+    async fn find_by_id(&self, db: &db::Context, id: common::UserId) -> Result<users::User, db::Error> {
         let row = sqlx::query_as!(
             UserRow,
             r#"
@@ -159,9 +160,9 @@ impl users::TRepository for Repository {
 
     async fn find_auth_details_by_email(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         email: &common::Email,
-    ) -> Result<Option<users::UserAuthRecord>, common::RepoError> {
+    ) -> Result<Option<users::UserAuthRecord>, db::Error> {
         let email_str = email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -193,9 +194,9 @@ impl users::TRepository for Repository {
 
     async fn list_by_tenant(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         query: users::ListUsersQuery,
-    ) -> Result<users::UserList, common::RepoError> {
+    ) -> Result<users::UserList, db::Error> {
         let rows = sqlx::query_as!(
             UserRow,
             r#"
@@ -246,9 +247,9 @@ impl users::TRepository for Repository {
 
     async fn link_sso_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: users::LinkSsoUserCommand,
-    ) -> Result<users::User, common::RepoError> {
+    ) -> Result<users::User, db::Error> {
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
             UserRow,
@@ -287,9 +288,9 @@ impl users::TRepository for Repository {
 
     async fn update_admin_credentials(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: users::UpdateAdminCredentialsCommand,
-    ) -> Result<(), common::RepoError> {
+    ) -> Result<(), db::Error> {
         let email = command.email.as_str().to_string();
         let result = sqlx::query!(
             r#"
@@ -305,16 +306,16 @@ impl users::TRepository for Repository {
         .await?;
 
         if result.rows_affected() == 0 {
-            return Err(common::RepoError::RowNotFound);
+            return Err(db::Error::RowNotFound);
         }
         Ok(())
     }
 
     async fn increment_failed_login_count(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         user_id: common::UserId,
-    ) -> Result<(), common::RepoError> {
+    ) -> Result<(), db::Error> {
         let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
         sqlx::query!(
             r#"
@@ -336,9 +337,9 @@ impl users::TRepository for Repository {
 
     async fn reset_failed_login_count(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         user_id: common::UserId,
-    ) -> Result<(), common::RepoError> {
+    ) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             UPDATE users SET

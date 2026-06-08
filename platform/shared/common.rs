@@ -1,11 +1,8 @@
-use sqlx::error::DatabaseError;
 use thiserror::Error;
 
 use crate::config;
-use crate::jwt::JwtContext;
-
-pub type SqlContext = sqlx::SqlitePool;
-pub type SqlError = sqlx::Error;
+use crate::db;
+use crate::jwt;
 pub type ArcContext = std::sync::Arc<Context>;
 pub type AppContext = axum::extract::State<ArcContext>;
 
@@ -39,65 +36,11 @@ pub enum DataValidationError {
     InvalidEmail,
 }
 
-#[derive(Debug, Error)]
-pub enum RepoError {
-    #[error("entity not found")]
-    RowNotFound,
 
-    #[error("unique constraint violation: {0}")]
-    UniqueViolation(String),
-
-    #[error("foreign key violation: {0}")]
-    ForeignKeyViolation(String),
-
-    #[error("check constraint violation: {0}")]
-    CheckViolation(String),
-
-    #[error("database error: {0}")]
-    Database(SqlError),
-
-    #[error("row conversion error: {0}")]
-    RowConversionFailed(String),
-}
-
-impl From<DataValidationError> for RepoError {
-    fn from(error: DataValidationError) -> Self {
-        match error {
-            DataValidationError::InvalidEmail => Self::RowConversionFailed("invalid email address".to_string()),
-        }
-    }
-}
-
-impl From<SqlError> for RepoError {
-    fn from(error: SqlError) -> Self {
-        fn is_check_violation(db_err: &dyn DatabaseError) -> bool {
-            db_err
-                .code()
-                .is_some_and(|code| code.as_ref() == "2067" || code.as_ref() == "275")
-        }
-
-        if let SqlError::Database(db_err) = &error {
-            let message = db_err.message().to_string();
-            if db_err.is_unique_violation() {
-                return Self::UniqueViolation(message);
-            }
-            if db_err.is_foreign_key_violation() {
-                return Self::ForeignKeyViolation(message);
-            }
-            if is_check_violation(db_err.as_ref()) {
-                return Self::CheckViolation(message);
-            }
-        }
-        match error {
-            SqlError::RowNotFound => Self::RowNotFound,
-            other => Self::Database(other),
-        }
-    }
-}
 
 pub struct Context {
-    pub db: SqlContext,
-    pub jwt: JwtContext,
+    pub db: db::Context,
+    pub jwt: jwt::JwtContext,
     pub settings: config::AppSettings,
     pub http_client: reqwest::Client,
 }
@@ -106,8 +49,8 @@ pub struct Context {
 impl Context {
     #[must_use]
     pub const fn new(
-        db: SqlContext,
-        jwt: JwtContext,
+        db: db::Context,
+        jwt: jwt::JwtContext,
         settings: config::AppSettings,
         http_client: reqwest::Client,
     ) -> Self {

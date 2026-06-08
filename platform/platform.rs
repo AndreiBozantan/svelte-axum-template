@@ -17,6 +17,7 @@ pub mod shared {
     pub mod auth;
     pub mod cli;
     pub mod common;
+    pub mod db;
     pub mod config;
     pub mod constants;
     pub mod jwt;

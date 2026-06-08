@@ -1,6 +1,7 @@
 use chrono::NaiveDateTime;
 
 use crate::common;
+use crate::db;
 
 #[derive(Debug, Clone)]
 pub struct CreateRefreshTokenCommand {
@@ -21,27 +22,27 @@ pub struct RefreshToken {
 pub trait TRepository: Send + Sync {
     fn create(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: CreateRefreshTokenCommand,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn revoke_by_jti(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         jti: &str,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn find_by_jti(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         tenant_id: common::TenantId,
         jti: &str,
-    ) -> impl std::future::Future<Output = Result<RefreshToken, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<RefreshToken, db::Error>> + Send;
 
     fn revoke_all_for_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 }

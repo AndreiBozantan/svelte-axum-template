@@ -2,6 +2,7 @@ use chrono::NaiveDateTime;
 use thiserror::Error;
 
 use crate::common;
+use crate::db;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserStatus {
@@ -85,14 +86,14 @@ pub enum UserError {
     AlreadyExists,
 
     #[error("database error: {0}")]
-    Database(common::RepoError),
+    Database(db::Error),
 }
 
-impl From<common::RepoError> for UserError {
-    fn from(error: common::RepoError) -> Self {
+impl From<db::Error> for UserError {
+    fn from(error: db::Error) -> Self {
         match error {
-            common::RepoError::RowNotFound => Self::NotFound,
-            common::RepoError::UniqueViolation(_) => Self::AlreadyExists,
+            db::Error::RowNotFound => Self::NotFound,
+            db::Error::UniqueViolation(_) => Self::AlreadyExists,
             other => Self::Database(other),
         }
     }
@@ -102,49 +103,49 @@ pub trait TRepository: Send + Sync {
     #[allow(dead_code)]
     fn create_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: CreateUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
 
     fn find_by_id(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
 
     fn find_auth_details_by_email(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         email: &common::Email,
-    ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, db::Error>> + Send;
 
     fn list_by_tenant(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         query: ListUsersQuery,
-    ) -> impl std::future::Future<Output = Result<UserList, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<UserList, db::Error>> + Send;
 
     fn link_sso_user(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: LinkSsoUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
 
     fn update_admin_credentials(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         command: UpdateAdminCredentialsCommand,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn increment_failed_login_count(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn reset_failed_login_count(
         &self,
-        db: &common::SqlContext,
+        db: &db::Context,
         user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), common::RepoError>> + Send;
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 }
