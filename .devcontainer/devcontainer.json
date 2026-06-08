@@ -23,9 +23,10 @@
     "source=svelaxum-npm-cache,target=/home/vscode/.npm,type=volume",
     // VS Code Server, extensions, and CodeLLDB
     "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume",
-    // Zsh history and other data files (e.g. for plugins like zsh-autosuggestions)
-    "source=svelaxum-zsh-history,target=/home/vscode/.zsh_data,type=volume"
-
+    // Fish history and other data files
+    "source=svelaxum-fish-history,target=/home/vscode/.local/share/fish,type=volume",
+    // CLI tool configurations (fish, git, gh, etc.)
+    "source=svelaxum-config,target=/home/vscode/.config,type=volume"
   ],
 
   "forwardPorts": [
@@ -59,5 +60,5 @@
     }
   },
 
-  "postCreateCommand": "bash ./.devcontainer/setup-zsh.sh && npm install && cargo fetch"
+  "postCreateCommand": "bash ./.devcontainer/setup-fish.sh && npm install && cargo fetch"
 }
