@@ -27,8 +27,8 @@ use thiserror::Error;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use platform::api;
 use platform::common;
-use platform::common::ApiError;
 use platform::common::ArcContext;
 use platform::config;
 use platform::jwt;
@@ -142,10 +142,10 @@ struct HealthCheckResponse {
 }
 
 #[allow(clippy::unused_async)]
-async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, ApiError> {
+async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, api::ApiError> {
     sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
         tracing::error!("Health check database ping failed: {error}");
-        ApiError::internal()
+        api::ApiError::internal()
     })?;
 
     Ok(axum::Json(HealthCheckResponse {
@@ -162,7 +162,7 @@ fn create_router(context: ArcContext) -> Router {
     let api = Router::new()
         .merge(platform::identity::router(context.clone()))
         .merge(public)
-        .fallback(|| async { ApiError::not_found() });
+        .fallback(|| async { api::ApiError::not_found() });
 
     Router::new()
         .nest("/api", api)

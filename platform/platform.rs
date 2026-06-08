@@ -13,6 +13,7 @@ pub(crate) mod internal {
 }
 
 pub mod shared {
+    pub mod api;
     pub mod auth;
     pub mod cli;
     pub mod common;

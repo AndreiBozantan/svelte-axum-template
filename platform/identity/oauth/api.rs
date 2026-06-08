@@ -3,6 +3,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 
+use crate::api;
 use crate::common;
 use crate::identity::auth;
 use crate::identity::oauth;
@@ -32,7 +33,7 @@ where
     pub auth_service: auth::Service<UR, TR>,
 }
 
-impl From<oauth::OAuthError> for common::ApiError {
+impl From<oauth::OAuthError> for api::ApiError {
     fn from(error: oauth::OAuthError) -> Self {
         match error {
             oauth::OAuthError::UnverifiedEmail | oauth::OAuthError::InvalidUserInfo => Self::invalid_credentials(),
@@ -53,7 +54,7 @@ async fn google_auth_init<UR, TR>(
     State(AppState { ctx, .. }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
-) -> Result<impl IntoResponse, common::ApiError>
+) -> Result<impl IntoResponse, api::ApiError>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
@@ -69,7 +70,7 @@ where
     let cookie = format!(
         "oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}"
     );
-    let cookie_val = axum::http::HeaderValue::from_str(&cookie).map_err(|_| common::ApiError::internal())?;
+    let cookie_val = axum::http::HeaderValue::from_str(&cookie).map_err(|_| api::ApiError::internal())?;
     response
         .headers_mut()
         .insert(axum::http::header::SET_COOKIE, cookie_val);
@@ -80,7 +81,7 @@ async fn google_auth_callback<UR, TR>(
     State(AppState { ctx, auth_service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
-) -> Result<impl IntoResponse, common::ApiError>
+) -> Result<impl IntoResponse, api::ApiError>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
@@ -88,7 +89,7 @@ where
     let oauth_state_cookie =
         tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
             logger::log_cookie_error(&headers, "missing_oauth_state");
-            common::ApiError::sso_failed()
+            api::ApiError::sso_failed()
         })?;
 
     let (user_info, redirect_url) =
@@ -96,7 +97,7 @@ where
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
-        return Err(common::ApiError::invalid_credentials());
+        return Err(api::ApiError::invalid_credentials());
     }
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");

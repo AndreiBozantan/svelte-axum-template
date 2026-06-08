@@ -23,7 +23,7 @@ pub enum TokenError {
     TokenInvalid,
 }
 
-impl From<TokenError> for common::ApiError {
+impl From<TokenError> for crate::api::ApiError {
     fn from(error: TokenError) -> Self {
         logger::log_auth_rejection(&error);
         match error {

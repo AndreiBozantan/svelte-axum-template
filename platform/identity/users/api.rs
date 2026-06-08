@@ -3,6 +3,7 @@ use axum::Router;
 use axum::extract::State;
 use serde::Serialize;
 
+use crate::api;
 use crate::common;
 use crate::identity::users;
 use crate::jwt;
@@ -59,7 +60,7 @@ pub struct UserInfoResponse {
     pub user: UserResponse,
 }
 
-impl From<users::UserError> for common::ApiError {
+impl From<users::UserError> for api::ApiError {
     fn from(error: users::UserError) -> Self {
         match error {
             users::UserError::NotFound => Self::not_found(),
@@ -78,9 +79,9 @@ impl From<users::UserError> for common::ApiError {
 
 async fn list_users<UR>(
     State(AppState { context, repo }): State<AppState<UR>>,
-    axum::extract::Query(pagination): axum::extract::Query<common::Pagination>,
+    axum::extract::Query(pagination): axum::extract::Query<api::Pagination>,
     claims: jwt::TokenClaims,
-) -> Result<Json<ListUsersResponse>, common::ApiError>
+) -> Result<Json<ListUsersResponse>, api::ApiError>
 where
     UR: users::TRepository + Clone,
 {
@@ -104,7 +105,7 @@ where
 async fn user_info<UR>(
     State(AppState { context, repo }): State<AppState<UR>>,
     claims: jwt::TokenClaims,
-) -> Result<Json<UserInfoResponse>, common::ApiError>
+) -> Result<Json<UserInfoResponse>, api::ApiError>
 where
     UR: users::TRepository + Clone,
 {

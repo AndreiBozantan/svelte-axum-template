@@ -5,6 +5,7 @@ use axum::http::Request;
 use axum::http::request::Parts;
 use axum::response::Response;
 
+use crate::api;
 use crate::common;
 use crate::identity::oauth;
 use crate::identity::tokens;
@@ -20,7 +21,7 @@ pub async fn middleware(
     State(context): State<common::ArcContext>,
     mut req: Request<Body>,
     next: axum::middleware::Next,
-) -> Result<Response, common::ApiError> {
+) -> Result<Response, api::ApiError> {
     let claims = tokens::utils::decode_token_from_req(&context, &req, jwt::TokenType::Access)?;
 
     tracing::debug!(
@@ -38,9 +39,9 @@ impl<S> FromRequestParts<S> for jwt::TokenClaims
 where
     S: Send + Sync,
 {
-    type Rejection = common::ApiError;
+    type Rejection = api::ApiError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts.extensions.get().cloned().ok_or_else(common::ApiError::invalid_token)
+        parts.extensions.get().cloned().ok_or_else(api::ApiError::invalid_token)
     }
 }
