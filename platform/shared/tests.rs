@@ -126,3 +126,97 @@ fn refresh_token_expiry() -> anyhow::Result<()> {
     assert!(matches!(result, Err(JwtError::TokenExpired)));
     Ok(())
 }
+
+#[test]
+fn future_token_valid() -> anyhow::Result<()> {
+    use chrono::Utc;
+    use jsonwebtoken as jsonwt;
+    use uuid::Uuid;
+
+    let ctx = test_context()?;
+    let user_id = 123;
+    let email = "test_user@example.com";
+
+    // create a token that expires far in the future
+    let now = Utc::now().timestamp();
+    let future_expiry = now + 86400; // 24 hours from now
+
+    let header = jsonwt::Header::new(jsonwt::Algorithm::HS256);
+    let future_claims = jwt::TokenClaims {
+        sub: user_id.to_string(),
+        tenant_id: 0,
+        email: email.to_string(),
+        exp: future_expiry,
+        iat: now,
+        jti: Uuid::new_v4().to_string(),
+        token_type: jwt::TokenType::Access,
+    };
+
+    let future_token = jsonwt::encode(&header, &future_claims, &ctx.encoding_key)?;
+
+    // test that future token is accepted
+    let claims = jwt::decode_token(&ctx, &future_token, jwt::TokenType::Access)?;
+    assert_eq!(claims.sub, user_id.to_string());
+    assert_eq!(claims.email, email);
+    assert_eq!(claims.exp, future_expiry);
+    Ok(())
+}
+
+#[test]
+fn access_token_used_as_refresh_token() -> anyhow::Result<()> {
+    let ctx = test_context()?;
+    let access_token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Access)?;
+
+    // try to decode access token as refresh token - should fail
+    let result = jwt::decode_token(&ctx, &access_token.value, jwt::TokenType::Refresh);
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), jwt::JwtError::InvalidToken));
+    Ok(())
+}
+
+#[test]
+fn refresh_token_used_as_access_token() -> anyhow::Result<()> {
+    let ctx = test_context()?;
+    let refresh_token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
+
+    // try to decode refresh token as access token - should fail
+    let result = jwt::decode_token(&ctx, &refresh_token.value, jwt::TokenType::Access);
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), jwt::JwtError::InvalidToken));
+    Ok(())
+}
+
+#[test]
+fn different_tokens_have_different_jwt_ids() -> anyhow::Result<()> {
+    let ctx = test_context()?;
+    let email = "test_user@example.com";
+
+    let token1 = jwt::generate_token(&ctx, 123, 0, email, jwt::TokenType::Access)?;
+    let token2 = jwt::generate_token(&ctx, 123, 0, email, jwt::TokenType::Refresh)?;
+
+    let claims1 = jwt::decode_token(&ctx, &token1.value, jwt::TokenType::Access)?;
+    let claims2 = jwt::decode_token(&ctx, &token2.value, jwt::TokenType::Refresh)?;
+
+    // JTIs should be different for different tokens
+    assert_ne!(claims1.jti, claims2.jti);
+    Ok(())
+}
+
+#[test]
+fn access_token_contains_correct_tenant_info() -> anyhow::Result<()> {
+    let ctx = test_context()?;
+    let email = "test_user@example.com";
+
+    // test with tenant
+    let tenant_id = 456;
+    let token_with_tenant = jwt::generate_token(&ctx, 123, tenant_id, email, jwt::TokenType::Access)?;
+    let claims_with_tenant = jwt::decode_token(&ctx, &token_with_tenant.value, jwt::TokenType::Access)?;
+    assert_eq!(claims_with_tenant.tenant_id, tenant_id);
+
+    // test without tenant
+    let token_without_tenant = jwt::generate_token(&ctx, 123, 0, email, jwt::TokenType::Access)?;
+    let claims_without_tenant = jwt::decode_token(&ctx, &token_without_tenant.value, jwt::TokenType::Access)?;
+    assert_eq!(claims_without_tenant.tenant_id, 0);
+    Ok(())
+}
+

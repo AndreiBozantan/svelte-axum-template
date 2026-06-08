@@ -54,3 +54,20 @@ fn dummy_hash_parameters_match_argon2_default() -> anyhow::Result<()> {
     assert_eq!(dummy.algorithm, reference.algorithm);
     Ok(())
 }
+
+#[test]
+fn hash_long_password() -> anyhow::Result<()> {
+    let password = "a".repeat(1000);
+    let hash = auth::hash_password(&password)?;
+    assert!(auth::verify_password(&password, &hash)?);
+    Ok(())
+}
+
+#[test]
+fn hash_unicode_password() -> anyhow::Result<()> {
+    let password = "🔐密码测试🔑";
+    let hash = auth::hash_password(password)?;
+    assert!(auth::verify_password(password, &hash)?);
+    Ok(())
+}
+
