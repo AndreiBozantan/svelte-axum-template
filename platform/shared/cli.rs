@@ -5,7 +5,7 @@ use clap::Parser;
 use clap::Subcommand;
 
 use crate::common;
-use crate::identity::auth;
+use crate::auth;
 use crate::identity::users;
 use crate::migrations;
 

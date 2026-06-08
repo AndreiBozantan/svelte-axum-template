@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 use crate::common;
 use crate::config;
-use crate::identity::auth;
+use crate::auth;
 use crate::identity::tokens;
 use crate::identity::users;
 use crate::jwt;

@@ -45,3 +45,59 @@ where
         parts.extensions.get().cloned().ok_or_else(api::Error::invalid_token)
     }
 }
+
+use crate::db;
+use argon2::password_hash as ar2;
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("invalid credentials")]
+    InvalidCredentials,
+
+    #[error("token expired or invalid")]
+    InvalidToken,
+
+    #[error("password hashing failed: {0}")]
+    PasswordHashingFailed(#[from] argon2::password_hash::Error),
+
+    #[error("jwt operation failed: {0}")]
+    JwtOperationFailed(#[from] jwt::Error),
+
+    #[error("token operation failed: {0}")]
+    TokenOperationFailed(#[from] tokens::utils::TokenError),
+
+    #[error("database error: {0}")]
+    DatabaseOperationFailed(#[from] db::Error),
+
+    #[error("internal error: {0}")]
+    Internal(String),
+}
+
+/// Hash a password using Argon2
+pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
+    use ar2::PasswordHasher;
+    use argon2::Argon2;
+    let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
+    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    Ok(hash.to_string())
+}
+
+/// Verify a password against a hash
+pub fn verify_password(password: &str, hash: &str) -> Result<bool, ar2::Error> {
+    use ar2::PasswordVerifier;
+    use argon2::Argon2;
+    let parsed_hash = ar2::PasswordHash::new(hash)?;
+    match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
+        Ok(()) => Ok(true),
+        Err(ar2::Error::Password) => Ok(false),
+        Err(e) => Err(e),
+    }
+}
+
+/// A pre-computed Argon2 hash of a dummy password, used to perform a
+/// constant-time "wasted" verify when the requested user does not exist,
+/// preventing user-enumeration via response-time differences.
+pub static DUMMY_HASH: &str = "$argon2id$\
+    v=19$m=19456,t=2,p=1$\
+    HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore
+

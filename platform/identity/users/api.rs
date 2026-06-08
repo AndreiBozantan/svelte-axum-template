@@ -5,12 +5,11 @@ use serde::Serialize;
 
 use crate::api;
 use crate::common;
-use crate::identity::users;
 use crate::jwt;
 
 pub fn router<UR>(ctx: common::ArcContext, repo: UR) -> Router<common::ArcContext>
 where
-    UR: users::TRepository + Clone + 'static,
+    UR: super::TRepository + Clone + 'static,
 {
     use axum::routing::get;
     let context = ctx.clone();
@@ -24,7 +23,7 @@ where
 #[derive(Clone)]
 struct AppState<UR>
 where
-    UR: users::TRepository + Clone + 'static,
+    UR: super::TRepository + Clone + 'static,
 {
     pub context: common::ArcContext,
     pub repo: UR,
@@ -37,8 +36,8 @@ pub struct UserResponse {
     pub tenant_id: i64,
 }
 
-impl From<users::User> for UserResponse {
-    fn from(user: users::User) -> Self {
+impl From<super::User> for UserResponse {
+    fn from(user: super::User) -> Self {
         Self {
             id: user.id.0,
             email: user.email.as_str().to_string(),
@@ -60,16 +59,16 @@ pub struct UserInfoResponse {
     pub user: UserResponse,
 }
 
-impl From<users::UserError> for api::Error {
-    fn from(error: users::UserError) -> Self {
+impl From<super::UserError> for api::Error {
+    fn from(error: super::UserError) -> Self {
         match error {
-            users::UserError::NotFound => Self::not_found(),
-            users::UserError::AlreadyExists => Self::user_already_exists(),
-            users::UserError::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
+            super::UserError::NotFound => Self::not_found(),
+            super::UserError::AlreadyExists => Self::user_already_exists(),
+            super::UserError::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
                 "field": "email",
                 "message": "invalid email address"
             })),
-            users::UserError::Database(repo_error) => {
+            super::UserError::Database(repo_error) => {
                 tracing::error!("user database error: {repo_error}");
                 Self::internal()
             }
@@ -83,10 +82,10 @@ async fn list_users<UR>(
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, api::Error>
 where
-    UR: users::TRepository + Clone,
+    UR: super::TRepository + Clone,
 {
     let (limit, offset) = pagination.sanitize();
-    let query = users::ListUsersQuery {
+    let query = super::ListUsersQuery {
         tenant_id: common::TenantId(claims.tenant_id),
         limit,
         offset,
@@ -107,7 +106,7 @@ async fn user_info<UR>(
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, api::Error>
 where
-    UR: users::TRepository + Clone,
+    UR: super::TRepository + Clone,
 {
     let user_id = claims.user_id()?;
     let user = repo.find_by_id(&context.db, common::UserId(user_id)).await?;
