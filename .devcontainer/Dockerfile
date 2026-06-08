@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libssl-dev \
         sqlite3 \
         libsqlite3-dev \
+        fish \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,11 +31,8 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 \
     /uv /usr/local/bin/uv
 
-# Install Gemini CLI 
-RUN npm install -g @google/gemini-cli
-
 # Setup User and Shell
-RUN usermod -s /usr/bin/zsh vscode
+RUN usermod -s /usr/bin/fish vscode
 USER vscode
 
 # Copy Rust toolchain into the vscode home directory with correct ownership
@@ -45,6 +43,9 @@ COPY --chown=vscode:vscode --from=rust-env /usr/local/rustup /home/vscode/.rustu
 ENV RUSTUP_HOME="/home/vscode/.rustup" \
     CARGO_HOME="/home/vscode/.cargo" \
     PATH="/home/vscode/.cargo/bin:/home/vscode/.local/bin:${PATH}"
+
+# Install Antigravity CLI
+RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
 
 # Install Semgrep using uv. The --mount=type=cache option is used to cache 
 # the downloaded packages on the host machine, which speeds up subsequent 
@@ -73,4 +74,6 @@ RUN mkdir -p \
   /home/vscode/.cargo/registry \
   /home/vscode/.cargo/git \
   /home/vscode/.npm \
-  /home/vscode/.vscode-server
+  /home/vscode/.vscode-server \
+  /home/vscode/.local/share/fish \
+  /home/vscode/.config

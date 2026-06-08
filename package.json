@@ -14,7 +14,7 @@
     "db:create": "cargo sqlx database create --database-url sqlite:data/db.sqlite",
     "db:migrate": "cargo sqlx migrate run --database-url sqlite:data/db.sqlite --source migrations",
     "db:sqlx": "cargo sqlx prepare --workspace --database-url sqlite:data/db.sqlite",
-    "db:init": "export DATABASE_URL=sqlite:data/db.sqlite && npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
+    "db:init": "npm run cargo:install && npm run db:create && npm run db:migrate && npm run db:sqlx",
 
     "lint:security": "semgrep --config r/all",
 
