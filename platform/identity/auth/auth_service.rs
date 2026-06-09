@@ -38,6 +38,33 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         Self { users, tokens }
     }
 
+    pub async fn register(
+        &self,
+        ctx: &common::ArcContext,
+        email: common::Email,
+        password: &str,
+        first_name: Option<String>,
+        last_name: Option<String>,
+    ) -> Result<users::User, auth::Error> {
+        let password_hash = auth::hash_password(password)?;
+        let cmd = users::CreateUserCommand {
+            tenant_id: common::TenantId(0),
+            status: users::UserStatus::Active,
+            email,
+            first_name,
+            middle_name: None,
+            last_name,
+            password_hash: Some(password_hash),
+            sso_provider: None,
+            sso_id: None,
+        };
+        let user = self
+            .users
+            .create_user(&ctx.db, cmd)
+            .await?;
+        Ok(user)
+    }
+
     pub async fn login(&self, ctx: &common::ArcContext, command: LoginCommand) -> Result<AuthResult, auth::Error> {
         let maybe_user = self.users.find_auth_details_by_email(&ctx.db, &command.email).await?;
 
