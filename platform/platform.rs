@@ -31,33 +31,50 @@ pub use shared::*;
 
 pub mod identity {
     pub(crate) mod auth {
+        #[path ="auth_api.rs"]
         pub mod api;
+
+        #[path ="auth_service.rs"]
         mod service;
 
         pub use service::*;
 
         #[cfg(test)]
+        #[path ="auth_tests.rs"]
         mod tests;
     }
 
     pub(crate) mod oauth {
+        #[path ="oauth_api.rs"]
         pub mod api;
+
+        #[path ="oauth_service.rs"]
         mod service;
 
         pub use service::*;
     }
 
     pub(crate) mod users {
+        #[path ="users_api.rs"]
         pub mod api;
+
+        #[path ="users_db.rs"]
         pub mod db;
+
+        #[path ="users_service.rs"]
         mod service;
 
         pub use service::*;
     }
 
     pub(crate) mod tokens {
+        #[path ="tokens_db.rs"]
         pub mod db;
+
+        #[path ="tokens_service.rs"]
         mod service;
+        
+        #[path ="tokens_utils.rs"]
         pub mod utils;
 
         pub use service::*;
