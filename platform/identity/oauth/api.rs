@@ -32,19 +32,19 @@ where
     pub auth_service: auth::Service<UR, TR>,
 }
 
+#[allow(clippy::match_same_arms)]
 impl From<super::Error> for api::Error {
     fn from(error: super::Error) -> Self {
+        tracing::error!("oauth error: {error}");
         match error {
             super::Error::UnverifiedEmail | super::Error::InvalidUserInfo => Self::invalid_credentials(),
-            super::Error::CsrfValidationFailed
-            | super::Error::SessionExpired
-            | super::Error::OAuth2RequestFailed(_)
-            | super::Error::InvalidConfig(_)
-            | super::Error::InvalidRedirectUrl => Self::sso_failed(),
-            super::Error::UserInfoRetrievalFailed(_) | super::Error::Internal(_) => {
-                tracing::error!("oauth error: {error}");
-                Self::internal()
-            }
+            super::Error::CsrfValidationFailed => Self::sso_failed(),
+            super::Error::SessionExpired => Self::sso_failed(),
+            super::Error::OAuth2RequestFailed(_) => Self::sso_failed(),
+            super::Error::InvalidConfig(_) => Self::sso_failed(),
+            super::Error::InvalidRedirectUrl => Self::sso_failed(),
+            super::Error::UserInfoRetrievalFailed(_) => Self::internal(),
+            super::Error::InternalFault(_) => Self::internal()
         }
     }
 }

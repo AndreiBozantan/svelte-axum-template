@@ -61,17 +61,12 @@ pub struct UserInfoResponse {
 
 impl From<super::Error> for api::Error {
     fn from(error: super::Error) -> Self {
+        tracing::error!("user database error: {error}");
         match error {
             super::Error::NotFound => Self::not_found(),
             super::Error::AlreadyExists => Self::user_already_exists(),
-            super::Error::InvalidEmail => Self::validation_failed(serde_json::json!({
-                "field": "email",
-                "message": "invalid email address"
-            })),
-            super::Error::DatabaseOperationFailed(repo_error) => {
-                tracing::error!("user database error: {repo_error}");
-                Self::internal()
-            }
+            super::Error::InvalidEmail => Self::validation_failed("email", "invalid email address"),
+            super::Error::DatabaseOperationFailed(_) => Self::internal(),
         }
     }
 }

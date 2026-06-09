@@ -14,7 +14,7 @@ use crate::internal::logger;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("internal error: {0}")]
-    Internal(String),
+    InternalFault(String),
 
     #[error("OAuth2 request failed: {0}")]
     OAuth2RequestFailed(
@@ -210,7 +210,7 @@ pub async fn complete_google_callback(
     let client = create_google_client(&context.settings.oauth)?;
     let oauth_client = oauth2::reqwest::ClientBuilder::new().build().map_err(|error| {
         logger::log_internal_error(&error, "create_oauth_client");
-        Error::Internal(format!("Failed to create HTTP client for OAuth: {error}"))
+        Error::InternalFault(format!("Failed to create HTTP client for OAuth: {error}"))
     })?;
 
     let token_result = client

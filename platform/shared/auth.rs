@@ -10,6 +10,7 @@ use crate::common;
 use crate::identity::oauth;
 use crate::identity::tokens;
 use crate::jwt;
+use crate::shared;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -28,11 +29,14 @@ pub enum Error {
     #[error("token operation failed: {0}")]
     TokenOperationFailed(#[from] tokens::utils::Error),
 
-    #[error("database error: {0}")]
-    DatabaseOperationFailed(#[from] db::Error),
-
     #[error("internal error: {0}")]
-    Internal(String),
+    InternalFault(String),
+}
+
+impl From<shared::db::Error> for Error {
+    fn from(error: shared::db::Error) -> Self {
+        Self::InternalFault(format!("database operation failed {error}"))
+    }
 }
 
 pub fn check_oauth_config(config: &crate::config::OAuthSettings) {
@@ -70,7 +74,6 @@ where
     }
 }
 
-use crate::db;
 use argon2::password_hash as ar2;
 
 /// Hash a password using Argon2

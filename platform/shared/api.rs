@@ -96,7 +96,11 @@ impl Error {
     }
 
     #[must_use]
-    pub fn validation_failed(details: serde_json::Value) -> Self {
+    pub fn validation_failed(field: &str, message: &str) -> Self {
+        let details = serde_json::json!({
+            "field": field,
+            "message": message
+        });
         Self::new(StatusCode::BAD_REQUEST, "validation_failed", "Request validation failed.", Some(details))
     }
 
