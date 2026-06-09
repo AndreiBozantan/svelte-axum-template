@@ -22,9 +22,6 @@ pub mod shared {
     pub mod constants;
     pub mod jwt;
     pub mod migrations;
-
-    #[cfg(test)]
-    mod tests;
 }
 
 pub use shared::*;
@@ -38,10 +35,6 @@ pub mod identity {
         mod service;
 
         pub use service::*;
-
-        #[cfg(test)]
-        #[path ="auth_tests.rs"]
-        mod tests;
     }
 
     pub(crate) mod oauth {
@@ -78,10 +71,11 @@ pub mod identity {
         pub mod utils;
 
         pub use service::*;
+        
+        #[cfg(test)]
+        #[path ="tokens_tests.rs"]
+        mod tests;
     }
-
-    #[cfg(test)]
-    mod tests;
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
         let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);

@@ -2,7 +2,7 @@ use argon2::Argon2;
 use argon2::PasswordHasher;
 use argon2::password_hash as ar2;
 
-use crate::auth;
+use platform::auth;
 
 #[test]
 fn hash_password_creates_valid_hash() -> anyhow::Result<()> {

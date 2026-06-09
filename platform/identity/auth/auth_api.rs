@@ -23,6 +23,7 @@ where
 {
     use axum::routing::post;
     Router::new()
+        .route("/auth/register", post(register::<UR, TR>))
         .route("/auth/login", post(login::<UR, TR>))
         .route("/auth/logout", post(logout::<UR, TR>))
         .route("/auth/refresh", post(refresh::<UR, TR>))
@@ -37,6 +38,19 @@ where
 {
     pub context: common::ArcContext,
     pub service: auth::Service<UR, TR>,
+}
+
+#[derive(Deserialize)]
+pub struct RegisterRequest {
+    pub email: String,
+    pub password: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct RegisterResponse {
+    pub user: UserResponse,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +87,35 @@ impl From<users::User> for UserResponse {
     }
 }
 
+async fn register<UR, TR>(
+    State(AppState { context, service }): State<AppState<UR, TR>>,
+    Json(request): Json<RegisterRequest>,
+) -> Result<impl IntoResponse, api::Error>
+where
+    UR: users::TRepository + Clone,
+    TR: tokens::TRepository + Clone,
+{
+    let email = common::Email::parse(&request.email).ok_or_else(|| {
+        api::Error::validation_failed("email", "invalid email address")
+    })?;
+
+    let user = service
+        .register(
+            &context,
+            email,
+            &request.password,
+            request.first_name,
+            request.last_name,
+        )
+        .await?;
+
+    let body = RegisterResponse {
+        user: user.into(),
+    };
+
+    Ok((axum::http::StatusCode::CREATED, Json(body)))
+}
+
 async fn login<UR, TR>(
     State(AppState { context, service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
@@ -97,7 +140,7 @@ where
         user: session.user.into(),
     };
     Ok(tokens::utils::create_response_with_auth_cookies(
-        &context,
+        &context.settings.jwt,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),
@@ -119,7 +162,7 @@ where
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())?;
-    Ok(tokens::utils::add_auth_cookies(&context, response, None, None)?)
+    Ok(tokens::utils::add_auth_cookies(&context.settings.jwt, response, None, None)?)
 }
 
 async fn refresh<UR, TR>(
@@ -145,7 +188,7 @@ where
         user: session.user.into(),
     };
     Ok(tokens::utils::create_response_with_auth_cookies(
-        &context,
+        &context.settings.jwt,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),

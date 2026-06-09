@@ -1,0 +1,221 @@
+use axum::http::StatusCode;
+use serde_json::Value;
+use serde_json::json;
+
+use platform::config;
+use platform::jwt;
+
+use super::super::*;
+
+#[tokio::test]
+async fn login_invalid_endpoint() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/invalid_endpoint")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": "wrong_password"
+        }))
+        .await;
+    response.assert_status(StatusCode::NOT_FOUND);
+    Ok(())
+}
+
+#[tokio::test]
+async fn login_invalid_credentials() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": "wrong_password"
+        }))
+        .await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "invalid_credentials");
+    Ok(())
+}
+
+#[tokio::test]
+async fn login_nonexistent_user() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": "nonexistent@example.com",
+            "password": "password"
+        }))
+        .await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "invalid_credentials");
+    Ok(())
+}
+
+#[tokio::test]
+async fn refresh_token_invalid() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server.post("/api/auth/refresh").await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "invalid_token");
+    Ok(())
+}
+
+#[tokio::test]
+async fn login_success() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let (body, access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
+    assert!(!access_token.is_empty());
+    assert!(!refresh_token.is_empty());
+    assert_eq!(body["user"]["email"], TEST_USER_EMAIL);
+    Ok(())
+}
+
+#[tokio::test]
+async fn malformed_json_login() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server.post("/api/auth/login").text("not json").await;
+    response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    Ok(())
+}
+
+#[tokio::test]
+async fn missing_fields_login() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({ "email": TEST_USER_EMAIL }))
+        .await;
+    response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+    Ok(())
+}
+
+#[tokio::test]
+async fn refresh_token_success() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
+    let refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .await;
+    refresh_response.assert_status(StatusCode::OK);
+    let refresh_body: Value = refresh_response.json();
+    assert!(!refresh_response.cookie("access_token").value().is_empty());
+    assert_eq!(refresh_body["user"]["email"], TEST_USER_EMAIL);
+    Ok(())
+}
+
+#[tokio::test]
+async fn revoke_token_success() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
+    let refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .await;
+    refresh_response.assert_status(StatusCode::OK);
+
+    let refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .await;
+    refresh_response.assert_status(StatusCode::UNAUTHORIZED);
+    Ok(())
+}
+
+#[tokio::test]
+async fn logout_success() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
+    let logout_response = server
+        .post("/api/auth/logout")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .await;
+    logout_response.assert_status(StatusCode::NO_CONTENT);
+
+    let refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .await;
+    refresh_response.assert_status(StatusCode::UNAUTHORIZED);
+    Ok(())
+}
+
+#[tokio::test]
+async fn access_token_expiry() -> anyhow::Result<()> {
+    use chrono::Utc;
+    use jsonwebtoken as jwtk;
+    use uuid::Uuid;
+
+    let server = create_test_server().await?;
+    let login_response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD
+        }))
+        .await;
+    let valid_access_token = login_response.cookie("access_token").value().to_string();
+
+    let response_valid = server
+        .get("/api/users/me")
+        .add_cookie(cookie::Cookie::new("access_token", valid_access_token.clone()))
+        .await;
+    response_valid.assert_status(StatusCode::OK);
+
+    let jwt_settings = config::JwtSettings {
+        access_token_expiry_minutes: 60,
+        refresh_token_expiry_days: 1,
+    };
+    let jwt_secret = "test__secret__key__for__jwt__testing";
+    let jwt_context = jwt::Context::new(&jwt_settings, jwt_secret)?;
+
+    let now = Utc::now().timestamp();
+    let expired_time = now - 3600;
+    let header = jwtk::Header::new(jwtk::Algorithm::HS256);
+    let expired_claims = jwt::TokenClaims {
+        sub: "1".to_string(),
+        tenant_id: 0,
+        email: TEST_USER_EMAIL.to_string(),
+        exp: expired_time,
+        iat: expired_time - 3600,
+        jti: Uuid::new_v4().to_string(),
+        token_type: jwt::TokenType::Access,
+    };
+    let expired_token = jwtk::encode(&header, &expired_claims, &jwt_context.encoding_key)?;
+
+    let response_expired = server
+        .get("/api/users/me")
+        .add_cookie(cookie::Cookie::new("access_token", expired_token))
+        .await;
+    response_expired.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response_expired.json();
+    assert_eq!(body["code"], "expired_token");
+    Ok(())
+}
+
+#[tokio::test]
+async fn account_lockout_after_failed_attempts() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    for _ in 0..5 {
+        let response = server
+            .post("/api/auth/login")
+            .json(&json!({
+                "email": TEST_USER_EMAIL,
+                "password": "wrong_password"
+            }))
+            .await;
+        response.assert_status(StatusCode::UNAUTHORIZED);
+    }
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD
+        }))
+        .await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    Ok(())
+}

@@ -1,18 +1,17 @@
-use crate::config;
-use crate::jwt;
-use crate::jwt::Context;
+use platform::config;
+use platform::jwt;
 
-fn test_context() -> anyhow::Result<Context> {
+fn test_context() -> anyhow::Result<jwt::Context> {
     let settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
     };
     let secret = "test_secret_key_for_jwt_testing";
-    Ok(Context::new(&settings, secret)?)
+    Ok(jwt::Context::new(&settings, secret)?)
 }
 
 fn generate_expired_token(
-    ctx: &Context,
+    ctx: &jwt::Context,
     user_id: i64,
     tenant_id: i64,
     email: &str,
@@ -82,7 +81,7 @@ fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
     };
-    let wrong_ctx = Context::new(&settings, "wrong_secret_key_for_jwt_testing")?;
+    let wrong_ctx = jwt::Context::new(&settings, "wrong_secret_key_for_jwt_testing")?;
     let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&wrong_ctx, &token.value, jwt::TokenType::Access);
     assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
