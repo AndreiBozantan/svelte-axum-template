@@ -11,11 +11,12 @@ use serde::Serialize;
 
 use crate::api;
 use crate::common;
+use crate::identity::auth;
 use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
 
-pub fn router<UR, TR>(context: common::ArcContext, service: super::Service<UR, TR>) -> Router<common::ArcContext>
+pub fn router<UR, TR>(context: common::ArcContext, service: auth::Service<UR, TR>) -> Router<common::ArcContext>
 where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
@@ -35,7 +36,7 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     pub context: common::ArcContext,
-    pub service: super::Service<UR, TR>,
+    pub service: auth::Service<UR, TR>,
 }
 
 #[derive(Deserialize)]
@@ -84,7 +85,7 @@ where
     logger::log_user_login_attempt(&headers, &request.email);
 
     let email = common::Email::parse(&request.email).ok_or_else(api::Error::invalid_credentials)?;
-    let cmd = super::LoginCommand {
+    let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
     };

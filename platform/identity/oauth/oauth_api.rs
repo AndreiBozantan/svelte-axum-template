@@ -6,6 +6,7 @@ use axum::response::IntoResponse;
 use crate::api;
 use crate::common;
 use crate::identity::auth;
+use crate::identity::oauth;
 use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
@@ -33,19 +34,19 @@ where
 }
 
 #[allow(clippy::match_same_arms)]
-impl From<super::Error> for api::Error {
-    fn from(error: super::Error) -> Self {
+impl From<oauth::Error> for api::Error {
+    fn from(error: oauth::Error) -> Self {
         tracing::error!("oauth error: {error}");
         match error {
-            super::Error::UnverifiedEmail | super::Error::InvalidUserInfo => Self::invalid_credentials(),
-            super::Error::CsrfValidationFailed(_) => Self::sso_failed(),
-            super::Error::CsrfMismatch => Self::sso_failed(),
-            super::Error::SessionExpired => Self::sso_failed(),
-            super::Error::OAuth2RequestFailed(_) => Self::sso_failed(),
-            super::Error::InvalidConfig(_) => Self::sso_failed(),
-            super::Error::InvalidRedirectUrl => Self::sso_failed(),
-            super::Error::UserInfoRetrievalFailed(_) => Self::internal(),
-            super::Error::InternalFault(_) => Self::internal(),
+            oauth::Error::UnverifiedEmail | oauth::Error::InvalidUserInfo => Self::invalid_credentials(),
+            oauth::Error::CsrfValidationFailed(_) => Self::sso_failed(),
+            oauth::Error::CsrfMismatch => Self::sso_failed(),
+            oauth::Error::SessionExpired => Self::sso_failed(),
+            oauth::Error::OAuth2RequestFailed(_) => Self::sso_failed(),
+            oauth::Error::InvalidConfig(_) => Self::sso_failed(),
+            oauth::Error::InvalidRedirectUrl => Self::sso_failed(),
+            oauth::Error::UserInfoRetrievalFailed(_) => Self::internal(),
+            oauth::Error::InternalFault(_) => Self::internal(),
         }
     }
 }
@@ -62,7 +63,7 @@ where
     let redirect_url = params.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
 
-    let (auth_url, state_jwt) = super::begin_google_flow(&ctx, redirect_url)?;
+    let (auth_url, state_jwt) = oauth::begin_google_flow(&ctx, redirect_url)?;
     logger::log_oauth_redirecting(&headers, &auth_url, "google");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
@@ -80,7 +81,7 @@ where
 async fn google_auth_callback<UR, TR>(
     State(AppState { ctx, auth_service }): State<AppState<UR, TR>>,
     headers: HeaderMap,
-    axum::extract::Query(params): axum::extract::Query<super::GoogleCallbackRequest>,
+    axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
@@ -92,7 +93,7 @@ where
             api::Error::sso_failed()
         })?;
 
-    let (user_info, redirect_url) = super::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
+    let (user_info, redirect_url) = oauth::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
