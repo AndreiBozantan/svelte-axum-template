@@ -31,8 +31,11 @@ pub enum Error {
     #[error("User info retrieval API call failed: {0}")]
     UserInfoRetrievalFailed(#[from] reqwest::Error),
 
-    #[error("CSRF token validation failed")]
-    CsrfValidationFailed,
+    #[error("CSRF token validation failed: {0}")]
+    CsrfValidationFailed(#[source] jsonwebtoken::errors::Error),
+
+    #[error("CSRF token mismatch")]
+    CsrfMismatch,
 
     #[error("OAuth session expired or invalid")]
     SessionExpired,
@@ -45,6 +48,30 @@ pub enum Error {
 
     #[error("email address is not verified")]
     UnverifiedEmail,
+}
+
+impl From<jsonwebtoken::errors::Error> for Error {
+    fn from(error: jsonwebtoken::errors::Error) -> Self {
+        tracing::error!("JWT error: {error}");
+        match error.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => Self::SessionExpired,
+            _ => Self::CsrfValidationFailed(error)
+        }
+    }
+}
+
+impl From<url::ParseError> for Error {
+    fn from(error: url::ParseError) -> Self {
+        tracing::error!("JWT error: {error}");
+        Self::InvalidConfig(format!("Invalid URL format: {error}"))
+    }
+}
+
+impl From<oauth2::reqwest::Error> for Error {
+    fn from(error: oauth2::reqwest::Error) -> Self {
+        tracing::error!("JWT error: {error}");
+        Self::InternalFault("JWT operation failed".into())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -105,10 +132,7 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
         ));
     }
 
-    let parsed: Url = config
-        .google_redirect_uri
-        .parse()
-        .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
+    let parsed: Url = config.google_redirect_uri.parse()?;
 
     let host = parsed.host_str().unwrap_or("");
     let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
@@ -124,12 +148,9 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
 
 fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
-    let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())
-        .map_err(|_| Error::InvalidConfig("Invalid Google Redirect URI format".to_string()))?;
-    let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())
-        .map_err(|_| Error::InvalidConfig("Invalid Google auth URL".to_string()))?;
-    let token_url = oauth2::TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())
-        .map_err(|_| Error::InvalidConfig("Invalid Google token URL".to_string()))?;
+    let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
+    let auth_url = oauth2::AuthUrl::new("https://accounts.google.com/o/oauth2/v2/auth".to_string())?;
+    let token_url = oauth2::TokenUrl::new("https://www.googleapis.com/oauth2/v3/token".to_string())?;
 
     let client = oauth2::basic::BasicClient::new(oauth2::ClientId::new(config.google_client_id.clone()))
         .set_client_secret(oauth2::ClientSecret::new(config.google_client_secret.clone()))
@@ -169,17 +190,13 @@ pub fn begin_google_flow(
     };
 
     let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
-    let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key).map_err(|error| {
-        logger::log_internal_error(&error, "encode_oauth_state");
-        Error::InvalidConfig("Failed to encode OAuth state JWT".to_string())
-    })?;
+    let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key)?;
 
     Ok((auth_url, state_jwt))
 }
 
 pub async fn complete_google_callback(
     context: &common::ArcContext,
-    headers: &axum::http::HeaderMap,
     code: &str,
     state: &str,
     oauth_state_cookie: &str,
@@ -189,38 +206,21 @@ pub async fn complete_google_callback(
     validation.leeway = 5;
 
     let token_data =
-        jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation).map_err(
-            |error| {
-                if matches!(error.kind(), jsonwebtoken::errors::ErrorKind::ExpiredSignature) {
-                    logger::log_signture_expired(headers);
-                    Error::SessionExpired
-                } else {
-                    logger::log_internal_error(&error, "decode_oauth_state");
-                    Error::CsrfValidationFailed
-                }
-            },
-        )?;
+        jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation)?;
 
     let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
     if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
         logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
-        return Err(Error::CsrfValidationFailed);
+        return Err(Error::CsrfMismatch);
     }
 
     let client = create_google_client(&context.settings.oauth)?;
-    let oauth_client = oauth2::reqwest::ClientBuilder::new().build().map_err(|error| {
-        logger::log_internal_error(&error, "create_oauth_client");
-        Error::InternalFault(format!("Failed to create HTTP client for OAuth: {error}"))
-    })?;
+    let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
 
     let token_result = client
         .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
         .request_async(&oauth_client)
-        .await
-        .map_err(|error| {
-            logger::log_internal_error(&error, "oauth_exchange_code");
-            Error::OAuth2RequestFailed(error)
-        })?;
+        .await?;
 
     let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
     let response = context

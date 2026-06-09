@@ -33,7 +33,7 @@ fn generate_expired_token(
         jti: Uuid::new_v4().to_string(),
         token_type,
     };
-    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key).map_err(jwt::Error::EncodingFailed)?;
+    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key)?;
     Ok(token)
 }
 

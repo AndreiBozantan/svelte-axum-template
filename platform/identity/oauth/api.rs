@@ -38,13 +38,14 @@ impl From<super::Error> for api::Error {
         tracing::error!("oauth error: {error}");
         match error {
             super::Error::UnverifiedEmail | super::Error::InvalidUserInfo => Self::invalid_credentials(),
-            super::Error::CsrfValidationFailed => Self::sso_failed(),
+            super::Error::CsrfValidationFailed(_) => Self::sso_failed(),
+            super::Error::CsrfMismatch => Self::sso_failed(),
             super::Error::SessionExpired => Self::sso_failed(),
             super::Error::OAuth2RequestFailed(_) => Self::sso_failed(),
             super::Error::InvalidConfig(_) => Self::sso_failed(),
             super::Error::InvalidRedirectUrl => Self::sso_failed(),
             super::Error::UserInfoRetrievalFailed(_) => Self::internal(),
-            super::Error::InternalFault(_) => Self::internal()
+            super::Error::InternalFault(_) => Self::internal(),
         }
     }
 }
@@ -69,7 +70,7 @@ where
     let cookie = format!(
         "oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}"
     );
-    let cookie_val = axum::http::HeaderValue::from_str(&cookie).map_err(|_| api::Error::internal())?;
+    let cookie_val = axum::http::HeaderValue::from_str(&cookie)?;
     response
         .headers_mut()
         .insert(axum::http::header::SET_COOKIE, cookie_val);
@@ -91,8 +92,7 @@ where
             api::Error::sso_failed()
         })?;
 
-    let (user_info, redirect_url) =
-        super::complete_google_callback(&ctx, &headers, &params.code, &params.state, oauth_state_cookie).await?;
+    let (user_info, redirect_url) = super::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");

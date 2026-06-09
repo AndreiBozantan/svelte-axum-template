@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use config::ConfigError;
 use config::Environment;
 use config::File;
 use serde::Deserialize;
@@ -124,16 +123,32 @@ impl Default for ServerSettings {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Failed to get config directory path: {0}")]
+    GetConfigDirFailed(#[source] std::io::Error),
+
+    #[error("Failed to build or parse configuration: {0}")]
+    ConfigParsingFailed(#[from] ::config::ConfigError),
+
+    #[error("Failed to serialize defaults: {0}")]
+    SerializeDefaultsFailed(#[source] toml::ser::Error),
+
+    #[error("Failed to serialize configuration: {0}")]
+    SerializeConfigFailed(#[source] toml::ser::Error),
+
+    #[error("Failed to write configuration file: {0}")]
+    WriteConfigFileFailed(#[source] std::io::Error),
+}
+
 impl AppSettings {
-    pub fn new() -> Result<Self, ConfigError> {
-        let config_dir = Self::get_config_dir()
-            .map_err(|e| ConfigError::Message(format!("Failed to get the config dir path: {e}")))?;
+    pub fn new() -> Result<Self, Error> {
+        let config_dir = Self::get_config_dir().map_err(Error::GetConfigDirFailed)?;
         let mut builder = ::config::Config::builder();
 
         // layer 0: set defaults from AppSettings::default()
         let default_settings = Self::default();
-        let default_toml = toml::to_string(&default_settings)
-            .map_err(|e| ConfigError::Message(format!("Failed to serialize defaults: {e}")))?;
+        let default_toml = toml::to_string(&default_settings).map_err(Error::SerializeDefaultsFailed)?;
         builder = builder.add_source(File::from_str(&default_toml, ::config::FileFormat::Toml));
 
         // layer 1: add common configuration from files
@@ -172,10 +187,8 @@ impl AppSettings {
         // this allows users to easily modify the file without needing to copy it during deployment
         if app_run_env == crate::constants::env::PRODUCTION && !env_config_exists {
             println!("Creating default config file at {}", env_config_path.to_string_lossy());
-            let settings_str = toml::to_string(&settings)
-                .map_err(|e| ConfigError::Message(format!("Failed to serialize config: {e}")))?;
-            fs::write(&env_config_path, settings_str)
-                .map_err(|e| ConfigError::Message(format!("Failed to write config file: {e}")))?;
+            let settings_str = toml::to_string(&settings).map_err(Error::SerializeConfigFailed)?;
+            fs::write(&env_config_path, settings_str).map_err(Error::WriteConfigFileFailed)?;
         }
 
         Ok(settings)

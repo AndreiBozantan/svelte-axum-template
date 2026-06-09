@@ -56,7 +56,7 @@ async fn main() {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Configuration error: {0}")]
-    ConfigLoadingFailed(#[from] ::config::ConfigError),
+    ConfigLoadingFailed(#[from] config::Error),
 
     #[error("Database error: {0}")]
     DatabaseOperationFailed(#[from] sqlx::Error),
@@ -200,12 +200,7 @@ async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
         "index.html" => create_index_response_builder(&asset),
         _ => create_asset_response_builder(&asset, path_str),
     };
-    let body = builder
-        .body(Body::from(asset.data.to_vec()))
-        .map_err(|error| {
-            tracing::error!("Failed to build response: {error}");
-            api::Error::internal()
-        })?;
+    let body = builder.body(Body::from(asset.data.to_vec()))?;
     Ok(body.into_response())
 }
 

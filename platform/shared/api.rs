@@ -155,6 +155,20 @@ impl From<db::Error> for Error {
     }
 }
 
+impl From<axum::http::Error> for Error {
+    fn from(error: axum::http::Error) -> Self {
+        tracing::error!("HTTP error: {error}");
+        Self::internal()
+    }
+}
+
+impl From<axum::http::header::InvalidHeaderValue> for Error {
+    fn from(error: axum::http::header::InvalidHeaderValue) -> Self {
+        tracing::error!("Invalid header value: {error}");
+        Self::internal()
+    }
+}
+
 #[derive(Deserialize)]
 pub struct Pagination {
     #[serde(default = "default_pagination_limit")]

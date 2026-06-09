@@ -1,16 +1,6 @@
 use sha2::Digest;
 use sha2::Sha256;
 
-pub fn log_internal_error<E: std::fmt::Display>(error: E, context: &str) {
-    tracing::error!(
-        event_type = "auth",
-        error_type = std::any::type_name::<E>(),
-        error_message = %error,
-        context,
-        message = "Internal error occurred"
-    );
-}
-
 pub fn log_invalid_config(field_name: &str, value: &str) {
     tracing::error!(
         event_type = "auth",
@@ -132,15 +122,6 @@ pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &st
         user_id,
         subject,
         jti,
-    );
-}
-
-pub fn log_signture_expired(headers: &axum::http::HeaderMap) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "OAuth state token expired"
     );
 }
 

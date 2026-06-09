@@ -132,8 +132,7 @@ where
 
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
-        .body(Body::empty())
-        .map_err(|_| api::Error::internal())?;
+        .body(Body::empty())?;
     Ok(tokens::utils::add_auth_cookies(&context, response, None, None)?)
 }
 
