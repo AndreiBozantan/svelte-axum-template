@@ -5,56 +5,90 @@
 // #![warn(clippy::cargo)]
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
-#[path = "auth/auth.rs"]
-pub mod auth;
+pub(crate) mod internal {
+    pub mod logger;
+}
 
-#[path = "auth/jwt.rs"]
-pub mod jwt;
-
-#[path = "auth/password.rs"]
-pub mod password;
-
-#[path = "auth/sso.rs"]
-pub mod sso;
-
-#[path = "auth/tokens.rs"]
-pub mod tokens;
-
-#[path = "misc/assets.rs"]
-pub mod assets;
-
-#[path = "misc/common.rs"]
-pub mod common;
-
-#[path = "misc/config.rs"]
-pub mod config;
-
-#[path = "misc/constants.rs"]
-pub mod constants;
-
-#[path = "misc/db.rs"]
-pub mod db;
-
-#[path = "misc/logger.rs"]
-pub mod logger;
-
-#[path = "misc/migrations.rs"]
-pub mod migrations;
-
-#[path = "misc/utils.rs"]
-pub mod utils;
-
-// identity domain implementation
-pub mod identity {
-    pub mod handlers;
-
-    pub mod models;
-
-    pub mod routes;
-
-    pub mod queries;
+pub mod shared {
+    pub mod api;
+    pub mod auth;
+    pub mod cli;
+    pub mod common;
+    pub mod db;
+    pub mod config;
+    pub mod constants;
+    pub mod jwt;
+    pub mod migrations;
 
     #[cfg(test)]
-    pub mod tests;
+    mod tests;
+}
+
+pub use shared::*;
+
+pub mod identity {
+    pub(crate) mod auth {
+        #[path ="auth_api.rs"]
+        pub mod api;
+
+        #[path ="auth_service.rs"]
+        mod service;
+
+        pub use service::*;
+
+        #[cfg(test)]
+        #[path ="auth_tests.rs"]
+        mod tests;
+    }
+
+    pub(crate) mod oauth {
+        #[path ="oauth_api.rs"]
+        pub mod api;
+
+        #[path ="oauth_service.rs"]
+        mod service;
+
+        pub use service::*;
+    }
+
+    pub(crate) mod users {
+        #[path ="users_api.rs"]
+        pub mod api;
+
+        #[path ="users_db.rs"]
+        pub mod db;
+
+        #[path ="users_service.rs"]
+        mod service;
+
+        pub use service::*;
+    }
+
+    pub(crate) mod tokens {
+        #[path ="tokens_db.rs"]
+        pub mod db;
+
+        #[path ="tokens_service.rs"]
+        mod service;
+        
+        #[path ="tokens_utils.rs"]
+        pub mod utils;
+
+        pub use service::*;
+    }
+
+    #[cfg(test)]
+    mod tests;
+
+    pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
+        let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
+
+        axum::Router::new()
+            .merge(auth::api::router(ctx.clone(), auth_service.clone()))
+            .merge(oauth::api::router(ctx.clone(), auth_service))
+            .merge(users::api::router(ctx, users::db::Repository))
+    }
 }

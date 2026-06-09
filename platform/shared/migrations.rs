@@ -4,24 +4,22 @@ use std::io::Write;
 use std::path::Path;
 
 use chrono;
-use sqlx::Error as SqlxError;
-use sqlx::migrate::MigrateError as SqlxMigrateError;
 use thiserror::Error;
 
-use crate::common::ArcContext;
+use crate::common;
 use crate::db;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
-pub enum MigrationError {
+pub enum Error {
     #[error("Failed to run embedded migrations")]
-    EmbeddedMigrationFailed { source: SqlxMigrateError },
+    EmbeddedMigrationFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to create migrator")]
-    MigratorCreationFailed { source: SqlxMigrateError },
+    MigratorCreationFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to run migrations")]
-    MigrationRunFailed { source: SqlxMigrateError },
+    MigrationRunFailed { source: sqlx::migrate::MigrateError },
 
     #[error("Failed to create timestamp")]
     TimestampConversionFailed,
@@ -30,7 +28,7 @@ pub enum MigrationError {
     NoMigrationsApplied,
 
     #[error("Failed to fetch applied migrations")]
-    FetchAppliedMigrationsFailed { #[from] source: SqlxError },
+    FetchAppliedMigrationsFailed { #[from] source: sqlx::Error },
 
     #[error("File system error")]
     FileSystemOperationFailed { #[from] source: std::io::Error },
@@ -46,12 +44,12 @@ pub fn list_migrations() -> Vec<String> {
 }
 
 /// Runs the embedded migrations
-pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
+pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
     // run core structural migrations safely on ALL environments
     sqlx::migrate!("../migrations")
         .run(&ctx.db)
         .await
-        .map_err(|e| MigrationError::EmbeddedMigrationFailed { source: e })?;
+        .map_err(|e| Error::EmbeddedMigrationFailed { source: e })?;
     tracing::info!("Database migrations completed successfully.");
 
     // conditionally run seed data ONLY in local/dev/test environments
@@ -75,20 +73,20 @@ pub async fn run_migrations(ctx: &ArcContext) -> Result<(), MigrationError> {
 }
 
 /// Check if migrations need to be applied
-pub async fn check_pending_migrations(db: &db::SqlContext) -> Result<bool, MigrationError> {
+pub async fn check_pending_migrations(db: &db::Context) -> Result<bool, Error> {
     let available_migrations = list_migrations();
     let applied_migrations = sqlx::query!("SELECT version FROM _sqlx_migrations ORDER BY version")
         .fetch_all(db)
         .await
         .map_err(|err| match &err {
-            sqlx::Error::Database(e) if e.message().contains("no such table") => MigrationError::NoMigrationsApplied,
-            _ => MigrationError::FetchAppliedMigrationsFailed { source: err },
+            sqlx::Error::Database(e) if e.message().contains("no such table") => Error::NoMigrationsApplied,
+            _ => Error::FetchAppliedMigrationsFailed { source: err },
         })?;
     Ok(available_migrations.len() > applied_migrations.len())
 }
 
 /// Create a new migration file with a versioned name and template content.
-pub fn create_migration(name: &str) -> Result<String, MigrationError> {
+pub fn create_migration(name: &str) -> Result<String, Error> {
     // Create migrations directory if it doesn't exist
     let migrations_path = Path::new("migrations");
     if !migrations_path.exists() {

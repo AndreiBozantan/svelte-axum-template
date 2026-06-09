@@ -1,16 +1,6 @@
 use sha2::Digest;
 use sha2::Sha256;
 
-pub fn log_internal_error<E: std::fmt::Display>(error: E, context: &str) {
-    tracing::error!(
-        event_type = "auth",
-        error_type = std::any::type_name::<E>(),
-        error_message = %error,
-        context,
-        message = "Internal error occurred"
-    );
-}
-
 pub fn log_invalid_config(field_name: &str, value: &str) {
     tracing::error!(
         event_type = "auth",
@@ -37,15 +27,6 @@ pub fn log_invalid_user_info(field_name: &str, value: &str, provider: &str) {
         value,
         provider,
         message = "Invalid user info from provider",
-    );
-}
-
-pub fn log_redirect_violation(violation: &str, url: &str) {
-    tracing::warn!(
-        event_type = "auth",
-        violation,
-        url,
-        message = "Redirect URL validation failed"
     );
 }
 
@@ -78,7 +59,7 @@ pub fn log_auth_rejection<E: std::fmt::Display>(error: E) -> E {
     error
 }
 
-pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: &Option<String>, provider: &str) {
+pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: Option<&String>, provider: &str) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -112,16 +93,6 @@ pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str
     );
 }
 
-pub fn log_oauth_rate_limit_exceeded(headers: &axum::http::HeaderMap, endpoint: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "OAuth rate limit exceeded",
-        endpoint,
-    );
-}
-
 pub fn log_user_login_attempt(headers: &axum::http::HeaderMap, email: &str) {
     tracing::info!(
         event_type = "auth",
@@ -142,37 +113,6 @@ pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
     );
 }
 
-pub fn log_missing_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Attempt login without password",
-        email,
-    );
-}
-
-pub fn log_invalid_password(headers: &axum::http::HeaderMap, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Invalid password attempt",
-        email,
-    );
-}
-
-pub fn log_user_logout(headers: &axum::http::HeaderMap, user_id: &str, email: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "User logout",
-        user_id,
-        email,
-    );
-}
-
 pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &str, subject: &str) {
     tracing::info!(
         event_type = "auth",
@@ -182,26 +122,6 @@ pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &st
         user_id,
         subject,
         jti,
-    );
-}
-
-pub fn log_token_revoke(headers: &axum::http::HeaderMap, jti: &str, subject: &str) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "Token revoked",
-        subject,
-        jti,
-    );
-}
-
-pub fn log_signture_expired(headers: &axum::http::HeaderMap) {
-    tracing::info!(
-        event_type = "auth",
-        client_ip = extract_client_ip(headers),
-        user_agent = extract_user_agent(headers),
-        message = "OAuth state token expired"
     );
 }
 
@@ -227,7 +147,7 @@ pub fn log_cookie_error(headers: &axum::http::HeaderMap, reason: &str) {
 }
 
 fn extract_client_ip(headers: &axum::http::HeaderMap) -> String {
-    // Check common proxy headers first
+    // check common proxy headers first
     if let Some(forwarded_for) = headers.get("x-forwarded-for")
         && let Ok(value) = forwarded_for.to_str()
         && let Some(ip) = value.split(',').next()
@@ -241,7 +161,7 @@ fn extract_client_ip(headers: &axum::http::HeaderMap) -> String {
         return value.to_string();
     }
 
-    // Fallback to connection info (set by router)
+    // fallback to connection info (set by router)
     "unknown".to_string()
 }
 

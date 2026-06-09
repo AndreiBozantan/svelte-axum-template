@@ -24,7 +24,7 @@
 
     "dev:init": "npm install && npm run build:frontend && npm run db:init && npm run dev:init:admin",
     "dev:init:admin": "cargo run -- create-admin --email a@b.cc",
-    "dev:backend": "cargo watch --ignore data/db.sqlite --watch backend/src --exec run",
+    "dev:backend": "cargo watch --ignore data/db.sqlite --watch app platform --exec run",
     "dev:frontend": "wait-on http://localhost:3000 && cd frontend && npm run dev",
     "dev:open": "wait-on http://localhost:5173 http://localhost:3000 && node -e \"import('open').then(m => m.default('http://localhost:5173'))\"",
     "dev": "concurrently npm:dev:frontend npm:dev:backend npm:dev:open --kill-others-on-fail --names fr,bk,op --prefix-colors magenta,blue,green",

@@ -4,36 +4,34 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
-use platform::common::ArcContext;
-use platform::migrations;
-use platform::password;
+use crate::common;
+use crate::auth;
+use crate::identity::users;
+use crate::migrations;
 
-use platform::identity::queries;
-
-// TODO: add support for secret rotation (should mark all tokens as invalid)
-// TODO: add support for expired tokens cleanup
-
-#[rustfmt::skip]
 #[derive(Debug, thiserror::Error)]
-pub enum CliError {
+pub enum Error {
     #[error("Migration creation failed")]
-    MigrationCreateFailed { source: migrations::MigrationError },
+    MigrationCreationFailed { source: migrations::Error },
 
-    // For the Status command, only actual errors from check_pending should be wrapped.
-    // NoMigrationsApplied is handled as informational output.
     #[error("Checking migration status failed")]
-    MigrationStatusCheckFailed { source: migrations::MigrationError },
+    MigrationStatusCheckFailed { source: migrations::Error },
 
     #[error("Running migrations failed")]
-    MigrationRunFailed { source: migrations::MigrationError },
+    MigrationRunFailed { source: migrations::Error },
 
     #[error("Password hashing failed")]
-    PasswordHashFailed { #[from] source: argon2::password_hash::Error },
+    PasswordHashFailed {
+        #[from]
+        source: argon2::password_hash::Error,
+    },
 
     #[error("Failed to read password input")]
-    PasswordReadFailed { #[from] source: std::io::Error },
+    PasswordReadFailed {
+        #[from]
+        source: std::io::Error,
+    },
 
-    // The Other(String) variant is kept as a fallback, though ideally all errors should be specific.
     #[error("An unexpected CLI error occurred: {0}")]
     Other(String),
 }
@@ -48,15 +46,11 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
-    /// run database migrations
     Migrate {
         #[command(subcommand)]
         action: MigrateAction,
     },
-
-    /// create an admin user
     CreateAdmin {
-        /// email for the admin user
         #[arg(short, long)]
         email: String,
     },
@@ -64,21 +58,14 @@ enum CliCommand {
 
 #[derive(Subcommand)]
 enum MigrateAction {
-    /// create a new migration file
     Create { name: String },
-
-    /// list all available migrations
     List,
-
-    /// check if there are pending migrations
     Status,
-
-    /// run all pending migrations
     Run,
 }
 
 #[allow(clippy::unit_arg)]
-pub async fn run_cli(ctx: &ArcContext) -> Result<bool, CliError> {
+pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, Error> {
     let cli = Cli::parse();
     match cli.command {
         None => {
@@ -96,7 +83,7 @@ pub async fn run_cli(ctx: &ArcContext) -> Result<bool, CliError> {
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, ctx: &ArcContext) -> Result<(), CliError> {
+async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), Error> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -105,14 +92,14 @@ async fn exec_migrate_command(action: MigrateAction, ctx: &ArcContext) -> Result
     }
 }
 
-fn migrate_action_create(name: &str) -> Result<(), CliError> {
-    let file_name = migrations::create_migration(name).map_err(|e| CliError::MigrationCreateFailed { source: e })?;
+fn migrate_action_create(name: &str) -> Result<(), Error> {
+    let file_name = migrations::create_migration(name).map_err(|e| Error::MigrationCreationFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn migrate_action_list() -> Result<(), CliError> {
+fn migrate_action_list() -> Result<(), Error> {
     let migrations = migrations::list_migrations();
     if migrations.is_empty() {
         println!("No migrations found.");
@@ -125,40 +112,48 @@ fn migrate_action_list() -> Result<(), CliError> {
     Ok(())
 }
 
-async fn migrate_action_status(ctx: &ArcContext) -> Result<(), CliError> {
+async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), Error> {
     match migrations::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
-        Err(migrations::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
-        Err(e) => return Err(CliError::MigrationStatusCheckFailed { source: e }),
+        Err(migrations::Error::NoMigrationsApplied) => println!("No migrations have been applied yet."),
+        Err(e) => return Err(Error::MigrationStatusCheckFailed { source: e }),
     }
     Ok(())
 }
 
-async fn migrate_action_run(ctx: &ArcContext) -> Result<(), CliError> {
+async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), Error> {
     migrations::run_migrations(ctx)
         .await
-        .map_err(|e| CliError::MigrationRunFailed { source: e })?;
+        .map_err(|e| Error::MigrationRunFailed { source: e })?;
     println!("Migrations applied successfully.");
     Ok(())
 }
 
-async fn create_admin(email: String, ctx: &ArcContext) -> Result<(), CliError> {
-    // prompt for password securely
+async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Error> {
+    use crate::identity::users::TRepository;
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 
     let password = rpassword::read_password()?;
-    password
-        .trim()
-        .is_empty()
-        .then(|| CliError::Other("Password cannot be empty".to_string()))
-        .map_or(Ok(()), Err)?;
+    if password.trim().is_empty() {
+        return Err(Error::Other("Password cannot be empty".to_string()));
+    }
 
-    let password_hash = password::hash_password(&password)?;
-    queries::update_user_email_and_password(&ctx.db, 0, &email, &password_hash)
+    let password_hash = auth::hash_password(password.trim())?;
+    let parsed_email = common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address".to_string()))?;
+
+    users::db::Repository
+        .update_admin_credentials(
+            &ctx.db,
+            users::UpdateAdminCredentialsCommand {
+                user_id: common::UserId(0),
+                email: parsed_email,
+                password_hash,
+            },
+        )
         .await
-        .map_err(|e| CliError::Other(e.to_string()))?;
+        .map_err(|e| Error::Other(e.to_string()))?;
 
     println!("Admin user updated successfully.");
     Ok(())

@@ -3,11 +3,11 @@ resolver = "3"
 
 members = [
     "platform",
-    "api",
+    "app",
 ]
 
 [workspace.dependencies]
-api = { path = "api" }
+app = { path = "app" }
 platform = { path = "platform" }
 
 argon2 = { version = "0.5", features = ["std"] }
