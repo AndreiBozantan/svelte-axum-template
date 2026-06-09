@@ -28,7 +28,7 @@ pub enum Error {
     RngOperationFailed { #[from] source: rand::rngs::SysError },
 
     #[error("Token has expired")]
-    TokenExpired,
+    ExpiredToken,
 
     #[error("Invalid token")]
     InvalidToken,
@@ -39,7 +39,7 @@ pub enum Error {
 impl From<jwt::errors::Error> for Error {
     fn from(e: jwt::errors::Error) -> Self {
         match e.kind() {
-            jwt::errors::ErrorKind::ExpiredSignature => Self::TokenExpired,
+            jwt::errors::ErrorKind::ExpiredSignature => Self::ExpiredToken,
             jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
             jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
             _ => Self::DecodingFailed(e),

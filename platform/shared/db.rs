@@ -10,13 +10,13 @@ pub enum Error {
     RowNotFound,
 
     #[error("unique constraint violation: {0}")]
-    UniqueViolation(String),
+    UniqueConstraintViolation(String),
 
     #[error("foreign key violation: {0}")]
     ForeignKeyViolation(String),
 
     #[error("check constraint violation: {0}")]
-    CheckViolation(String),
+    CheckConstraintViolation(String),
 
     #[error("database error: {0}")]
     DatabaseOperationFailed(sqlx::Error),
@@ -44,13 +44,13 @@ impl From<sqlx::Error> for Error {
         if let sqlx::Error::Database(db_err) = &error {
             let message = db_err.message().to_string();
             if db_err.is_unique_violation() {
-                return Self::UniqueViolation(message);
+                return Self::UniqueConstraintViolation(message);
             }
             if db_err.is_foreign_key_violation() {
                 return Self::ForeignKeyViolation(message);
             }
             if is_check_violation(db_err.as_ref()) {
-                return Self::CheckViolation(message);
+                return Self::CheckConstraintViolation(message);
             }
         }
         match error {

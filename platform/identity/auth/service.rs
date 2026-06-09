@@ -199,13 +199,13 @@ fn generate_access_token(ctx: &common::ArcContext, user: &users::User) -> Result
 }
 
 #[allow(clippy::match_same_arms)]
-impl From<users::UserError> for auth::Error {
-    fn from(error: users::UserError) -> Self {
+impl From<users::Error> for auth::Error {
+    fn from(error: users::Error) -> Self {
         match error {
-            users::UserError::NotFound => Self::InvalidCredentials,
-            users::UserError::InvalidEmail(_) => Self::InvalidCredentials,
-            users::UserError::Database(e) => Self::DatabaseOperationFailed(e),
-            users::UserError::AlreadyExists => Self::Internal("auth UserError::AlreadyExists".into()),
+            users::Error::NotFound => Self::InvalidCredentials,
+            users::Error::InvalidEmail(_) => Self::InvalidCredentials,
+            users::Error::DatabaseOperationFailed(e) => Self::DatabaseOperationFailed(e),
+            users::Error::AlreadyExists => Self::Internal("auth UserError::AlreadyExists".into()),
         }
     }
 }

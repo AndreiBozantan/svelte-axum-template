@@ -75,7 +75,7 @@ pub struct UserList {
 }
 
 #[derive(Debug, Error)]
-pub enum UserError {
+pub enum Error {
     #[error("invalid email address")]
     InvalidEmail(#[from] common::DataValidationError),
 
@@ -86,15 +86,15 @@ pub enum UserError {
     AlreadyExists,
 
     #[error("database error: {0}")]
-    Database(db::Error),
+    DatabaseOperationFailed(db::Error),
 }
 
-impl From<db::Error> for UserError {
+impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
         match error {
             db::Error::RowNotFound => Self::NotFound,
-            db::Error::UniqueViolation(_) => Self::AlreadyExists,
-            other => Self::Database(other),
+            db::Error::UniqueConstraintViolation(_) => Self::AlreadyExists,
+            other => Self::DatabaseOperationFailed(other),
         }
     }
 }

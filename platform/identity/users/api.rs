@@ -59,16 +59,16 @@ pub struct UserInfoResponse {
     pub user: UserResponse,
 }
 
-impl From<super::UserError> for api::Error {
-    fn from(error: super::UserError) -> Self {
+impl From<super::Error> for api::Error {
+    fn from(error: super::Error) -> Self {
         match error {
-            super::UserError::NotFound => Self::not_found(),
-            super::UserError::AlreadyExists => Self::user_already_exists(),
-            super::UserError::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
+            super::Error::NotFound => Self::not_found(),
+            super::Error::AlreadyExists => Self::user_already_exists(),
+            super::Error::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
                 "field": "email",
                 "message": "invalid email address"
             })),
-            super::UserError::Database(repo_error) => {
+            super::Error::DatabaseOperationFailed(repo_error) => {
                 tracing::error!("user database error: {repo_error}");
                 Self::internal()
             }

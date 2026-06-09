@@ -11,6 +11,30 @@ use crate::identity::oauth;
 use crate::identity::tokens;
 use crate::jwt;
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("invalid credentials")]
+    InvalidCredentials,
+
+    #[error("token expired or invalid")]
+    InvalidToken,
+
+    #[error("password hashing failed: {0}")]
+    PasswordHashingFailed(#[from] argon2::password_hash::Error),
+
+    #[error("jwt operation failed: {0}")]
+    JwtOperationFailed(#[from] jwt::Error),
+
+    #[error("token operation failed: {0}")]
+    TokenOperationFailed(#[from] tokens::utils::Error),
+
+    #[error("database error: {0}")]
+    DatabaseOperationFailed(#[from] db::Error),
+
+    #[error("internal error: {0}")]
+    Internal(String),
+}
+
 pub fn check_oauth_config(config: &crate::config::OAuthSettings) {
     if let Err(error) = oauth::validate_google_config(config) {
         tracing::warn!("Google OAuth config is incomplete. {error}");
@@ -48,30 +72,6 @@ where
 
 use crate::db;
 use argon2::password_hash as ar2;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("invalid credentials")]
-    InvalidCredentials,
-
-    #[error("token expired or invalid")]
-    InvalidToken,
-
-    #[error("password hashing failed: {0}")]
-    PasswordHashingFailed(#[from] argon2::password_hash::Error),
-
-    #[error("jwt operation failed: {0}")]
-    JwtOperationFailed(#[from] jwt::Error),
-
-    #[error("token operation failed: {0}")]
-    TokenOperationFailed(#[from] tokens::utils::TokenError),
-
-    #[error("database error: {0}")]
-    DatabaseOperationFailed(#[from] db::Error),
-
-    #[error("internal error: {0}")]
-    Internal(String),
-}
 
 /// Hash a password using Argon2
 pub fn hash_password(password: &str) -> Result<String, ar2::Error> {

@@ -5,7 +5,6 @@
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 
-use std::error::Error;
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -23,7 +22,6 @@ use rust_embed::RustEmbed;
 use serde::Serialize;
 use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::sqlite::SqlitePoolOptions;
-use thiserror::Error;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -42,6 +40,7 @@ async fn main() {
         dotenvy::dotenv().ok();
     }
     if let Err(error) = run_app().await {
+        use std::error::Error;
         eprintln!("❌ {error}\n");
         let mut source = error.source();
         while let Some(err) = source {
@@ -54,8 +53,8 @@ async fn main() {
     }
 }
 
-#[derive(Debug, Error)]
-pub enum AppError {
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
     #[error("Configuration error: {0}")]
     ConfigLoadingFailed(#[from] ::config::ConfigError),
 
@@ -66,7 +65,7 @@ pub enum AppError {
     JwtOperationFailed(#[from] jwt::Error),
 
     #[error("Migration error: {0}")]
-    MigrationFailed(#[from] migrations::MigrationError),
+    MigrationFailed(#[from] migrations::Error),
 
     #[error("CLI error: {0}")]
     CliOperationFailed(#[from] platform::cli::Error),
@@ -81,7 +80,7 @@ pub enum AppError {
     HttpClientCreationFailed(#[from] reqwest::Error),
 }
 
-async fn run_app() -> Result<(), AppError> {
+async fn run_app() -> Result<(), Error> {
     let settings = config::AppSettings::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
@@ -108,7 +107,7 @@ async fn run_app() -> Result<(), AppError> {
     Ok(())
 }
 
-async fn start_server(ctx: common::ArcContext) -> Result<(), AppError> {
+async fn start_server(ctx: common::ArcContext) -> Result<(), Error> {
     let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
     let router = create_router(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
     let listener = tokio::net::TcpListener::bind(addr).await?;
@@ -188,44 +187,26 @@ async fn create_db_context(db_config: &config::DatabaseSettings) -> Result<db::C
     Ok(pool)
 }
 
-#[derive(Debug, Error)]
-enum AssetError {
-    #[error("Failed to build response: {0}")]
-    ResponseBuildError(#[from] http::Error),
-
-    #[error("Asset not found: {0}")]
-    NotFound(String),
-}
-
-impl IntoResponse for AssetError {
-    fn into_response(self) -> Response {
-        tracing::error!("{self}");
-        let status = match self {
-            Self::ResponseBuildError(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
-            Self::NotFound(_) => http::StatusCode::NOT_FOUND,
-        };
-        let body = match self {
-            Self::ResponseBuildError(_) => "Internal server error".to_string(),
-            Self::NotFound(path) => format!("Asset not found: {path}"),
-        };
-        (status, body).into_response()
-    }
-}
-
 #[allow(clippy::unused_async)]
-async fn static_handler(uri: Uri) -> Result<impl IntoResponse, AssetError> {
+async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
     let asset = Assets::get(path_str);
     let path_str = if asset.is_none() { "index.html" } else { path_str };
     let asset = asset
         .or_else(|| Assets::get(path_str))
-        .ok_or_else(|| AssetError::NotFound(path_str.to_string()))?;
+        .ok_or_else(api::Error::not_found)?;
     let builder = match path_str {
         "index.html" => create_index_response_builder(&asset),
         _ => create_asset_response_builder(&asset, path_str),
     };
-    Ok(builder.body(Body::from(asset.data.to_vec()))?.into_response())
+    let body = builder
+        .body(Body::from(asset.data.to_vec()))
+        .map_err(|error| {
+            tracing::error!("Failed to build response: {error}");
+            api::Error::internal()
+        })?;
+    Ok(body.into_response())
 }
 
 type Builder = http::response::Builder;

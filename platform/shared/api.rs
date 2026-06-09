@@ -128,7 +128,7 @@ impl From<jwt::Error> for Error {
     fn from(error: jwt::Error) -> Self {
         tracing::error!("JWT error: {error}");
         match error {
-            jwt::Error::TokenExpired => Self::expired_token(),
+            jwt::Error::ExpiredToken => Self::expired_token(),
             jwt::Error::InvalidToken => Self::invalid_token(),
             _ => Self::internal(),
         }
@@ -143,9 +143,9 @@ impl From<db::Error> for Error {
         #[allow(clippy::match_same_arms)]
         match error {
             db::Error::RowNotFound => Self::not_found(),
-            db::Error::UniqueViolation(_) => Self::db_key_violation("unique_violation"),
+            db::Error::UniqueConstraintViolation(_) => Self::db_key_violation("unique_violation"),
             db::Error::ForeignKeyViolation(_) => Self::db_key_violation("foreign_key_violation"),
-            db::Error::CheckViolation(_) => Self::db_key_violation("check_violation"),
+            db::Error::CheckConstraintViolation(_) => Self::db_key_violation("check_violation"),
             db::Error::DatabaseOperationFailed(_) => Self::internal(),
             db::Error::RowConversionFailed(_) => Self::internal(),
         }

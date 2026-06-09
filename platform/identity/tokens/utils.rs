@@ -13,7 +13,7 @@ use crate::internal::logger;
 use crate::jwt;
 
 #[derive(Debug, Error)]
-pub enum TokenError {
+pub enum Error {
     #[error("Invalid header value: {0}")]
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 
@@ -21,14 +21,14 @@ pub enum TokenError {
     JwtOperationFailed(#[from] jwt::Error),
 
     #[error("Token expired or invalid")]
-    TokenInvalid,
+    InvalidToken,
 }
 
-impl From<TokenError> for api::Error {
-    fn from(error: TokenError) -> Self {
+impl From<Error> for api::Error {
+    fn from(error: Error) -> Self {
         logger::log_auth_rejection(&error);
         match error {
-            TokenError::JwtOperationFailed(jwt::Error::TokenExpired) => Self::expired_token(),
+            Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             _ => Self::invalid_token(),
         }
     }
@@ -45,24 +45,24 @@ pub fn decode_token_from_req(
     context: &common::ArcContext,
     req: &Request,
     token_type: jwt::TokenType,
-) -> Result<jwt::TokenClaims, TokenError> {
+) -> Result<jwt::TokenClaims, Error> {
     get_cookie_value_from_headers(req.headers(), "access_token")
         .map_or_else(|| extract_bearer_token(req), Ok) // fallback to Authorization: Bearer for API clients
-        .and_then(|token| jwt::decode_token(&context.jwt, token, token_type).map_err(TokenError::from))
+        .and_then(|token| jwt::decode_token(&context.jwt, token, token_type).map_err(Error::from))
 }
 
-fn extract_bearer_token(req: &Request<Body>) -> Result<&str, TokenError> {
+fn extract_bearer_token(req: &Request<Body>) -> Result<&str, Error> {
     req.headers()
         .get(http::header::AUTHORIZATION)
-        .ok_or(TokenError::TokenInvalid)?
+        .ok_or(Error::InvalidToken)?
         .to_str()
-        .map_err(|_| TokenError::TokenInvalid)?
+        .map_err(|_| Error::InvalidToken)?
         .strip_prefix("Bearer ")
-        .ok_or(TokenError::TokenInvalid)
+        .ok_or(Error::InvalidToken)
 }
 
-pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, TokenError> {
-    get_cookie_value_from_headers(req.headers(), "refresh_token").ok_or(TokenError::TokenInvalid)
+pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, Error> {
+    get_cookie_value_from_headers(req.headers(), "refresh_token").ok_or(Error::InvalidToken)
 }
 
 pub fn add_auth_cookies(
@@ -70,7 +70,7 @@ pub fn add_auth_cookies(
     response: Response<Body>,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
-) -> Result<Response<Body>, TokenError> {
+) -> Result<Response<Body>, Error> {
     let mut response = response;
     let headers = response.headers_mut();
 
@@ -95,7 +95,7 @@ pub fn create_response_with_auth_cookies(
     body: &impl Serialize,
     access_token: Option<&str>,
     refresh_token: Option<&str>,
-) -> Result<Response<Body>, TokenError> {
+) -> Result<Response<Body>, Error> {
     let response = axum::response::Json(body).into_response();
     add_auth_cookies(context, response, access_token, refresh_token)
 }

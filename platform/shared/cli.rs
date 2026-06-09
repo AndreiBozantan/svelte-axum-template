@@ -12,13 +12,13 @@ use crate::migrations;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Migration creation failed")]
-    MigrationCreateFailed { source: migrations::MigrationError },
+    MigrationCreationFailed { source: migrations::Error },
 
     #[error("Checking migration status failed")]
-    MigrationStatusCheckFailed { source: migrations::MigrationError },
+    MigrationStatusCheckFailed { source: migrations::Error },
 
     #[error("Running migrations failed")]
-    MigrationRunFailed { source: migrations::MigrationError },
+    MigrationRunFailed { source: migrations::Error },
 
     #[error("Password hashing failed")]
     PasswordHashFailed {
@@ -93,7 +93,7 @@ async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -
 }
 
 fn migrate_action_create(name: &str) -> Result<(), Error> {
-    let file_name = migrations::create_migration(name).map_err(|e| Error::MigrationCreateFailed { source: e })?;
+    let file_name = migrations::create_migration(name).map_err(|e| Error::MigrationCreationFailed { source: e })?;
     println!("Created new migration file: {file_name}");
     Ok(())
 }
@@ -116,7 +116,7 @@ async fn migrate_action_status(ctx: &common::ArcContext) -> Result<(), Error> {
     match migrations::check_pending_migrations(&ctx.db).await {
         Ok(true) => println!("There are pending migrations that need to be applied."),
         Ok(false) => println!("Database is up to date. No pending migrations."),
-        Err(migrations::MigrationError::NoMigrationsApplied) => println!("No migrations have been applied yet."),
+        Err(migrations::Error::NoMigrationsApplied) => println!("No migrations have been applied yet."),
         Err(e) => return Err(Error::MigrationStatusCheckFailed { source: e }),
     }
     Ok(())

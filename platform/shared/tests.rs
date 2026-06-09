@@ -113,7 +113,7 @@ fn token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Access);
-    assert!(matches!(result, Err(jwt::Error::TokenExpired)));
+    assert!(matches!(result, Err(jwt::Error::ExpiredToken)));
     Ok(())
 }
 
@@ -122,7 +122,7 @@ fn refresh_token_expiry() -> anyhow::Result<()> {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Refresh)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Refresh);
-    assert!(matches!(result, Err(jwt::Error::TokenExpired)));
+    assert!(matches!(result, Err(jwt::Error::ExpiredToken)));
     Ok(())
 }
 
