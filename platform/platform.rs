@@ -81,7 +81,9 @@ pub mod identity {
     }
 
     #[cfg(test)]
+        #[path ="tokens_tests.rs"]
     mod tests;
+    }
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
         let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);

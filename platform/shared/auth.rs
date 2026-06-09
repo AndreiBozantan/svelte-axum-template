@@ -64,7 +64,7 @@ pub async fn middleware(
     mut req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Result<Response, api::Error> {
-    let claims = tokens::utils::decode_token_from_req(&context, &req, jwt::TokenType::Access)?;
+    let claims = tokens::utils::decode_token_from_req(&context.jwt, &req, jwt::TokenType::Access)?;
 
     tracing::debug!(
         user_id = claims.sub,

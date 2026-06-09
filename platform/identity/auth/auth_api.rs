@@ -97,7 +97,7 @@ where
         user: session.user.into(),
     };
     Ok(tokens::utils::create_response_with_auth_cookies(
-        &context,
+        &context.settings.jwt,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),
@@ -119,7 +119,7 @@ where
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())?;
-    Ok(tokens::utils::add_auth_cookies(&context, response, None, None)?)
+    Ok(tokens::utils::add_auth_cookies(&context.settings.jwt, response, None, None)?)
 }
 
 async fn refresh<UR, TR>(
@@ -145,7 +145,7 @@ where
         user: session.user.into(),
     };
     Ok(tokens::utils::create_response_with_auth_cookies(
-        &context,
+        &context.settings.jwt,
         &body,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),

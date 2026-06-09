@@ -113,7 +113,7 @@ where
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = tokens::utils::add_auth_cookies(
-        &ctx,
+        &ctx.settings.jwt,
         response,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),
