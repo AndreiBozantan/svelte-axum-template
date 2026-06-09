@@ -10,7 +10,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::api;
-use crate::auth;
 use crate::common;
 use crate::identity::tokens;
 use crate::identity::users;
@@ -69,20 +68,6 @@ impl From<users::User> for UserResponse {
             id: user.id.0,
             email: user.email.as_str().to_string(),
             tenant_id: user.tenant_id.0,
-        }
-    }
-}
-
-impl From<auth::Error> for api::Error {
-    fn from(error: auth::Error) -> Self {
-        // TODO: use structured logging here
-        tracing::error!("auth error: {error}");
-        match error {
-            auth::Error::InvalidCredentials => Self::invalid_credentials(),
-            auth::Error::InvalidToken => Self::invalid_token(),
-            auth::Error::TokenOperationFailed(token_error) => token_error.into(),
-            auth::Error::JwtOperationFailed(jwt_error) => jwt_error.into(),
-            _ => Self::internal(),
         }
     }
 }

@@ -33,6 +33,20 @@ pub enum Error {
     InternalFault(String),
 }
 
+impl From<Error> for api::Error {
+    fn from(error: Error) -> Self {
+        // TODO: use structured logging here
+        tracing::error!("auth error: {error}");
+        match error {
+            Error::InvalidCredentials => Self::invalid_credentials(),
+            Error::InvalidToken => Self::invalid_token(),
+            Error::TokenOperationFailed(token_error) => token_error.into(),
+            Error::JwtOperationFailed(jwt_error) => jwt_error.into(),
+            _ => Self::internal(),
+        }
+    }
+}
+
 impl From<shared::db::Error> for Error {
     fn from(error: shared::db::Error) -> Self {
         Self::InternalFault(format!("database operation failed {error}"))
