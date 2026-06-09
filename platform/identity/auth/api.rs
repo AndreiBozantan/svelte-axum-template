@@ -98,7 +98,7 @@ where
 {
     logger::log_user_login_attempt(&headers, &request.email);
 
-    let email = common::Email::parse(&request.email)?;
+    let email = common::Email::parse(&request.email).ok_or_else(api::Error::invalid_credentials)?;
     let cmd = super::LoginCommand {
         email: email.clone(),
         password: request.password,

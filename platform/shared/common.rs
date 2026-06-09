@@ -1,5 +1,3 @@
-use thiserror::Error;
-
 use crate::config;
 use crate::db;
 use crate::jwt;
@@ -16,24 +14,19 @@ pub struct TenantId(pub i64);
 pub struct Email(String);
 
 impl Email {
-    pub fn parse(raw: &str) -> Result<Self, DataValidationError> {
+    #[must_use]
+    pub fn parse(raw: &str) -> Option<Self> {
         let normalized = raw.trim().to_ascii_lowercase();
         if normalized.is_empty() || !normalized.contains('@') {
-            return Err(DataValidationError::InvalidEmail);
+            return None;
         }
-        Ok(Self(normalized))
+        Some(Self(normalized))
     }
 
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
-}
-
-#[derive(Debug, Error)]
-pub enum DataValidationError {
-    #[error("invalid email address")]
-    InvalidEmail,
 }
 
 

@@ -59,12 +59,13 @@ impl From<users::UserStatus> for UserStatusRow {
 }
 
 impl TryFrom<UserRow> for users::User {
-    type Error = common::DataValidationError;
+    type Error = db::Error;
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self {
             id: common::UserId(row.id),
             tenant_id: common::TenantId(row.tenant_id),
-            email: common::Email::parse(&row.email)?,
+            email: common::Email::parse(&row.email)
+                .ok_or_else(|| db::Error::RowConversionFailed("invalid email".to_string()))?,
             status: row.status.into(),
             first_name: row.first_name,
             middle_name: row.middle_name,
@@ -74,7 +75,7 @@ impl TryFrom<UserRow> for users::User {
 }
 
 impl TryFrom<UserRow> for users::UserAuthRecord {
-    type Error = common::DataValidationError;
+    type Error = db::Error;
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
         Ok(Self {
             user: row.clone().try_into()?,
@@ -126,7 +127,7 @@ impl users::TRepository for Repository {
         )
         .fetch_one(db)
         .await?;
-        Ok(row.try_into()?)
+        row.try_into()
     }
 
     async fn find_by_id(&self, db: &db::Context, id: common::UserId) -> Result<users::User, db::Error> {
@@ -155,7 +156,7 @@ impl users::TRepository for Repository {
         )
         .fetch_one(db)
         .await?;
-        Ok(row.try_into()?)
+        row.try_into()
     }
 
     async fn find_auth_details_by_email(
@@ -189,7 +190,7 @@ impl users::TRepository for Repository {
         )
         .fetch_optional(db)
         .await?;
-        Ok(row.map(TryInto::try_into).transpose()?)
+        row.map(TryInto::try_into).transpose()
     }
 
     async fn list_by_tenant(
@@ -283,7 +284,7 @@ impl users::TRepository for Repository {
         )
         .fetch_one(db)
         .await?;
-        Ok(row.try_into()?)
+        row.try_into()
     }
 
     async fn update_admin_credentials(

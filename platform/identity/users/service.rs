@@ -77,7 +77,7 @@ pub struct UserList {
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("invalid email address")]
-    InvalidEmail(#[from] common::DataValidationError),
+    InvalidEmail,
 
     #[error("user not found")]
     NotFound,

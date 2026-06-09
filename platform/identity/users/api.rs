@@ -64,7 +64,7 @@ impl From<super::Error> for api::Error {
         match error {
             super::Error::NotFound => Self::not_found(),
             super::Error::AlreadyExists => Self::user_already_exists(),
-            super::Error::InvalidEmail(_) => Self::validation_failed(serde_json::json!({
+            super::Error::InvalidEmail => Self::validation_failed(serde_json::json!({
                 "field": "email",
                 "message": "invalid email address"
             })),

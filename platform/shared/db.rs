@@ -1,6 +1,5 @@
 use sqlx::error::DatabaseError;
 use thiserror::Error;
-use crate::common::DataValidationError;
 
 pub type Context = sqlx::SqlitePool;
 
@@ -23,14 +22,6 @@ pub enum Error {
 
     #[error("row conversion error: {0}")]
     RowConversionFailed(String),
-}
-
-impl From<DataValidationError> for Error {
-    fn from(error: DataValidationError) -> Self {
-        match error {
-            DataValidationError::InvalidEmail => Self::RowConversionFailed("invalid email address".to_string()),
-        }
-    }
 }
 
 impl From<sqlx::Error> for Error {

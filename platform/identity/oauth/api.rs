@@ -101,7 +101,7 @@ where
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = common::Email::parse(&user_info.email)?;
+    let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::invalid_credentials)?;
     let cmd = auth::OAuthLoginCommand {
         email,
         sso_provider: "google".to_string(),

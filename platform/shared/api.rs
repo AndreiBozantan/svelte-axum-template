@@ -5,7 +5,6 @@ use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::common;
 use crate::db;
 use crate::jwt;
 
@@ -148,14 +147,6 @@ impl From<db::Error> for Error {
             db::Error::CheckConstraintViolation(_) => Self::db_key_violation("check_violation"),
             db::Error::DatabaseOperationFailed(_) => Self::internal(),
             db::Error::RowConversionFailed(_) => Self::internal(),
-        }
-    }
-}
-
-impl From<common::DataValidationError> for Error {
-    fn from(error: common::DataValidationError) -> Self {
-        match error {
-            common::DataValidationError::InvalidEmail => Self::invalid_credentials(),
         }
     }
 }

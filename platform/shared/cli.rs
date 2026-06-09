@@ -141,7 +141,7 @@ async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Err
     }
 
     let password_hash = auth::hash_password(password.trim())?;
-    let parsed_email = common::Email::parse(&email).map_err(|e| Error::Other(e.to_string()))?;
+    let parsed_email = common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address".to_string()))?;
 
     users::db::Repository
         .update_admin_credentials(

@@ -203,7 +203,7 @@ impl From<users::Error> for auth::Error {
     fn from(error: users::Error) -> Self {
         match error {
             users::Error::NotFound => Self::InvalidCredentials,
-            users::Error::InvalidEmail(_) => Self::InvalidCredentials,
+            users::Error::InvalidEmail => Self::InvalidCredentials,
             users::Error::DatabaseOperationFailed(e) => Self::DatabaseOperationFailed(e),
             users::Error::AlreadyExists => Self::Internal("auth UserError::AlreadyExists".into()),
         }

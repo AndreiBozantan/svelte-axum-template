@@ -66,13 +66,14 @@ async fn create_test_server(config: config::AppSettings) -> anyhow::Result<TestS
 
     let ctx = create_test_context(config).await?;
     let password_hash = auth::hash_password(TEST_PASSWORD)?;
+    let test_email = common::Email::parse(TEST_USER_EMAIL).ok_or_else(|| anyhow::anyhow!("invalid test user email"))?;
     users::db::Repository
         .create_user(
             &ctx.db,
             users::CreateUserCommand {
                 tenant_id: common::TenantId(0),
                 status: users::UserStatus::Active,
-                email: common::Email::parse(TEST_USER_EMAIL)?,
+                email: test_email,
                 first_name: Some("Test".to_string()),
                 middle_name: None,
                 last_name: Some("User".to_string()),
