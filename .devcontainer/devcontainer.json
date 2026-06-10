@@ -60,5 +60,5 @@
     }
   },
 
-  "postCreateCommand": "bash ./.devcontainer/setup-fish.sh && npm install && cargo fetch"
+  "postCreateCommand": "bash ./.devcontainer/setup-env.sh && npm install && cargo fetch"
 }
