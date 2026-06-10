@@ -7,7 +7,7 @@ use crate::identity::tokens;
 
 #[derive(Debug, FromRow)]
 #[allow(dead_code)]
-struct RefreshTokenRow {
+struct Row {
     id: i64,
     jti: String,
     user_id: i64,
@@ -17,8 +17,8 @@ struct RefreshTokenRow {
     revoked_at: Option<NaiveDateTime>,
 }
 
-impl From<RefreshTokenRow> for tokens::RefreshToken {
-    fn from(row: RefreshTokenRow) -> Self {
+impl From<Row> for tokens::RefreshToken {
+    fn from(row: Row) -> Self {
         Self {
             user_id: common::UserId(row.user_id),
             token_hash: row.token_hash,
@@ -69,7 +69,7 @@ impl tokens::TRepository for Repository {
         jti: &str,
     ) -> Result<tokens::RefreshToken, db::Error> {
         let row = sqlx::query_as!(
-            RefreshTokenRow,
+            Row,
             r#"
             SELECT
                 id as "id!",

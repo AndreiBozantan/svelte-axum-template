@@ -8,7 +8,7 @@ use crate::identity::users;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
-enum UserStatusRow {
+enum Status {
     Onboarding,
     Active,
     Suspended,
@@ -19,12 +19,12 @@ enum UserStatusRow {
 /// (e.g. auth lockout fields) or reserved for future API fields (names).
 #[derive(Debug, Clone, FromRow)]
 #[allow(dead_code)]
-struct UserRow {
+struct Row {
     id: i64,
     tenant_id: i64,
     created_at: NaiveDateTime,
     updated_at: NaiveDateTime,
-    status: UserStatusRow,
+    status: Status,
     email: String,
     first_name: Option<String>,
     middle_name: Option<String>,
@@ -36,18 +36,18 @@ struct UserRow {
     last_failed_login: Option<NaiveDateTime>,
 }
 
-impl From<UserStatusRow> for users::UserStatus {
-    fn from(value: UserStatusRow) -> Self {
+impl From<Status> for users::UserStatus {
+    fn from(value: Status) -> Self {
         match value {
-            UserStatusRow::Onboarding => Self::Onboarding,
-            UserStatusRow::Active => Self::Active,
-            UserStatusRow::Suspended => Self::Suspended,
-            UserStatusRow::Archived => Self::Archived,
+            Status::Onboarding => Self::Onboarding,
+            Status::Active => Self::Active,
+            Status::Suspended => Self::Suspended,
+            Status::Archived => Self::Archived,
         }
     }
 }
 
-impl From<users::UserStatus> for UserStatusRow {
+impl From<users::UserStatus> for Status {
     fn from(value: users::UserStatus) -> Self {
         match value {
             users::UserStatus::Onboarding => Self::Onboarding,
@@ -58,9 +58,9 @@ impl From<users::UserStatus> for UserStatusRow {
     }
 }
 
-impl TryFrom<UserRow> for users::User {
+impl TryFrom<Row> for users::User {
     type Error = db::Error;
-    fn try_from(row: UserRow) -> Result<Self, Self::Error> {
+    fn try_from(row: Row) -> Result<Self, Self::Error> {
         Ok(Self {
             id: common::UserId(row.id),
             tenant_id: common::TenantId(row.tenant_id),
@@ -74,9 +74,9 @@ impl TryFrom<UserRow> for users::User {
     }
 }
 
-impl TryFrom<UserRow> for users::UserAuthRecord {
+impl TryFrom<Row> for users::UserAuthRecord {
     type Error = db::Error;
-    fn try_from(row: UserRow) -> Result<Self, Self::Error> {
+    fn try_from(row: Row) -> Result<Self, Self::Error> {
         Ok(Self {
             user: row.clone().try_into()?,
             password_hash: row.password_hash,
@@ -91,10 +91,10 @@ pub struct Repository;
 
 impl users::TRepository for Repository {
     async fn create_user(&self, db: &db::Context, command: users::CreateUserCommand) -> Result<users::User, db::Error> {
-        let status: UserStatusRow = command.status.into();
+        let status: Status = command.status.into();
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
-            UserRow,
+            Row,
             r#"
             INSERT INTO users (tenant_id, status, email, password_hash, sso_provider, sso_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -103,7 +103,7 @@ impl users::TRepository for Repository {
                 tenant_id as "tenant_id!",
                 created_at as "created_at!",
                 updated_at as "updated_at!",
-                status as "status: UserStatusRow",
+                status as "status: Status",
                 email as "email!",
                 first_name,
                 middle_name,
@@ -128,14 +128,14 @@ impl users::TRepository for Repository {
 
     async fn find_by_id(&self, db: &db::Context, id: common::UserId) -> Result<users::User, db::Error> {
         let row = sqlx::query_as!(
-            UserRow,
+            Row,
             r#"
             SELECT
                 id as "id!",
                 tenant_id as "tenant_id!",
                 created_at as "created_at!",
                 updated_at as "updated_at!",
-                status as "status: UserStatusRow",
+                status as "status: Status",
                 email as "email!",
                 first_name,
                 middle_name,
@@ -179,14 +179,14 @@ impl users::TRepository for Repository {
     ) -> Result<Option<users::UserAuthRecord>, db::Error> {
         let email_str = email.as_str().to_string();
         let row = sqlx::query_as!(
-            UserRow,
+            Row,
             r#"
             SELECT
                 id as "id!",
                 tenant_id as "tenant_id!",
                 created_at as "created_at!",
                 updated_at as "updated_at!",
-                status as "status: UserStatusRow",
+                status as "status: Status",
                 email as "email!",
                 first_name,
                 middle_name,
@@ -212,14 +212,14 @@ impl users::TRepository for Repository {
         query: users::ListUsersQuery,
     ) -> Result<users::UserList, db::Error> {
         let rows = sqlx::query_as!(
-            UserRow,
+            Row,
             r#"
             SELECT
                 id as "id!",
                 tenant_id as "tenant_id!",
                 created_at as "created_at!",
                 updated_at as "updated_at!",
-                status as "status: UserStatusRow",
+                status as "status: Status",
                 email as "email!",
                 first_name,
                 middle_name,
@@ -266,7 +266,7 @@ impl users::TRepository for Repository {
     ) -> Result<users::User, db::Error> {
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
-            UserRow,
+            Row,
             r#"
             INSERT INTO users (tenant_id, status, email, sso_provider, sso_id, created_at, updated_at)
             VALUES (?, 'active', ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
@@ -279,7 +279,7 @@ impl users::TRepository for Repository {
                 tenant_id as "tenant_id!",
                 created_at as "created_at!",
                 updated_at as "updated_at!",
-                status as "status: UserStatusRow",
+                status as "status: Status",
                 email as "email!",
                 first_name,
                 middle_name,
