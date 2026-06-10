@@ -218,3 +218,67 @@ fn access_token_contains_correct_tenant_info() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn jwt_clock_skew_leeway_validation() -> anyhow::Result<()> {
+    let ctx = test_context()?;
+    let now = chrono::Utc::now().timestamp();
+
+    // 1. within 5-second leeway: 3 seconds in the past should be accepted
+    let exp_within = now - 3;
+    let token_within = generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_within)?;
+    let claims_within = jwt::decode_token(&ctx, &token_within, jwt::TokenType::Access);
+    assert!(claims_within.is_ok());
+    assert_eq!(claims_within.unwrap().sub, "123");
+
+    // 2. outside 5-second leeway: 6 seconds in the past should be rejected
+    let exp_outside = now - 6;
+    let token_outside = generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_outside)?;
+    let claims_outside = jwt::decode_token(&ctx, &token_outside, jwt::TokenType::Access);
+    assert!(claims_outside.is_err());
+    assert!(matches!(claims_outside.unwrap_err(), jwt::Error::ExpiredToken));
+
+    Ok(())
+}
+
+#[test]
+fn token_claims_user_id_malformed_returns_error() {
+    let claims = jwt::TokenClaims {
+        sub: "not_a_number".to_string(),
+        tenant_id: 1,
+        email: "test@example.com".to_string(),
+        exp: 0,
+        iat: 0,
+        jti: "some_jti".to_string(),
+        token_type: jwt::TokenType::Access,
+    };
+
+    let result = claims.user_id();
+    assert!(result.is_err());
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
+}
+
+fn generate_token_with_custom_exp(
+    ctx: &jwt::Context,
+    user_id: i64,
+    tenant_id: i64,
+    email: &str,
+    token_type: jwt::TokenType,
+    exp: i64,
+) -> Result<String, jwt::Error> {
+    use chrono::Utc;
+    use uuid::Uuid;
+
+    let now = Utc::now().timestamp();
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
+    let claims = jwt::TokenClaims {
+        sub: user_id.to_string(),
+        tenant_id,
+        email: email.to_string(),
+        exp,
+        iat: now - 3600,
+        jti: Uuid::new_v4().to_string(),
+        token_type,
+    };
+    let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key)?;
+    Ok(token)
+}

@@ -108,6 +108,40 @@ async fn refresh_token_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
+async fn refresh_token_reuse_detection() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let (_body, _access_token, refresh_token_1) = login_testuser_and_get_tokens(&server).await?;
+
+    // first refresh: rotates refresh_token_1 to refresh_token_2
+    let refresh_response_1 = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_1.clone()))
+        .await;
+    refresh_response_1.assert_status(StatusCode::OK);
+    let refresh_token_2 = refresh_response_1.cookie("refresh_token").value().to_string();
+    assert!(!refresh_token_2.is_empty());
+    assert_ne!(refresh_token_1, refresh_token_2);
+
+    // reuse refresh_token_1: should fail with UNAUTHORIZED
+    let reuse_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_1.clone()))
+        .await;
+    reuse_response.assert_status(StatusCode::UNAUTHORIZED);
+
+    // because of reuse detection, all active tokens for the user should be revoked.
+    // try refreshing with the new refresh_token_2: should now also fail with UNAUTHORIZED.
+    let subsequent_refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_2))
+        .await;
+    subsequent_refresh_response.assert_status(StatusCode::UNAUTHORIZED);
+
+    Ok(())
+}
+
+
+#[tokio::test]
 async fn revoke_token_success() -> anyhow::Result<()> {
     let server = create_test_server().await?;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;

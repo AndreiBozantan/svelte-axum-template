@@ -159,6 +159,27 @@ impl users::TRepository for Repository {
         row.try_into()
     }
 
+    async fn find_sso_info_by_id(
+        &self,
+        db: &db::Context,
+        id: common::UserId,
+    ) -> Result<users::UserSsoInfo, db::Error> {
+        let record = sqlx::query!(
+            r#"
+            SELECT sso_provider, sso_id FROM users
+            WHERE id = ?
+            "#,
+            id.0
+        )
+        .fetch_one(db)
+        .await?;
+
+        Ok(users::UserSsoInfo {
+            sso_provider: record.sso_provider,
+            sso_id: record.sso_id,
+        })
+    }
+
     async fn find_auth_details_by_email(
         &self,
         db: &db::Context,
