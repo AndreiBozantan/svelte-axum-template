@@ -106,7 +106,9 @@ cat << 'EOF' > /home/vscode/.gemini/config/hooks.json
   }
 }
 EOF
-cp /home/vscode/.gemini/config/hooks.json /home/vscode/.gemini/antigravity-cli/hooks.json
+if [ ! -e /home/vscode/.gemini/antigravity-cli/hooks.json ] || [ "$(realpath /home/vscode/.gemini/config/hooks.json)" != "$(realpath /home/vscode/.gemini/antigravity-cli/hooks.json)" ]; then
+  cp /home/vscode/.gemini/config/hooks.json /home/vscode/.gemini/antigravity-cli/hooks.json
+fi
 chmod +x /workspaces/svelaxum/.agents/post_tool_hook.sh
 echo "Antigravity CLI Hooks configured."
 
