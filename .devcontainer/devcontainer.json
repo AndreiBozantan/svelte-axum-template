@@ -26,7 +26,9 @@
     // Fish history and other data files
     "source=svelaxum-fish-history,target=/home/vscode/.local/share/fish,type=volume",
     // CLI tool configurations (fish, git, gh, etc.)
-    "source=svelaxum-config,target=/home/vscode/.config,type=volume"
+    "source=svelaxum-config,target=/home/vscode/.config,type=volume",
+    // Antigravity (agy) CLI configuration, logs, and conversation history
+    "source=svelaxum-gemini,target=/home/vscode/.gemini,type=volume"
   ],
 
   "forwardPorts": [
