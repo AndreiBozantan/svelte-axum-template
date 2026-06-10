@@ -56,7 +56,6 @@ impl From<users::Error> for api::Error {
         match error {
             users::Error::NotFound => Self::not_found(),
             users::Error::AlreadyExists => Self::user_already_exists(),
-            users::Error::InvalidEmail => Self::validation_failed("email", "invalid email address"),
             users::Error::DatabaseOperationFailed(_) => Self::internal(),
         }
     }

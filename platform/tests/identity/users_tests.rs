@@ -56,9 +56,8 @@ async fn list_users_invalid_query_params() -> anyhow::Result<()> {
     response.assert_status(StatusCode::BAD_REQUEST);
     let r: Value = response.json();
     assert_eq!(r["code"], "validation_failed");
-    assert_eq!(r["details"]["field"], "query");
     assert!(
-        r["details"]["message"]
+        r["details"]["query"][0]
             .as_str()
             .unwrap()
             .contains("Failed to deserialize query string")

@@ -83,9 +83,6 @@ pub struct UserSsoInfo {
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("invalid email address")]
-    InvalidEmail,
-
     #[error("user not found")]
     NotFound,
 
