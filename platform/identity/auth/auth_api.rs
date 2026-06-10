@@ -27,11 +27,11 @@ where
         .route("/auth/login", post(login::<UR, TR>))
         .route("/auth/logout", post(logout::<UR, TR>))
         .route("/auth/refresh", post(refresh::<UR, TR>))
-        .with_state(AppState { context, service })
+        .with_state(RouteState { context, service })
 }
 
 #[derive(Clone)]
-struct AppState<UR, TR>
+struct RouteState<UR, TR>
 where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
@@ -88,7 +88,7 @@ impl From<users::User> for UserResponse {
 }
 
 async fn register<UR, TR>(
-    State(AppState { context, service }): State<AppState<UR, TR>>,
+    State(RouteState { context, service }): State<RouteState<UR, TR>>,
     Json(request): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, api::Error>
 where
@@ -114,7 +114,7 @@ where
 }
 
 async fn login<UR, TR>(
-    State(AppState { context, service }): State<AppState<UR, TR>>,
+    State(RouteState { context, service }): State<RouteState<UR, TR>>,
     headers: HeaderMap,
     Json(request): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, api::Error>
@@ -145,7 +145,7 @@ where
 }
 
 async fn logout<UR, TR>(
-    State(AppState { context, service }): State<AppState<UR, TR>>,
+    State(RouteState { context, service }): State<RouteState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, api::Error>
 where
@@ -168,7 +168,7 @@ where
 }
 
 async fn refresh<UR, TR>(
-    State(AppState { context, service }): State<AppState<UR, TR>>,
+    State(RouteState { context, service }): State<RouteState<UR, TR>>,
     req: Request<Body>,
 ) -> Result<impl IntoResponse, api::Error>
 where

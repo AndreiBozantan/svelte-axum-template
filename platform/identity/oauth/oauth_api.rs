@@ -20,11 +20,11 @@ where
     Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
         .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))
-        .with_state(AppState { ctx, auth_service })
+        .with_state(RouteState { ctx, auth_service })
 }
 
 #[derive(Clone)]
-struct AppState<UR, TR>
+struct RouteState<UR, TR>
 where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
@@ -52,7 +52,7 @@ impl From<oauth::Error> for api::Error {
 }
 
 async fn google_auth_init<UR, TR>(
-    State(AppState { ctx, .. }): State<AppState<UR, TR>>,
+    State(RouteState { ctx, .. }): State<RouteState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, api::Error>
@@ -79,7 +79,7 @@ where
 }
 
 async fn google_auth_callback<UR, TR>(
-    State(AppState { ctx, auth_service }): State<AppState<UR, TR>>,
+    State(RouteState { ctx, auth_service }): State<RouteState<UR, TR>>,
     headers: HeaderMap,
     axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, api::Error>
