@@ -106,6 +106,19 @@ impl From<db::Error> for Error {
     }
 }
 
+#[derive(Clone)]
+pub struct Service<UR: TRepository> {
+    pub context: common::ArcContext,
+    pub users: UR,
+}
+
+impl<UR: TRepository> Service<UR> {
+    #[must_use]
+    pub const fn new(repo: UR, context: common::ArcContext) -> Self {
+        Self { users: repo, context }
+    }
+}
+
 pub trait TRepository: Send + Sync {
     fn create_user(
         &self,

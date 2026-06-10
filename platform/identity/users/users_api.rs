@@ -1,5 +1,5 @@
 use axum;
-use axum::extract;
+use axum::extract::State;
 use serde::Serialize;
 
 use crate::api;
@@ -7,26 +7,17 @@ use crate::common;
 use crate::identity::users;
 use crate::jwt;
 
-pub fn router<UR>(ctx: common::ArcContext, repo: UR) -> axum::Router<common::ArcContext>
+pub fn router<UR>(service: users::Service<UR>) -> axum::Router<common::ArcContext>
 where
     UR: users::TRepository + Clone + 'static,
 {
     use axum::routing::get;
-    let context = ctx.clone();
+    let ctx = service.context.clone();
     axum::Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
-        .with_state(RouteState { context, repo })
+        .with_state(service)
         .route_layer(axum::middleware::from_fn_with_state(ctx, crate::auth::middleware))
-}
-
-#[derive(Clone)]
-struct RouteState<UR>
-where
-    UR: users::TRepository + Clone + 'static,
-{
-    pub context: common::ArcContext,
-    pub repo: UR,
 }
 
 #[derive(Serialize)]
@@ -72,12 +63,12 @@ impl From<users::Error> for api::Error {
 }
 
 async fn list_users<UR>(
-    state: extract::State<RouteState<UR>>,
+    State(service): State<users::Service<UR>>,
     pagination: api::Query<api::Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<axum::Json<ListUsersResponse>, api::Error>
 where
-    UR: users::TRepository + Clone,
+    UR: users::TRepository + Clone + 'static,
 {
     let (limit, offset) = pagination.data().sanitize();
     let query = users::ListUsersQuery {
@@ -85,7 +76,7 @@ where
         limit,
         offset,
     };
-    let result = state.repo.list_by_tenant(&state.context.db, query).await?;
+    let result = service.users.list_by_tenant(&service.context.db, query).await?;
     Ok(axum::Json(ListUsersResponse {
         users: result.users.into_iter().map(Into::into).collect(),
         total: result.total,
@@ -95,16 +86,16 @@ where
 }
 
 async fn user_info<UR>(
-    state: extract::State<RouteState<UR>>,
+    State(service): State<users::Service<UR>>,
     claims: jwt::TokenClaims,
 ) -> Result<axum::Json<UserInfoResponse>, api::Error>
 where
-    UR: users::TRepository + Clone,
+    UR: users::TRepository + Clone + 'static,
 {
     let user_id = claims.user_id()?;
-    let user = state
-        .repo
-        .find_by_id(&state.context.db, common::UserId(user_id))
+    let user = service
+        .users
+        .find_by_id(&service.context.db, common::UserId(user_id))
         .await?;
     Ok(axum::Json(UserInfoResponse { user: user.into() }))
 }

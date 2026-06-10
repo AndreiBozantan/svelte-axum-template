@@ -8,7 +8,9 @@ use url::Url;
 
 use crate::common;
 use crate::config;
+use crate::identity::auth;
 use crate::identity::tokens;
+use crate::identity::users;
 use crate::internal::logger;
 
 #[derive(Debug, Error)]
@@ -158,97 +160,114 @@ fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Cl
     Ok(client)
 }
 
-pub fn begin_google_flow(context: &common::ArcContext, redirect_url: Option<String>) -> Result<(Url, String), Error> {
-    let redirect_url = if let Some(url) = redirect_url
-        && validate_redirect_path(&url).is_ok()
-    {
-        Some(url)
-    } else {
-        Some("/".to_string())
-    };
-
-    let client = create_google_client(&context.settings.oauth)?;
-    let (auth_url, csrf_token) = client
-        .authorize_url(oauth2::CsrfToken::new_random)
-        .add_scope(oauth2::Scope::new("openid".to_string()))
-        .add_scope(oauth2::Scope::new("email".to_string()))
-        .add_scope(oauth2::Scope::new("profile".to_string()))
-        .url();
-
-    let now = Utc::now().timestamp();
-    let timeout_minutes = i64::from(context.settings.oauth.session_timeout_minutes);
-    let claims = OAuthStateClaims {
-        csrf_token_hash: tokens::utils::get_token_hash_as_hex(csrf_token.secret()),
-        iat: now,
-        exp: now + (timeout_minutes * 60),
-        redirect_url,
-    };
-
-    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
-    let state_jwt = jsonwebtoken::encode(&header, &claims, &context.jwt.encoding_key)?;
-
-    Ok((auth_url, state_jwt))
+#[derive(Clone)]
+pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
+    pub context: common::ArcContext,
+    pub auth: auth::Service<UR, TR>,
 }
 
-pub async fn complete_google_callback(
-    context: &common::ArcContext,
-    code: &str,
-    state: &str,
-    oauth_state_cookie: &str,
-) -> Result<(GoogleUserInfo, Option<String>), Error> {
-    let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
-    validation.validate_exp = true;
-    validation.leeway = 5;
-
-    let token_data =
-        jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &context.jwt.decoding_key, &validation)?;
-
-    let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
-    if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
-        logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
-        return Err(Error::CsrfMismatch);
+impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
+    #[must_use]
+    pub const fn new(context: common::ArcContext, auth_service: auth::Service<UR, TR>) -> Self {
+        Self {
+            context,
+            auth: auth_service,
+        }
     }
 
-    let client = create_google_client(&context.settings.oauth)?;
-    let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
+    pub fn begin_google_flow(&self, redirect_url: Option<String>) -> Result<(Url, String), Error> {
+        let redirect_url = if let Some(url) = redirect_url
+            && validate_redirect_path(&url).is_ok()
+        {
+            Some(url)
+        } else {
+            Some("/".to_string())
+        };
 
-    let token_result = client
-        .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
-        .request_async(&oauth_client)
-        .await?;
+        let client = create_google_client(&self.context.settings.oauth)?;
+        let (auth_url, csrf_token) = client
+            .authorize_url(oauth2::CsrfToken::new_random)
+            .add_scope(oauth2::Scope::new("openid".to_string()))
+            .add_scope(oauth2::Scope::new("email".to_string()))
+            .add_scope(oauth2::Scope::new("profile".to_string()))
+            .url();
 
-    let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
-    let response = context
-        .http_client
-        .get("https://www.googleapis.com/oauth2/v2/userinfo")
-        .bearer_auth(access_token)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await?;
+        let now = Utc::now().timestamp();
+        let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
+        let claims = OAuthStateClaims {
+            csrf_token_hash: tokens::utils::get_token_hash_as_hex(csrf_token.secret()),
+            iat: now,
+            exp: now + (timeout_minutes * 60),
+            redirect_url,
+        };
 
-    if !response.status().is_success() {
-        logger::log_provider_api_error(response.status(), "google");
-        return Err(Error::InvalidConfig("OAuth provider returned an error".to_string()));
+        let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
+        let state_jwt = jsonwebtoken::encode(&header, &claims, &self.context.jwt.encoding_key)?;
+
+        Ok((auth_url, state_jwt))
     }
 
-    let user_info: GoogleUserInfo = response.json().await?;
+    pub async fn complete_google_callback(
+        &self,
+        code: &str,
+        state: &str,
+        oauth_state_cookie: &str,
+    ) -> Result<(GoogleUserInfo, Option<String>), Error> {
+        let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
+        validation.validate_exp = true;
+        validation.leeway = 5;
 
-    if user_info.email.is_empty() {
-        logger::log_invalid_user_info("email", &user_info.email, "google");
-        return Err(Error::InvalidUserInfo);
+        let token_data =
+            jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &self.context.jwt.decoding_key, &validation)?;
+
+        let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
+        if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
+            logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
+            return Err(Error::CsrfMismatch);
+        }
+
+        let client = create_google_client(&self.context.settings.oauth)?;
+        let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
+
+        let token_result = client
+            .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .request_async(&oauth_client)
+            .await?;
+
+        let access_token = oauth2::TokenResponse::access_token(&token_result).secret();
+        let response = self
+            .context
+            .http_client
+            .get("https://www.googleapis.com/oauth2/v2/userinfo")
+            .bearer_auth(access_token)
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            logger::log_provider_api_error(response.status(), "google");
+            return Err(Error::InvalidConfig("OAuth provider returned an error".to_string()));
+        }
+
+        let user_info: GoogleUserInfo = response.json().await?;
+
+        if user_info.email.is_empty() {
+            logger::log_invalid_user_info("email", &user_info.email, "google");
+            return Err(Error::InvalidUserInfo);
+        }
+
+        if !user_info.verified_email {
+            logger::log_invalid_user_info("verified_email", "false", "google");
+            return Err(Error::UnverifiedEmail);
+        }
+
+        if user_info.id.is_empty() {
+            logger::log_invalid_user_info("id", &user_info.id, "google");
+            return Err(Error::InvalidUserInfo);
+        }
+
+        Ok((user_info, token_data.claims.redirect_url))
     }
-
-    if !user_info.verified_email {
-        logger::log_invalid_user_info("verified_email", "false", "google");
-        return Err(Error::UnverifiedEmail);
-    }
-
-    if user_info.id.is_empty() {
-        logger::log_invalid_user_info("id", &user_info.id, "google");
-        return Err(Error::InvalidUserInfo);
-    }
-
-    Ok((user_info, token_data.claims.redirect_url))
 }
 
 fn validate_redirect_path(path: &str) -> Result<(), Error> {
