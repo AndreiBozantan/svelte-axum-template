@@ -1,6 +1,6 @@
-use axum::Router;
-use axum::extract::State;
-use axum::http::HeaderMap;
+use axum;
+use axum::extract;
+use axum::http;
 use axum::response::IntoResponse;
 
 use crate::api;
@@ -11,16 +11,19 @@ use crate::identity::tokens;
 use crate::identity::users;
 use crate::internal::logger;
 
-pub fn router<UR, TR>(ctx: common::ArcContext, auth_service: auth::Service<UR, TR>) -> Router<common::ArcContext>
+pub fn router<UR, TR>(
+    context: common::ArcContext,
+    auth_service: auth::Service<UR, TR>,
+) -> axum::Router<common::ArcContext>
 where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
     use axum::routing::get;
-    Router::new()
+    axum::Router::new()
         .route("/oauth/google", get(google_auth_init::<UR, TR>))
         .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))
-        .with_state(RouteState { ctx, auth_service })
+        .with_state(RouteState { context, auth_service })
 }
 
 #[derive(Clone)]
@@ -29,7 +32,7 @@ where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
-    pub ctx: common::ArcContext,
+    pub context: common::ArcContext,
     pub auth_service: auth::Service<UR, TR>,
 }
 
@@ -52,22 +55,22 @@ impl From<oauth::Error> for api::Error {
 }
 
 async fn google_auth_init<UR, TR>(
-    State(RouteState { ctx, .. }): State<RouteState<UR, TR>>,
-    headers: HeaderMap,
-    axum::extract::Query(params): axum::extract::Query<std::collections::BTreeMap<String, String>>,
+    state: extract::State<RouteState<UR, TR>>,
+    headers: http::HeaderMap,
+    params: api::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
 {
-    let redirect_url = params.get("redirect_url").cloned();
+    let redirect_url = params.0.get("redirect_url").cloned();
     logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
 
-    let (auth_url, state_jwt) = oauth::begin_google_flow(&ctx, redirect_url)?;
+    let (auth_url, state_jwt) = oauth::begin_google_flow(&state.context, redirect_url)?;
     logger::log_oauth_redirecting(&headers, &auth_url, "google");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
-    let cookie_max_age = ctx.settings.oauth.session_timeout_minutes * 60;
+    let cookie_max_age = state.context.settings.oauth.session_timeout_minutes * 60;
     let cookie = format!(
         "oauth_state={state_jwt}; HttpOnly; Secure; SameSite=Lax; Path=/api/oauth/google/callback; Max-Age={cookie_max_age}"
     );
@@ -79,14 +82,15 @@ where
 }
 
 async fn google_auth_callback<UR, TR>(
-    State(RouteState { ctx, auth_service }): State<RouteState<UR, TR>>,
-    headers: HeaderMap,
-    axum::extract::Query(params): axum::extract::Query<oauth::GoogleCallbackRequest>,
+    state: extract::State<RouteState<UR, TR>>,
+    headers: http::HeaderMap,
+    params: api::Query<oauth::GoogleCallbackRequest>,
 ) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
 {
+    let params = params.0;
     let oauth_state_cookie =
         tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
             logger::log_cookie_error(&headers, "missing_oauth_state");
@@ -94,8 +98,7 @@ where
         })?;
 
     let (user_info, redirect_url) =
-        oauth::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
-
+        oauth::complete_google_callback(&state.context, &params.code, &params.state, oauth_state_cookie).await?;
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
         return Err(api::Error::invalid_credentials());
@@ -110,11 +113,11 @@ where
         sso_id: user_info.id,
     };
 
-    let session = auth_service.login_oauth(&ctx, cmd).await?;
+    let session = state.auth_service.login_oauth(&state.context, cmd).await?;
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = tokens::utils::add_auth_cookies(
-        &ctx.settings.jwt,
+        &state.context.settings.jwt,
         response,
         Some(&session.access_token.value),
         Some(&session.refresh_token.value),
