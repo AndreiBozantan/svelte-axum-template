@@ -114,7 +114,10 @@ pub struct Service<UR: TRepository> {
 
 impl<UR: TRepository> Service<UR> {
     #[must_use]
-    pub const fn new(repo: UR, context: common::ArcContext) -> Self {
+    pub const fn new(
+        repo: UR,
+        context: common::ArcContext,
+    ) -> Self {
         Self { users: repo, context }
     }
 }

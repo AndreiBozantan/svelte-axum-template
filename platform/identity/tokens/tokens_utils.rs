@@ -91,7 +91,10 @@ pub fn create_response_with_auth_cookies(
     add_auth_cookies(settings, response, access_token, refresh_token)
 }
 
-pub fn get_cookie_value_from_headers<'a>(headers: &'a http::HeaderMap, name: &str) -> Option<&'a str> {
+pub fn get_cookie_value_from_headers<'a>(
+    headers: &'a http::HeaderMap,
+    name: &str,
+) -> Option<&'a str> {
     headers
         .get(http::header::COOKIE)
         .and_then(|header| header.to_str().ok())
@@ -99,7 +102,10 @@ pub fn get_cookie_value_from_headers<'a>(headers: &'a http::HeaderMap, name: &st
 }
 
 #[must_use]
-pub fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> Option<&'a str> {
+pub fn extract_token_from_cookie<'a>(
+    cookie_str: &'a str,
+    token_name: &str,
+) -> Option<&'a str> {
     cookie_str.split(';').find_map(|cookie| {
         let mut parts = cookie.trim().splitn(2, '=');
         if parts.next()? == token_name {
@@ -110,7 +116,12 @@ pub fn extract_token_from_cookie<'a>(cookie_str: &'a str, token_name: &str) -> O
     })
 }
 
-fn create_token_cookie(cookie_name: &str, cookie_value: &str, path: &str, max_age: u32) -> String {
+fn create_token_cookie(
+    cookie_name: &str,
+    cookie_value: &str,
+    path: &str,
+    max_age: u32,
+) -> String {
     let max_age = if cookie_value.is_empty() { 0 } else { max_age };
     format!("{cookie_name}={cookie_value}; HttpOnly; Secure; SameSite=Strict; Path={path}; Max-Age={max_age}")
 }

@@ -1,7 +1,10 @@
 use sha2::Digest;
 use sha2::Sha256;
 
-pub fn log_invalid_config(field_name: &str, value: &str) {
+pub fn log_invalid_config(
+    field_name: &str,
+    value: &str,
+) {
     tracing::error!(
         event_type = "auth",
         field_name,
@@ -10,7 +13,10 @@ pub fn log_invalid_config(field_name: &str, value: &str) {
     );
 }
 
-pub fn log_provider_api_error(status: axum::http::StatusCode, provider: &str) {
+pub fn log_provider_api_error(
+    status: axum::http::StatusCode,
+    provider: &str,
+) {
     tracing::warn!(
         event_type = "auth",
         error_type = "provider_api",
@@ -20,7 +26,11 @@ pub fn log_provider_api_error(status: axum::http::StatusCode, provider: &str) {
     );
 }
 
-pub fn log_invalid_user_info(field_name: &str, value: &str, provider: &str) {
+pub fn log_invalid_user_info(
+    field_name: &str,
+    value: &str,
+    provider: &str,
+) {
     tracing::warn!(
         event_type = "auth",
         field_name,
@@ -59,7 +69,11 @@ pub fn log_auth_rejection<E: std::fmt::Display>(error: E) -> E {
     error
 }
 
-pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: Option<&String>, provider: &str) {
+pub fn log_oauth_flow_initiated(
+    headers: &axum::http::HeaderMap,
+    redirect_url: Option<&String>,
+    provider: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -70,7 +84,11 @@ pub fn log_oauth_flow_initiated(headers: &axum::http::HeaderMap, redirect_url: O
     );
 }
 
-pub fn log_oauth_redirecting(headers: &axum::http::HeaderMap, auth_url: &url::Url, provider: &str) {
+pub fn log_oauth_redirecting(
+    headers: &axum::http::HeaderMap,
+    auth_url: &url::Url,
+    provider: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -81,7 +99,12 @@ pub fn log_oauth_redirecting(headers: &axum::http::HeaderMap, auth_url: &url::Ur
     );
 }
 
-pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str, email: &str, provider: &str) {
+pub fn log_oauth_user_authenticated(
+    headers: &axum::http::HeaderMap,
+    state: &str,
+    email: &str,
+    provider: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -93,7 +116,10 @@ pub fn log_oauth_user_authenticated(headers: &axum::http::HeaderMap, state: &str
     );
 }
 
-pub fn log_user_login_attempt(headers: &axum::http::HeaderMap, email: &str) {
+pub fn log_user_login_attempt(
+    headers: &axum::http::HeaderMap,
+    email: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -103,7 +129,10 @@ pub fn log_user_login_attempt(headers: &axum::http::HeaderMap, email: &str) {
     );
 }
 
-pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
+pub fn log_user_login_success(
+    headers: &axum::http::HeaderMap,
+    email: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -113,7 +142,12 @@ pub fn log_user_login_success(headers: &axum::http::HeaderMap, email: &str) {
     );
 }
 
-pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &str, subject: &str) {
+pub fn log_token_refresh(
+    headers: &axum::http::HeaderMap,
+    user_id: i64,
+    jti: &str,
+    subject: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),
@@ -125,7 +159,11 @@ pub fn log_token_refresh(headers: &axum::http::HeaderMap, user_id: i64, jti: &st
     );
 }
 
-pub fn log_csrf_mismatch(headers: Option<&axum::http::HeaderMap>, expected: &str, got: &str) {
+pub fn log_csrf_mismatch(
+    headers: Option<&axum::http::HeaderMap>,
+    expected: &str,
+    got: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = headers.map_or_else(|| "unknown".to_string(), extract_client_ip),
@@ -136,7 +174,10 @@ pub fn log_csrf_mismatch(headers: Option<&axum::http::HeaderMap>, expected: &str
     );
 }
 
-pub fn log_cookie_error(headers: &axum::http::HeaderMap, reason: &str) {
+pub fn log_cookie_error(
+    headers: &axum::http::HeaderMap,
+    reason: &str,
+) {
     tracing::info!(
         event_type = "auth",
         client_ip = extract_client_ip(headers),

@@ -188,7 +188,10 @@ fn create_index_response_builder(asset: &rust_embed::EmbeddedFile) -> Builder {
         .header(header::ETAG, etag)
 }
 
-fn create_asset_response_builder(asset: &rust_embed::EmbeddedFile, path: &str) -> Builder {
+fn create_asset_response_builder(
+    asset: &rust_embed::EmbeddedFile,
+    path: &str,
+) -> Builder {
     let mime_type = mime_guess::from_path(path).first_or_octet_stream();
     let etag = hex::encode(asset.metadata.sha256_hash());
     let builder = Response::builder()

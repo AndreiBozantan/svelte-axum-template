@@ -31,7 +31,11 @@ impl From<Row> for tokens::RefreshToken {
 pub struct Repository;
 
 impl tokens::TRepository for Repository {
-    async fn create(&self, db: &db::Context, command: tokens::CreateRefreshTokenCommand) -> Result<(), db::Error> {
+    async fn create(
+        &self,
+        db: &db::Context,
+        command: tokens::CreateRefreshTokenCommand,
+    ) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             INSERT INTO refresh_tokens (jti, tenant_id, user_id, token_hash, issued_at, expires_at)
@@ -48,7 +52,11 @@ impl tokens::TRepository for Repository {
         Ok(())
     }
 
-    async fn revoke_by_jti(&self, db: &db::Context, jti: &str) -> Result<(), db::Error> {
+    async fn revoke_by_jti(
+        &self,
+        db: &db::Context,
+        jti: &str,
+    ) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             UPDATE refresh_tokens

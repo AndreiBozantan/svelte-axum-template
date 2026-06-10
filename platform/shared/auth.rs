@@ -83,7 +83,10 @@ where
 {
     type Rejection = api::Error;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
         parts.extensions.get().cloned().ok_or_else(api::Error::invalid_token)
     }
 }
@@ -100,7 +103,10 @@ pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
 }
 
 /// Verify a password against a hash
-pub fn verify_password(password: &str, hash: &str) -> Result<bool, ar2::Error> {
+pub fn verify_password(
+    password: &str,
+    hash: &str,
+) -> Result<bool, ar2::Error> {
     use ar2::PasswordVerifier;
     use argon2::Argon2;
     let parsed_hash = ar2::PasswordHash::new(hash)?;

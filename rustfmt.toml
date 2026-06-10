@@ -1,1 +1,14 @@
+# Keep maximum line width to 120 characters
 max_width = 120
+
+# Use the Rust 2024 edition formatting style
+edition = "2024"
+
+# Force all parameters in function/method signatures onto separate lines
+fn_params_layout = "Vertical"
+
+# Force a trailing comma after block-based match arms (improves diff clean-ness)
+match_block_trailing_comma = true
+
+# Use field initialize shorthand where possible (e.g. User { name } instead of User { name: name })
+use_field_init_shorthand = true

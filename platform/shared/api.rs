@@ -135,7 +135,10 @@ impl Error {
     }
 
     #[must_use]
-    pub fn validation_failed(field: &str, message: &str) -> Self {
+    pub fn validation_failed(
+        field: &str,
+        message: &str,
+    ) -> Self {
         let details = serde_json::json!({
             "field": field,
             "message": message
@@ -159,7 +162,10 @@ impl Error {
     }
 
     #[must_use]
-    pub fn conflict(code: &'static str, message: impl Into<String>) -> Self {
+    pub fn conflict(
+        code: &'static str,
+        message: impl Into<String>,
+    ) -> Self {
         Self::new(StatusCode::CONFLICT, code, message, None)
     }
 }
@@ -257,7 +263,10 @@ where
 {
     type Rejection = Error;
 
-    async fn from_request(req: axum::extract::Request, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(
+        req: axum::extract::Request,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
         match axum::Json::<T>::from_request(req, state).await {
             Ok(axum::Json(value)) => Ok(Self(value)),
             Err(rejection) => {
@@ -273,7 +282,7 @@ where
                     "Request validation failed.",
                     Some(details),
                 ))
-            }
+            },
         }
     }
 }
@@ -304,7 +313,10 @@ where
 {
     type Rejection = Error;
 
-    async fn from_request_parts(parts: &mut axum::http::request::Parts, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
         match axum::extract::Query::<T>::from_request_parts(parts, state).await {
             Ok(axum::extract::Query(value)) => Ok(Self(value)),
             Err(rejection) => {
@@ -320,7 +332,7 @@ where
                     "Request validation failed.",
                     Some(details),
                 ))
-            }
+            },
         }
     }
 }

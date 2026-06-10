@@ -35,7 +35,11 @@ pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
 
 impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     #[must_use]
-    pub const fn new(users: UR, tokens: TR, context: common::ArcContext) -> Self {
+    pub const fn new(
+        users: UR,
+        tokens: TR,
+        context: common::ArcContext,
+    ) -> Self {
         Self { context, users, tokens }
     }
 
@@ -62,7 +66,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         Ok(user)
     }
 
-    pub async fn login(&self, command: LoginCommand) -> Result<AuthResult, auth::Error> {
+    pub async fn login(
+        &self,
+        command: LoginCommand,
+    ) -> Result<AuthResult, auth::Error> {
         let maybe_user = self
             .users
             .find_auth_details_by_email(&self.context.db, &command.email)
@@ -98,7 +105,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         self.issue_session(record.user).await
     }
 
-    pub async fn login_oauth(&self, command: OAuthLoginCommand) -> Result<AuthResult, auth::Error> {
+    pub async fn login_oauth(
+        &self,
+        command: OAuthLoginCommand,
+    ) -> Result<AuthResult, auth::Error> {
         let cmd = users::LinkSsoUserCommand {
             email: command.email,
             tenant_id: common::TenantId(crate::constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
@@ -110,7 +120,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         self.issue_session(user).await
     }
 
-    pub async fn issue_session(&self, user: users::User) -> Result<AuthResult, auth::Error> {
+    pub async fn issue_session(
+        &self,
+        user: users::User,
+    ) -> Result<AuthResult, auth::Error> {
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
         let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
@@ -134,13 +147,19 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         })
     }
 
-    pub async fn revoke_refresh_token(&self, refresh_token_value: &str) -> Result<(), auth::Error> {
+    pub async fn revoke_refresh_token(
+        &self,
+        refresh_token_value: &str,
+    ) -> Result<(), auth::Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
         Ok(())
     }
 
-    pub async fn refresh(&self, refresh_token_value: &str) -> Result<AuthResult, auth::Error> {
+    pub async fn refresh(
+        &self,
+        refresh_token_value: &str,
+    ) -> Result<AuthResult, auth::Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .tokens
@@ -205,7 +224,10 @@ fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
     })
 }
 
-fn generate_refresh_token(ctx: &common::ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, auth::Error> {
+fn generate_refresh_token(
+    ctx: &common::ArcContext,
+    user: &users::User,
+) -> Result<jwt::TokenWithClaims, auth::Error> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -215,7 +237,10 @@ fn generate_refresh_token(ctx: &common::ArcContext, user: &users::User) -> Resul
     )?)
 }
 
-fn generate_access_token(ctx: &common::ArcContext, user: &users::User) -> Result<jwt::TokenWithClaims, auth::Error> {
+fn generate_access_token(
+    ctx: &common::ArcContext,
+    user: &users::User,
+) -> Result<jwt::TokenWithClaims, auth::Error> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
