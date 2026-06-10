@@ -3,11 +3,11 @@
     "enabled": true,
     "PostToolUse": [
       {
-        "matcher": "replace_file_content|multi_replace_file_content|write_to_file",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "./.agents/post_tool_hook.sh",
+            "command": "/workspaces/svelaxum/.agents/post_tool_hook.sh",
             "timeout": 120
           }
         ]

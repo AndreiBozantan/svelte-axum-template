@@ -82,3 +82,66 @@ if command -v uv &> /dev/null; then
 fi
 
 echo "Fish configuration complete."
+
+# Configure Antigravity CLI Hooks
+echo "Configuring Antigravity CLI Hooks..."
+mkdir -p /home/vscode/.gemini/config
+mkdir -p /home/vscode/.gemini/antigravity-cli
+cat << 'EOF' > /home/vscode/.gemini/config/hooks.json
+{
+  "rust-post-edit-validation": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/workspaces/svelaxum/.agents/post_tool_hook.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+cp /home/vscode/.gemini/config/hooks.json /home/vscode/.gemini/antigravity-cli/hooks.json
+chmod +x /workspaces/svelaxum/.agents/post_tool_hook.sh
+echo "Antigravity CLI Hooks configured."
+
+# Configure Antigravity CLI Permissions (Auto-Approve safe tools)
+echo "Configuring Antigravity CLI Permissions..."
+mkdir -p /home/vscode/.gemini/antigravity-cli
+cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
+{
+  "permissions": {
+    "allow": [
+      "read_file(/workspaces/svelaxum)",
+      "write_file(/workspaces/svelaxum)",
+      "command(git)",
+      "command(cargo)",
+      "command(npm)",
+      "command(npx)",
+      "command(node)",
+      "command(which)",
+      "command(ls)",
+      "command(grep)",
+      "command(rg)",
+      "command(cat)",
+      "command(head)",
+      "command(tail)",
+      "command(find)",
+      "command(mkdir)",
+      "command(cp)",
+      "command(touch)",
+      "command(jq)",
+      "command(ps)",
+      "command(date)"
+    ]
+  }
+}
+EOF
+echo "Antigravity CLI Permissions configured."
+
+
