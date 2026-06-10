@@ -255,7 +255,6 @@ impl From<users::Error> for auth::Error {
     fn from(error: users::Error) -> Self {
         match error {
             users::Error::NotFound => Self::InvalidCredentials,
-            users::Error::InvalidEmail => Self::InvalidCredentials,
             users::Error::DatabaseOperationFailed(e) => Self::InternalFault(format!("database operation failed: {e}")),
             users::Error::AlreadyExists => Self::InternalFault("auth UserError::AlreadyExists".into()),
         }

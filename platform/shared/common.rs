@@ -16,11 +16,12 @@ pub struct Email(String);
 impl Email {
     #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
+        use validator::ValidateEmail;
         let normalized = raw.trim().to_ascii_lowercase();
-        if normalized.is_empty() || !normalized.contains('@') {
-            return None;
-        }
-        Some(Self(normalized))
+        if normalized.validate_email() {
+            return Some(Self(normalized));
+        } 
+        None
     }
 
     #[must_use]

@@ -80,7 +80,7 @@ async fn malformed_json_login() -> anyhow::Result<()> {
     response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
     let r: Value = response.json();
     assert_eq!(r["code"], "validation_failed");
-    assert_eq!(r["details"]["field"], "body");
+    assert!(r["details"]["body"][0].is_string());
     Ok(())
 }
 
@@ -94,7 +94,7 @@ async fn missing_fields_login() -> anyhow::Result<()> {
     response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
     let r: Value = response.json();
     assert_eq!(r["code"], "validation_failed");
-    assert_eq!(r["details"]["field"], "body");
+    assert!(r["details"]["body"][0].is_string());
     Ok(())
 }
 
@@ -256,5 +256,43 @@ async fn account_lockout_after_failed_attempts() -> anyhow::Result<()> {
         }))
         .await;
     response.assert_status(StatusCode::UNAUTHORIZED);
+    Ok(())
+}
+
+#[tokio::test]
+async fn register_invalid_email() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "not-an-email",
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response.assert_status(StatusCode::BAD_REQUEST);
+    let r: Value = response.json();
+    assert_eq!(r["code"], "validation_failed");
+    assert_eq!(r["details"]["email"][0], "invalid email address");
+    Ok(())
+}
+
+#[tokio::test]
+async fn register_invalid_password() -> anyhow::Result<()> {
+    let server = create_test_server().await?;
+    let response = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "valid_but_new@example.com",
+            "password": "short",
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response.assert_status(StatusCode::BAD_REQUEST);
+    let r: Value = response.json();
+    assert_eq!(r["code"], "validation_failed");
+    assert_eq!(r["details"]["password"][0], "password must be at least 8 characters");
     Ok(())
 }

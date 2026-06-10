@@ -15,8 +15,10 @@ pub struct Error {
     code: &'static str,
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    details: Option<serde_json::Value>,
+    details: Option<ValidationErrorsMap>,
 }
+
+pub type ValidationErrorsMap = std::collections::HashMap<String, Vec<String>>;
 
 impl Error {
     #[must_use]
@@ -24,7 +26,7 @@ impl Error {
         status: StatusCode,
         code: &'static str,
         message: impl Into<String>,
-        details: Option<serde_json::Value>,
+        details: Option<ValidationErrorsMap>,
     ) -> Self {
         Self {
             status,
@@ -50,7 +52,7 @@ impl Error {
     }
 
     #[must_use]
-    pub fn details(&self) -> Option<serde_json::Value> {
+    pub fn details(&self) -> Option<ValidationErrorsMap> {
         self.details.clone()
     }
 
@@ -139,15 +141,34 @@ impl Error {
         field: &str,
         message: &str,
     ) -> Self {
-        let details = serde_json::json!({
-            "field": field,
-            "message": message
-        });
-        Self::new(
+        Self::validation_failed_with_status(
             StatusCode::BAD_REQUEST,
+            field,
+            message,
+        )
+    }
+
+    #[must_use]
+    pub fn validation_failed_with_status(
+        status: StatusCode,
+        field: &str,
+        message: &str,
+    ) -> Self {
+        let mut map = std::collections::HashMap::new();
+        map.insert(field.to_string(), vec![message.to_string()]);
+        Self::validation_errors_with_status(status, map)
+    }
+
+    #[must_use]
+    pub fn validation_errors_with_status(
+        status: StatusCode,
+        errors: ValidationErrorsMap,
+    ) -> Self {
+        Self::new(
+            status,
             "validation_failed",
             "Request validation failed.",
-            Some(details),
+            Some(errors),
         )
     }
 
@@ -272,15 +293,10 @@ where
             Err(rejection) => {
                 let status = rejection.status();
                 let message = rejection.body_text();
-                let details = serde_json::json!({
-                    "field": "body",
-                    "message": message
-                });
-                Err(Error::new(
+                Err(Error::validation_failed_with_status(
                     status,
-                    "validation_failed",
-                    "Request validation failed.",
-                    Some(details),
+                    "body",
+                    &message,
                 ))
             },
         }
@@ -322,17 +338,53 @@ where
             Err(rejection) => {
                 let status = rejection.status();
                 let message = rejection.body_text();
-                let details = serde_json::json!({
-                    "field": "query",
-                    "message": message
-                });
-                Err(Error::new(
+                Err(Error::validation_failed_with_status(
                     status,
-                    "validation_failed",
-                    "Request validation failed.",
-                    Some(details),
+                    "query",
+                    &message,
                 ))
             },
         }
+    }
+}
+
+/// A custom JSON extractor that wraps our custom `Json` extractor and additionally
+/// performs validation using the `validator` crate.
+pub struct ValidatedJson<T>(pub T);
+
+impl<T> ValidatedJson<T> {
+    pub fn data(self) -> T {
+        self.0
+    }
+}
+
+impl<T, S> axum::extract::FromRequest<S> for ValidatedJson<T>
+where
+    T: serde::de::DeserializeOwned + validator::Validate,
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request(
+        req: axum::extract::Request,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let Json(value) = Json::<T>::from_request(req, state).await?;
+        value.validate().map_err(|errors| {
+            let mut errs = std::collections::HashMap::new();
+            for (field, field_errors) in errors.field_errors() {
+                let messages = field_errors
+                    .iter()
+                    .map(|err| {
+                        err.message
+                            .as_ref()
+                            .map_or_else(|| "Invalid value".to_string(), std::string::ToString::to_string)
+                    })
+                    .collect::<Vec<_>>();
+                errs.insert(field.to_string(), messages);
+            }
+            Error::validation_errors_with_status(StatusCode::BAD_REQUEST, errs)
+        })?;
+        Ok(Self(value))
     }
 }

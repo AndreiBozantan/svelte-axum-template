@@ -27,9 +27,11 @@ where
         .with_state(service)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, validator::Validate)]
 pub struct RegisterRequest {
+    #[validate(email(message = "invalid email address"))]
     pub email: String,
+    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
     pub password: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
@@ -76,15 +78,14 @@ impl From<users::User> for UserResponse {
 
 async fn register<UR, TR>(
     State(service): State<auth::Service<UR, TR>>,
-    request: api::Json<RegisterRequest>,
+    request: api::ValidatedJson<RegisterRequest>,
 ) -> Result<impl IntoResponse, api::Error>
 where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
     let request = request.data();
-    let email = common::Email::parse(&request.email)
-        .ok_or_else(|| api::Error::validation_failed("email", "invalid email address"))?;
+    let email = common::Email::parse(&request.email).ok_or_else(api::Error::internal)?;
     let user = service
         .register(email, &request.password, request.first_name, request.last_name)
         .await?;
