@@ -1,8 +1,8 @@
 use crate::api;
 use crate::common;
 use crate::identity::auth;
-use crate::identity::users;
 use crate::identity::tokens;
+use crate::identity::users;
 
 #[tokio::test]
 async fn oauth_login_new_user_success() -> anyhow::Result<()> {
@@ -51,9 +51,15 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
     let email = common::Email::parse("link_me@example.com").ok_or_else(api::Error::invalid_credentials)?;
     // register user with password first
     let user = auth_service
-        .register(&ctx, email.clone(), "super_secure_pass_123", Some("First".to_string()), Some("Last".to_string()))
+        .register(
+            &ctx,
+            email.clone(),
+            "super_secure_pass_123",
+            Some("First".to_string()),
+            Some("Last".to_string()),
+        )
         .await?;
-    
+
     // Query DB to verify no SSO info initially
     let sso_info_init = users::db::Repository.find_sso_info_by_id(&ctx.db, user.id).await?;
     assert!(sso_info_init.sso_provider.is_none());
@@ -74,10 +80,11 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
     assert_eq!(sso_info_after.sso_id, Some("google-linked-id".to_string()));
 
     // verify they can still log in with their password
-    let password_login = auth_service.login(&ctx, auth::LoginCommand {
+    let cmd = auth::LoginCommand {
         email: email.clone(),
         password: "super_secure_pass_123".to_string(),
-    }).await?;
+    };
+    let password_login = auth_service.login(&ctx, cmd).await?;
     assert_eq!(password_login.user.id, user.id);
 
     Ok(())
@@ -99,13 +106,17 @@ async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
     assert_eq!(res.user.email.as_str(), "oauth_only@example.com");
 
     // try logging in with password - should fail since there is no password_hash
-    let password_login_res = auth_service.login(&ctx, auth::LoginCommand {
+    let cmd = auth::LoginCommand {
         email,
         password: "some_random_password".to_string(),
-    }).await;
+    };
+    let password_login_res = auth_service.login(&ctx, cmd).await;
 
     assert!(password_login_res.is_err());
-    assert!(matches!(password_login_res, Err(crate::auth::Error::InvalidCredentials)));
+    assert!(matches!(
+        password_login_res,
+        Err(crate::auth::Error::InvalidCredentials)
+    ));
 
     Ok(())
 }

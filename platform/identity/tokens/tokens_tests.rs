@@ -3,8 +3,8 @@ use axum::http;
 use axum::http::HeaderValue;
 use axum::http::Request;
 
-use crate::jwt;
 use crate::identity::tokens::utils;
+use crate::jwt;
 
 fn create_test_context() -> anyhow::Result<jwt::Context> {
     let settings = crate::config::JwtSettings {

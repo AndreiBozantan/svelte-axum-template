@@ -140,7 +140,6 @@ async fn refresh_token_reuse_detection() -> anyhow::Result<()> {
     Ok(())
 }
 
-
 #[tokio::test]
 async fn revoke_token_success() -> anyhow::Result<()> {
     let server = create_test_server().await?;

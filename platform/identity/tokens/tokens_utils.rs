@@ -46,8 +46,8 @@ pub fn decode_token_from_req(
     req: &Request,
     token_type: jwt::TokenType,
 ) -> Result<jwt::TokenClaims, Error> {
-    let token = get_cookie_value_from_headers(req.headers(), "access_token")
-        .map_or_else(|| extract_bearer_token(req), Ok)?; // fallback to Authorization: Bearer for API clients
+    let token =
+        get_cookie_value_from_headers(req.headers(), "access_token").map_or_else(|| extract_bearer_token(req), Ok)?; // fallback to Authorization: Bearer for API clients
     let claims = jwt::decode_token(context, token, token_type)?;
     Ok(claims)
 }
@@ -124,4 +124,3 @@ fn extract_bearer_token(req: &Request<Body>) -> Result<&str, Error> {
         .strip_prefix("Bearer ")
         .ok_or(Error::InvalidToken)
 }
-

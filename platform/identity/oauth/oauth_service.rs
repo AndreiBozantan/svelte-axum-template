@@ -55,7 +55,7 @@ impl From<jsonwebtoken::errors::Error> for Error {
         tracing::error!("JWT error: {error}");
         match error.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => Self::SessionExpired,
-            _ => Self::CsrfValidationFailed(error)
+            _ => Self::CsrfValidationFailed(error),
         }
     }
 }
@@ -117,9 +117,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
 
 pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Error> {
     if config.google_client_id.is_empty() {
-        return Err(Error::InvalidConfig(
-            "Google Client ID is not configured".to_string(),
-        ));
+        return Err(Error::InvalidConfig("Google Client ID is not configured".to_string()));
     }
     if config.google_client_secret.is_empty() {
         return Err(Error::InvalidConfig(
@@ -160,10 +158,7 @@ fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Cl
     Ok(client)
 }
 
-pub fn begin_google_flow(
-    context: &common::ArcContext,
-    redirect_url: Option<String>,
-) -> Result<(Url, String), Error> {
+pub fn begin_google_flow(context: &common::ArcContext, redirect_url: Option<String>) -> Result<(Url, String), Error> {
     let redirect_url = if let Some(url) = redirect_url
         && validate_redirect_path(&url).is_ok()
     {
@@ -233,9 +228,7 @@ pub async fn complete_google_callback(
 
     if !response.status().is_success() {
         logger::log_provider_api_error(response.status(), "google");
-        return Err(Error::InvalidConfig(
-            "OAuth provider returned an error".to_string(),
-        ));
+        return Err(Error::InvalidConfig("OAuth provider returned an error".to_string()));
     }
 
     let user_info: GoogleUserInfo = response.json().await?;

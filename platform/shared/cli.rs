@@ -4,8 +4,8 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
-use crate::common;
 use crate::auth;
+use crate::common;
 use crate::identity::users;
 use crate::migrations;
 

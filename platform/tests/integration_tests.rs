@@ -5,15 +5,14 @@ use serde_json::json;
 
 use platform::common;
 
-
 mod identity {
-     mod auth_tests;
-     mod users_tests;
+    mod auth_tests;
+    mod users_tests;
 }
 
 mod shared {
-     mod auth_tests;
-     mod jwt_tests;
+    mod auth_tests;
+    mod jwt_tests;
 }
 
 pub const TEST_USER_EMAIL: &str = "test@example.com";
@@ -37,13 +36,13 @@ pub async fn login_testuser_and_get_tokens(server: &TestServer) -> anyhow::Resul
 }
 
 pub async fn create_test_server() -> anyhow::Result<TestServer> {
-    let ctx = common::Context::create_test_context().await.map_err(|e| anyhow::anyhow!(e))?;
+    let ctx = common::Context::create_test_context()
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
 
     let platform_router = platform::identity::router(ctx.clone()).with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);
-    let server = TestServer::new(
-        api_router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
-    );
+    let server = TestServer::new(api_router.into_make_service_with_connect_info::<std::net::SocketAddr>());
 
     // register the test user via the API
     let response = server

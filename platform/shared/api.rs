@@ -57,42 +57,82 @@ impl Error {
 
     #[must_use]
     pub fn internal() -> Self {
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "An unexpected error occured.", None)
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal_error",
+            "An unexpected error occured.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn invalid_credentials() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "invalid_credentials", "Email or password is incorrect", None)
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "invalid_credentials",
+            "Email or password is incorrect",
+            None,
+        )
     }
 
     #[must_use]
     pub fn not_authenticated() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "not_authenticated", "Authentication is required.", None)
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "not_authenticated",
+            "Authentication is required.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn sso_failed() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "sso_failed", "Single sign-on authentication failed.", None)
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "sso_failed",
+            "Single sign-on authentication failed.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn expired_token() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "expired_token", "Authentication token has expired.", None)
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "expired_token",
+            "Authentication token has expired.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn invalid_token() -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, "invalid_token", "Authentication token is invalid.", None)
+        Self::new(
+            StatusCode::UNAUTHORIZED,
+            "invalid_token",
+            "Authentication token is invalid.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn forbidden() -> Self {
-        Self::new(StatusCode::FORBIDDEN, "forbidden", "The requested operation is not allowed.", None)
+        Self::new(
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            "The requested operation is not allowed.",
+            None,
+        )
     }
 
     #[must_use]
     pub fn not_found() -> Self {
-        Self::new(StatusCode::NOT_FOUND, "not_found", "The requested resource is not found.", None)
+        Self::new(
+            StatusCode::NOT_FOUND,
+            "not_found",
+            "The requested resource is not found.",
+            None,
+        )
     }
 
     #[must_use]
@@ -101,7 +141,12 @@ impl Error {
             "field": field,
             "message": message
         });
-        Self::new(StatusCode::BAD_REQUEST, "validation_failed", "Request validation failed.", Some(details))
+        Self::new(
+            StatusCode::BAD_REQUEST,
+            "validation_failed",
+            "Request validation failed.",
+            Some(details),
+        )
     }
 
     #[must_use]

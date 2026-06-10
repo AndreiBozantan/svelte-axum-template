@@ -70,4 +70,3 @@ fn hash_unicode_password() -> anyhow::Result<()> {
     assert!(auth::verify_password(password, &hash)?);
     Ok(())
 }
-

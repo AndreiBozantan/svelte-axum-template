@@ -90,11 +90,7 @@ impl TryFrom<UserRow> for users::UserAuthRecord {
 pub struct Repository;
 
 impl users::TRepository for Repository {
-    async fn create_user(
-        &self,
-        db: &db::Context,
-        command: users::CreateUserCommand,
-    ) -> Result<users::User, db::Error> {
+    async fn create_user(&self, db: &db::Context, command: users::CreateUserCommand) -> Result<users::User, db::Error> {
         let status: UserStatusRow = command.status.into();
         let email = command.email.as_str().to_string();
         let row = sqlx::query_as!(
@@ -159,11 +155,7 @@ impl users::TRepository for Repository {
         row.try_into()
     }
 
-    async fn find_sso_info_by_id(
-        &self,
-        db: &db::Context,
-        id: common::UserId,
-    ) -> Result<users::UserSsoInfo, db::Error> {
+    async fn find_sso_info_by_id(&self, db: &db::Context, id: common::UserId) -> Result<users::UserSsoInfo, db::Error> {
         let record = sqlx::query!(
             r#"
             SELECT sso_provider, sso_id FROM users
@@ -333,11 +325,7 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn increment_failed_login_count(
-        &self,
-        db: &db::Context,
-        user_id: common::UserId,
-    ) -> Result<(), db::Error> {
+    async fn increment_failed_login_count(&self, db: &db::Context, user_id: common::UserId) -> Result<(), db::Error> {
         let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
         sqlx::query!(
             r#"
@@ -357,11 +345,7 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn reset_failed_login_count(
-        &self,
-        db: &db::Context,
-        user_id: common::UserId,
-    ) -> Result<(), db::Error> {
+    async fn reset_failed_login_count(&self, db: &db::Context, user_id: common::UserId) -> Result<(), db::Error> {
         sqlx::query!(
             r#"
             UPDATE users SET

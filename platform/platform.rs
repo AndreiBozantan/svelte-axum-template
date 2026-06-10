@@ -17,9 +17,9 @@ pub mod shared {
     pub mod auth;
     pub mod cli;
     pub mod common;
-    pub mod db;
     pub mod config;
     pub mod constants;
+    pub mod db;
     pub mod jwt;
     pub mod migrations;
 }
@@ -28,56 +28,56 @@ pub use shared::*;
 
 pub mod identity {
     pub(crate) mod auth {
-        #[path ="auth_api.rs"]
+        #[path = "auth_api.rs"]
         pub mod api;
 
-        #[path ="auth_service.rs"]
+        #[path = "auth_service.rs"]
         mod service;
 
         pub use service::*;
 
         #[cfg(test)]
-        #[path ="auth_tests.rs"]
+        #[path = "auth_tests.rs"]
         mod tests;
     }
 
     pub(crate) mod oauth {
-        #[path ="oauth_api.rs"]
+        #[path = "oauth_api.rs"]
         pub mod api;
 
-        #[path ="oauth_service.rs"]
+        #[path = "oauth_service.rs"]
         mod service;
 
         pub use service::*;
     }
 
     pub(crate) mod users {
-        #[path ="users_api.rs"]
+        #[path = "users_api.rs"]
         pub mod api;
 
-        #[path ="users_db.rs"]
+        #[path = "users_db.rs"]
         pub mod db;
 
-        #[path ="users_service.rs"]
+        #[path = "users_service.rs"]
         mod service;
 
         pub use service::*;
     }
 
     pub(crate) mod tokens {
-        #[path ="tokens_db.rs"]
+        #[path = "tokens_db.rs"]
         pub mod db;
 
-        #[path ="tokens_service.rs"]
+        #[path = "tokens_service.rs"]
         mod service;
-        
-        #[path ="tokens_utils.rs"]
+
+        #[path = "tokens_utils.rs"]
         pub mod utils;
 
         pub use service::*;
-        
+
         #[cfg(test)]
-        #[path ="tokens_tests.rs"]
+        #[path = "tokens_tests.rs"]
         mod tests;
     }
 
