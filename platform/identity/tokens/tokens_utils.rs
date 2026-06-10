@@ -52,8 +52,8 @@ pub fn decode_token_from_req(
     Ok(claims)
 }
 
-pub fn get_refresh_token_from_cookie(req: &Request<Body>) -> Result<&str, Error> {
-    get_cookie_value_from_headers(req.headers(), "refresh_token").ok_or(Error::InvalidToken)
+pub fn get_refresh_token_from_cookie(headers: &http::HeaderMap) -> Result<&str, Error> {
+    get_cookie_value_from_headers(headers, "refresh_token").ok_or(Error::InvalidToken)
 }
 
 pub fn add_auth_cookies(

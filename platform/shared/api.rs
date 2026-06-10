@@ -1,4 +1,3 @@
-use axum::Json;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use reqwest::StatusCode;
@@ -168,7 +167,7 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status;
-        (status, Json(self)).into_response()
+        (status, axum::Json(self)).into_response()
     }
 }
 
@@ -232,5 +231,96 @@ impl Pagination {
         let limit = self.limit.clamp(1, 200);
         let offset = self.offset.max(0);
         (limit, offset)
+    }
+}
+
+/// A custom JSON extractor that wraps axum's standard `Json` extractor to intercept
+/// deserialization/parsing errors and return them as a structured `api::Error`.
+pub struct Json<T>(pub T);
+
+impl<T> Json<T> {
+    pub fn data(self) -> T {
+        self.0
+    }
+}
+
+impl<T> From<T> for Json<T> {
+    fn from(value: T) -> Self {
+        Self(value)
+    }
+}
+
+impl<T, S> axum::extract::FromRequest<S> for Json<T>
+where
+    T: serde::de::DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request(req: axum::extract::Request, state: &S) -> Result<Self, Self::Rejection> {
+        match axum::Json::<T>::from_request(req, state).await {
+            Ok(axum::Json(value)) => Ok(Self(value)),
+            Err(rejection) => {
+                let status = rejection.status();
+                let message = rejection.body_text();
+                let details = serde_json::json!({
+                    "field": "body",
+                    "message": message
+                });
+                Err(Error::new(
+                    status,
+                    "validation_failed",
+                    "Request validation failed.",
+                    Some(details),
+                ))
+            }
+        }
+    }
+}
+
+impl<T> IntoResponse for Json<T>
+where
+    T: Serialize,
+{
+    fn into_response(self) -> Response {
+        axum::Json(self.0).into_response()
+    }
+}
+
+/// A custom Query extractor that wraps axum's standard `Query` extractor to intercept
+/// parsing errors and return them as a structured `api::Error`.
+pub struct Query<T>(pub T);
+
+impl<T> Query<T> {
+    pub fn data(self) -> T {
+        self.0
+    }
+}
+
+impl<T, S> axum::extract::FromRequestParts<S> for Query<T>
+where
+    T: serde::de::DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut axum::http::request::Parts, state: &S) -> Result<Self, Self::Rejection> {
+        match axum::extract::Query::<T>::from_request_parts(parts, state).await {
+            Ok(axum::extract::Query(value)) => Ok(Self(value)),
+            Err(rejection) => {
+                let status = rejection.status();
+                let message = rejection.body_text();
+                let details = serde_json::json!({
+                    "field": "query",
+                    "message": message
+                });
+                Err(Error::new(
+                    status,
+                    "validation_failed",
+                    "Request validation failed.",
+                    Some(details),
+                ))
+            }
+        }
     }
 }

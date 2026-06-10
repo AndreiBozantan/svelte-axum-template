@@ -78,6 +78,9 @@ async fn malformed_json_login() -> anyhow::Result<()> {
     let server = create_test_server().await?;
     let response = server.post("/api/auth/login").text("not json").await;
     response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    let r: Value = response.json();
+    assert_eq!(r["code"], "validation_failed");
+    assert_eq!(r["details"]["field"], "body");
     Ok(())
 }
 
@@ -89,6 +92,9 @@ async fn missing_fields_login() -> anyhow::Result<()> {
         .json(&json!({ "email": TEST_USER_EMAIL }))
         .await;
     response.assert_status(StatusCode::UNPROCESSABLE_ENTITY);
+    let r: Value = response.json();
+    assert_eq!(r["code"], "validation_failed");
+    assert_eq!(r["details"]["field"], "body");
     Ok(())
 }
 
