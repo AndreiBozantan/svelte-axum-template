@@ -3,6 +3,23 @@ use thiserror::Error;
 
 pub type Context = sqlx::SqlitePool;
 
+pub async fn create_context(db_config: &crate::config::DatabaseSettings) -> Result<Context, sqlx::Error> {
+    use std::str::FromStr;
+    let options = sqlx::sqlite::SqliteConnectOptions::from_str(&db_config.url)?
+        .create_if_missing(true)
+        .foreign_keys(true)
+        .busy_timeout(std::time::Duration::from_secs(30));
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(db_config.max_connections)
+        .connect_with(options)
+        .await?;
+    sqlx::query("PRAGMA journal_mode = WAL").execute(&pool).await?;
+    if db_config.store_temp_tables_in_memory {
+        sqlx::query("PRAGMA temp_store = MEMORY").execute(&pool).await?;
+    }
+    Ok(pool)
+}
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("entity not found")]

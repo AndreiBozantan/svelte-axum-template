@@ -1,57 +1,13 @@
-use std::str::FromStr;
-
-use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::sqlite::SqlitePoolOptions;
-
 use crate::api;
 use crate::common;
 use crate::identity::auth;
 use crate::identity::users;
 use crate::identity::tokens;
 
-async fn create_test_context() -> anyhow::Result<common::ArcContext> {
-    let config = crate::config::AppSettings {
-        jwt: crate::config::JwtSettings {
-            access_token_expiry_minutes: 60,
-            refresh_token_expiry_days: 1,
-        },
-        server: crate::config::ServerSettings {
-            env: crate::constants::env::TEST.to_string(),
-            ..Default::default()
-        },
-        database: crate::config::DatabaseSettings {
-            url: "sqlite::memory:".to_string(),
-            max_connections: 5,
-            store_temp_tables_in_memory: true,
-        },
-        ..Default::default()
-    };
-
-    let db_options = SqliteConnectOptions::from_str(&config.database.url)?
-        .create_if_missing(true)
-        .foreign_keys(true);
-    let db = SqlitePoolOptions::new()
-        .max_connections(config.database.max_connections)
-        .connect_with(db_options)
-        .await?;
-
-    let jwt_secret = "test__secret__key__for__jwt__testing";
-    let jwt = crate::jwt::Context::new(&config.jwt, jwt_secret)?;
-    let http_client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
-
-    let ctx = common::Context::new(db, jwt, config, http_client).into();
-    crate::migrations::run_migrations(&ctx).await?;
-
-    Ok(ctx)
-}
-
 #[tokio::test]
 async fn oauth_login_new_user_success() -> anyhow::Result<()> {
     use crate::identity::users::TRepository;
-
-    let ctx = create_test_context().await?;
+    let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
 
     let email = common::Email::parse("oauth_new@example.com").ok_or_else(api::Error::invalid_credentials)?;
@@ -89,7 +45,7 @@ async fn oauth_login_new_user_success() -> anyhow::Result<()> {
 async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
     use crate::identity::users::TRepository;
 
-    let ctx = create_test_context().await?;
+    let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
 
     let email = common::Email::parse("link_me@example.com").ok_or_else(api::Error::invalid_credentials)?;
@@ -129,7 +85,7 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
-    let ctx = create_test_context().await?;
+    let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
 
     let email = common::Email::parse("oauth_only@example.com").ok_or_else(api::Error::invalid_credentials)?;
