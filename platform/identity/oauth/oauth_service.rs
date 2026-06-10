@@ -110,7 +110,10 @@ type GoogleOAuth2Client = oauth2::basic::BasicClient<
     oauth2::EndpointSet,
 >;
 
-fn constant_time_eq(a: &str, b: &str) -> bool {
+fn constant_time_eq(
+    a: &str,
+    b: &str,
+) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -168,14 +171,20 @@ pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
 
 impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     #[must_use]
-    pub const fn new(context: common::ArcContext, auth_service: auth::Service<UR, TR>) -> Self {
+    pub const fn new(
+        context: common::ArcContext,
+        auth_service: auth::Service<UR, TR>,
+    ) -> Self {
         Self {
             context,
             auth: auth_service,
         }
     }
 
-    pub fn begin_google_flow(&self, redirect_url: Option<String>) -> Result<(Url, String), Error> {
+    pub fn begin_google_flow(
+        &self,
+        redirect_url: Option<String>,
+    ) -> Result<(Url, String), Error> {
         let redirect_url = if let Some(url) = redirect_url
             && validate_redirect_path(&url).is_ok()
         {

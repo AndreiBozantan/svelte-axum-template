@@ -71,19 +71,22 @@ pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, Error> {
         None => {
             tracing::info!("CLI command not provided. Use --help for CLI usage.");
             Ok(false)
-        }
+        },
         Some(CliCommand::Migrate { action }) => {
             exec_migrate_command(action, ctx).await?;
             Ok(true)
-        }
+        },
         Some(CliCommand::CreateAdmin { email }) => {
             create_admin(email, ctx).await?;
             Ok(true)
-        }
+        },
     }
 }
 
-async fn exec_migrate_command(action: MigrateAction, ctx: &common::ArcContext) -> Result<(), Error> {
+async fn exec_migrate_command(
+    action: MigrateAction,
+    ctx: &common::ArcContext,
+) -> Result<(), Error> {
     match action {
         MigrateAction::Create { name } => migrate_action_create(&name),
         MigrateAction::List => migrate_action_list(),
@@ -130,7 +133,10 @@ async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), Error> {
     Ok(())
 }
 
-async fn create_admin(email: String, ctx: &common::ArcContext) -> Result<(), Error> {
+async fn create_admin(
+    email: String,
+    ctx: &common::ArcContext,
+) -> Result<(), Error> {
     use crate::identity::users::TRepository;
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
