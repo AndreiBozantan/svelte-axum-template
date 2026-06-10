@@ -20,7 +20,7 @@ impl Email {
         let normalized = raw.trim().to_ascii_lowercase();
         if normalized.validate_email() {
             return Some(Self(normalized));
-        } 
+        }
         None
     }
 
