@@ -63,24 +63,23 @@ impl From<users::Error> for api::Error {
 
 async fn list_users<UR>(
     State(service): State<users::Service<UR>>,
-    pagination: api::Query<api::Pagination>,
+    pagination: api::Pagination,
     claims: jwt::TokenClaims,
 ) -> Result<axum::Json<ListUsersResponse>, api::Error>
 where
     UR: users::TRepository + Clone + 'static,
 {
-    let (limit, offset) = pagination.data().sanitize();
     let query = users::ListUsersQuery {
         tenant_id: common::TenantId(claims.tenant_id),
-        limit,
-        offset,
+        limit: pagination.limit,
+        offset: pagination.offset,
     };
     let result = service.users.list_by_tenant(&service.context.db, query).await?;
     Ok(axum::Json(ListUsersResponse {
         users: result.users.into_iter().map(Into::into).collect(),
         total: result.total,
-        limit,
-        offset,
+        limit: pagination.limit,
+        offset: pagination.offset,
     }))
 }
 

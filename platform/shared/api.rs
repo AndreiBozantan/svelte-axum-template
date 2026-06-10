@@ -137,18 +137,6 @@ impl Error {
     }
 
     #[must_use]
-    pub fn validation_failed(
-        field: &str,
-        message: &str,
-    ) -> Self {
-        Self::validation_failed_with_status(
-            StatusCode::BAD_REQUEST,
-            field,
-            message,
-        )
-    }
-
-    #[must_use]
     pub fn validation_failed_with_status(
         status: StatusCode,
         field: &str,
@@ -164,12 +152,7 @@ impl Error {
         status: StatusCode,
         errors: ValidationErrorsMap,
     ) -> Self {
-        Self::new(
-            status,
-            "validation_failed",
-            "Request validation failed.",
-            Some(errors),
-        )
+        Self::new(status, "validation_failed", "Request validation failed.", Some(errors))
     }
 
     #[must_use]
@@ -241,10 +224,16 @@ impl From<axum::http::header::InvalidHeaderValue> for Error {
 }
 
 #[derive(Deserialize)]
-pub struct Pagination {
+struct RawPagination {
     #[serde(default = "default_pagination_limit")]
     pub limit: i64,
     #[serde(default)]
+    pub offset: i64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Pagination {
+    pub limit: i64,
     pub offset: i64,
 }
 
@@ -252,12 +241,20 @@ const fn default_pagination_limit() -> i64 {
     20
 }
 
-impl Pagination {
-    #[must_use]
-    pub fn sanitize(&self) -> (i64, i64) {
-        let limit = self.limit.clamp(1, 200);
-        let offset = self.offset.max(0);
-        (limit, offset)
+impl<S> axum::extract::FromRequestParts<S> for Pagination
+where
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let Query(raw) = Query::<RawPagination>::from_request_parts(parts, state).await?;
+        let limit = raw.limit.clamp(1, 200);
+        let offset = raw.offset.max(0);
+        Ok(Self { limit, offset })
     }
 }
 
@@ -293,11 +290,7 @@ where
             Err(rejection) => {
                 let status = rejection.status();
                 let message = rejection.body_text();
-                Err(Error::validation_failed_with_status(
-                    status,
-                    "body",
-                    &message,
-                ))
+                Err(Error::validation_failed_with_status(status, "body", &message))
             },
         }
     }
@@ -338,11 +331,7 @@ where
             Err(rejection) => {
                 let status = rejection.status();
                 let message = rejection.body_text();
-                Err(Error::validation_failed_with_status(
-                    status,
-                    "query",
-                    &message,
-                ))
+                Err(Error::validation_failed_with_status(status, "query", &message))
             },
         }
     }
