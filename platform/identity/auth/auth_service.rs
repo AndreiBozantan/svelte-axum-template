@@ -58,10 +58,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             sso_provider: None,
             sso_id: None,
         };
-        let user = self
-            .users
-            .create_user(&ctx.db, cmd)
-            .await?;
+        let user = self.users.create_user(&ctx.db, cmd).await?;
         Ok(user)
     }
 
@@ -144,7 +141,11 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         Ok(())
     }
 
-    pub async fn refresh(&self, ctx: &common::ArcContext, refresh_token_value: &str) -> Result<AuthResult, auth::Error> {
+    pub async fn refresh(
+        &self,
+        ctx: &common::ArcContext,
+        refresh_token_value: &str,
+    ) -> Result<AuthResult, auth::Error> {
         let claims = jwt::decode_token(&ctx.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .tokens

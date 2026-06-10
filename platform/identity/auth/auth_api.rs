@@ -95,9 +95,8 @@ where
     UR: users::TRepository + Clone,
     TR: tokens::TRepository + Clone,
 {
-    let email = common::Email::parse(&request.email).ok_or_else(|| {
-        api::Error::validation_failed("email", "invalid email address")
-    })?;
+    let email = common::Email::parse(&request.email)
+        .ok_or_else(|| api::Error::validation_failed("email", "invalid email address"))?;
 
     let user = service
         .register(
@@ -109,9 +108,7 @@ where
         )
         .await?;
 
-    let body = RegisterResponse {
-        user: user.into(),
-    };
+    let body = RegisterResponse { user: user.into() };
 
     Ok((axum::http::StatusCode::CREATED, Json(body)))
 }
@@ -162,7 +159,12 @@ where
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(Body::empty())?;
-    Ok(tokens::utils::add_auth_cookies(&context.settings.jwt, response, None, None)?)
+    Ok(tokens::utils::add_auth_cookies(
+        &context.settings.jwt,
+        response,
+        None,
+        None,
+    )?)
 }
 
 async fn refresh<UR, TR>(

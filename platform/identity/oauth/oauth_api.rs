@@ -93,7 +93,8 @@ where
             api::Error::sso_failed()
         })?;
 
-    let (user_info, redirect_url) = oauth::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
+    let (user_info, redirect_url) =
+        oauth::complete_google_callback(&ctx, &params.code, &params.state, oauth_state_cookie).await?;
 
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");

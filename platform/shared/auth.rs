@@ -117,4 +117,3 @@ pub fn verify_password(password: &str, hash: &str) -> Result<bool, ar2::Error> {
 pub static DUMMY_HASH: &str = "$argon2id$\
     v=19$m=19456,t=2,p=1$\
     HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore
-

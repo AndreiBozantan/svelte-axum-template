@@ -5,8 +5,8 @@ use serde::Serialize;
 
 use crate::api;
 use crate::common;
-use crate::jwt;
 use crate::identity::users;
+use crate::jwt;
 
 pub fn router<UR>(ctx: common::ArcContext, repo: UR) -> Router<common::ArcContext>
 where

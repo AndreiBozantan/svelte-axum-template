@@ -225,14 +225,16 @@ fn jwt_clock_skew_leeway_validation() -> anyhow::Result<()> {
 
     // 1. within 5-second leeway: 3 seconds in the past should be accepted
     let exp_within = now - 3;
-    let token_within = generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_within)?;
+    let token_within =
+        generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_within)?;
     let claims_within = jwt::decode_token(&ctx, &token_within, jwt::TokenType::Access);
     assert!(claims_within.is_ok());
     assert_eq!(claims_within.unwrap().sub, "123");
 
     // 2. outside 5-second leeway: 6 seconds in the past should be rejected
     let exp_outside = now - 6;
-    let token_outside = generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_outside)?;
+    let token_outside =
+        generate_token_with_custom_exp(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access, exp_outside)?;
     let claims_outside = jwt::decode_token(&ctx, &token_outside, jwt::TokenType::Access);
     assert!(claims_outside.is_err());
     assert!(matches!(claims_outside.unwrap_err(), jwt::Error::ExpiredToken));

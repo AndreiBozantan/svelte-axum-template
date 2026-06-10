@@ -72,10 +72,7 @@ impl Context {
         self.settings.server.env == crate::constants::env::TEST
     }
 
-    pub async fn create(
-        settings: config::AppSettings,
-        jwt_secret: &str,
-    ) -> Result<ArcContext, ContextCreationError> {
+    pub async fn create(settings: config::AppSettings, jwt_secret: &str) -> Result<ArcContext, ContextCreationError> {
         let db = crate::db::create_context(&settings.database).await?;
         let jwt = crate::jwt::Context::new(&settings.jwt, jwt_secret)?;
         let http_client = reqwest::Client::builder()
@@ -116,4 +113,3 @@ impl Context {
         Ok(context)
     }
 }
-

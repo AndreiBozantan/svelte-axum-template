@@ -114,7 +114,6 @@ async fn start_server(ctx: common::ArcContext) -> Result<(), Error> {
     Ok(())
 }
 
-
 async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
         Ok(()) => tracing::info!("Shutdown signal received, shutting down gracefully"),
@@ -161,7 +160,6 @@ fn create_router(context: ArcContext) -> Router {
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(context)
 }
-
 
 #[allow(clippy::unused_async)]
 async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
