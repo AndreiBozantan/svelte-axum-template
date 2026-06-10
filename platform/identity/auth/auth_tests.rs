@@ -8,7 +8,7 @@ use crate::identity::users;
 async fn oauth_login_new_user_success() -> anyhow::Result<()> {
     use crate::identity::users::TRepository;
     let ctx = common::Context::create_test_context().await?;
-    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
+    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 
     let email = common::Email::parse("oauth_new@example.com").ok_or_else(api::Error::invalid_credentials)?;
     let command = auth::OAuthLoginCommand {
@@ -18,7 +18,7 @@ async fn oauth_login_new_user_success() -> anyhow::Result<()> {
     };
 
     // first login should succeed and create the user
-    let res = auth_service.login_oauth(&ctx, command).await?;
+    let res = auth_service.login_oauth(command).await?;
     assert_eq!(res.user.email.as_str(), "oauth_new@example.com");
     assert!(!res.access_token.value.is_empty());
     assert!(!res.refresh_token.value.is_empty());
@@ -34,7 +34,7 @@ async fn oauth_login_new_user_success() -> anyhow::Result<()> {
         sso_provider: "google".to_string(),
         sso_id: "google-sso-id-123".to_string(),
     };
-    let res_subsequent = auth_service.login_oauth(&ctx, command_subsequent).await?;
+    let res_subsequent = auth_service.login_oauth(command_subsequent).await?;
     assert_eq!(res_subsequent.user.id, res.user.id);
     assert_eq!(res_subsequent.user.email.as_str(), "oauth_new@example.com");
 
@@ -46,13 +46,12 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
     use crate::identity::users::TRepository;
 
     let ctx = common::Context::create_test_context().await?;
-    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
+    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 
     let email = common::Email::parse("link_me@example.com").ok_or_else(api::Error::invalid_credentials)?;
     // register user with password first
     let user = auth_service
         .register(
-            &ctx,
             email.clone(),
             "super_secure_pass_123",
             Some("First".to_string()),
@@ -71,7 +70,7 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
         sso_provider: "google".to_string(),
         sso_id: "google-linked-id".to_string(),
     };
-    let res = auth_service.login_oauth(&ctx, command).await?;
+    let res = auth_service.login_oauth(command).await?;
     assert_eq!(res.user.id, user.id);
 
     // Query DB to verify SSO info was linked
@@ -84,7 +83,7 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
         email: email.clone(),
         password: "super_secure_pass_123".to_string(),
     };
-    let password_login = auth_service.login(&ctx, cmd).await?;
+    let password_login = auth_service.login(cmd).await?;
     assert_eq!(password_login.user.id, user.id);
 
     Ok(())
@@ -93,7 +92,7 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
 #[tokio::test]
 async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
     let ctx = common::Context::create_test_context().await?;
-    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
+    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 
     let email = common::Email::parse("oauth_only@example.com").ok_or_else(api::Error::invalid_credentials)?;
     let command = auth::OAuthLoginCommand {
@@ -102,7 +101,7 @@ async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
         sso_id: "google-sso-id-999".to_string(),
     };
 
-    let res = auth_service.login_oauth(&ctx, command).await?;
+    let res = auth_service.login_oauth(command).await?;
     assert_eq!(res.user.email.as_str(), "oauth_only@example.com");
 
     // try logging in with password - should fail since there is no password_hash
@@ -110,7 +109,7 @@ async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
         email,
         password: "some_random_password".to_string(),
     };
-    let password_login_res = auth_service.login(&ctx, cmd).await;
+    let password_login_res = auth_service.login(cmd).await;
 
     assert!(password_login_res.is_err());
     assert!(matches!(

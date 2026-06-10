@@ -82,11 +82,13 @@ pub mod identity {
     }
 
     pub fn router(ctx: crate::common::ArcContext) -> axum::Router<crate::common::ArcContext> {
-        let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository);
+        let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
+        let oauth_service = oauth::Service::new(ctx.clone(), auth_service.clone());
+        let users_service = users::Service::new(users::db::Repository, ctx);
 
         axum::Router::new()
-            .merge(auth::api::router(ctx.clone(), auth_service.clone()))
-            .merge(oauth::api::router(ctx.clone(), auth_service))
-            .merge(users::api::router(ctx, users::db::Repository))
+            .merge(auth::api::router(auth_service))
+            .merge(oauth::api::router(oauth_service))
+            .merge(users::api::router(users_service))
     }
 }
