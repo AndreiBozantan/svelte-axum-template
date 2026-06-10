@@ -37,7 +37,11 @@ toml = { workspace = true }
 clap = { workspace = true }
 rpassword = { workspace = true }
 
+[features]
+test-helpers = []
+
 [dev-dependencies]
+platform = { path = ".", features = ["test-helpers"] }
 anyhow = "1.0"
 axum-test = { workspace = true }
 cookie = { workspace = true }

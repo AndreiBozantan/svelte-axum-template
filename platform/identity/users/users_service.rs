@@ -74,6 +74,13 @@ pub struct UserList {
     pub total: i64,
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct UserSsoInfo {
+    pub sso_provider: Option<String>,
+    pub sso_id: Option<String>,
+}
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("invalid email address")]
@@ -100,7 +107,6 @@ impl From<db::Error> for Error {
 }
 
 pub trait TRepository: Send + Sync {
-    #[allow(dead_code)]
     fn create_user(
         &self,
         db: &db::Context,
@@ -112,6 +118,13 @@ pub trait TRepository: Send + Sync {
         db: &db::Context,
         id: common::UserId,
     ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
+
+    #[allow(dead_code)]
+    fn find_sso_info_by_id(
+        &self,
+        db: &db::Context,
+        id: common::UserId,
+    ) -> impl std::future::Future<Output = Result<UserSsoInfo, db::Error>> + Send;
 
     fn find_auth_details_by_email(
         &self,

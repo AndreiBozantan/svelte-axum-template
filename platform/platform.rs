@@ -35,6 +35,10 @@ pub mod identity {
         mod service;
 
         pub use service::*;
+
+        #[cfg(test)]
+        #[path ="auth_tests.rs"]
+        mod tests;
     }
 
     pub(crate) mod oauth {

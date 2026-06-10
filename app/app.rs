@@ -6,7 +6,6 @@
 #![allow(clippy::missing_errors_doc)]
 
 use std::net::SocketAddr;
-use std::str::FromStr;
 
 use axum::Router;
 use axum::body::Body;
@@ -20,8 +19,6 @@ use chrono::TimeZone;
 use chrono::Utc;
 use rust_embed::RustEmbed;
 use serde::Serialize;
-use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -29,7 +26,6 @@ use platform::api;
 use platform::common;
 use platform::common::ArcContext;
 use platform::config;
-use platform::db;
 use platform::jwt;
 use platform::migrations;
 
@@ -78,6 +74,9 @@ pub enum Error {
 
     #[error("Server error: {0}")]
     HttpClientCreationFailed(#[from] reqwest::Error),
+
+    #[error("Context creation error: {0}")]
+    ContextCreationFailed(#[from] platform::common::ContextCreationError),
 }
 
 async fn run_app() -> Result<(), Error> {
@@ -94,11 +93,8 @@ async fn run_app() -> Result<(), Error> {
     tracing::info!("cfg_dir: {}", settings.get_config_dir_str()?);
     tracing::info!("address: http://{}", settings.get_server_address());
 
-    let http_client = create_http_client()?;
-    let db = create_db_context(&settings.database).await?;
     let jwt_secret = jwt::get_jwt_secret()?;
-    let jwt = jwt::Context::new(&settings.jwt, &jwt_secret)?;
-    let ctx = common::Context::new(db, jwt, settings, http_client).into();
+    let ctx = common::Context::create(settings, &jwt_secret).await?;
 
     if !platform::cli::run_cli(&ctx).await? {
         migrations::run_migrations(&ctx).await?;
@@ -118,11 +114,6 @@ async fn start_server(ctx: common::ArcContext) -> Result<(), Error> {
     Ok(())
 }
 
-fn create_http_client() -> Result<reqwest::Client, reqwest::Error> {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-}
 
 async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
@@ -171,21 +162,6 @@ fn create_router(context: ArcContext) -> Router {
         .with_state(context)
 }
 
-async fn create_db_context(db_config: &config::DatabaseSettings) -> Result<db::Context, sqlx::Error> {
-    let options = SqliteConnectOptions::from_str(&db_config.url)?
-        .create_if_missing(true)
-        .foreign_keys(true)
-        .busy_timeout(std::time::Duration::from_secs(30));
-    let pool = SqlitePoolOptions::new()
-        .max_connections(db_config.max_connections)
-        .connect_with(options)
-        .await?;
-    sqlx::query("PRAGMA journal_mode = WAL").execute(&pool).await?;
-    if db_config.store_temp_tables_in_memory {
-        sqlx::query("PRAGMA temp_store = MEMORY").execute(&pool).await?;
-    }
-    Ok(pool)
-}
 
 #[allow(clippy::unused_async)]
 async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
