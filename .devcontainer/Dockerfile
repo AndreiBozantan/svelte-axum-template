@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-# --- Rust Toolchain (v1.95.0) ---
+# Rust Toolchain (v1.95.0) 
 FROM rust:1.95.0-slim-bookworm@sha256:caaf9ca7acd474892186860307d6f28e51fdbc1a4eada459fcff81517cf46a36 AS rust-env
 RUN rustup component add rust-analyzer clippy rustfmt
 
-# --- Node.js (v24 LTS) ---
+# Node.js (v24 LTS)
 FROM node:24-bookworm-slim@sha256:03eae3ef7e88a9de535496fb488d67e02b9d96a063a8967bae657744ecd513f2 AS node-env
 
-# --- Final Dev Container ---
+# Final Dev Container 
 FROM mcr.microsoft.com/devcontainers/base:bookworm@sha256:17e6cc517b483d1108b333d4c34352b0a21617f0117052e9b259d47113a9dc37
 
 # Install system build tools (required for compiling native Rust/Node extensions)
@@ -39,7 +39,7 @@ USER vscode
 COPY --chown=vscode:vscode --from=rust-env /usr/local/cargo /home/vscode/.cargo
 COPY --chown=vscode:vscode --from=rust-env /usr/local/rustup /home/vscode/.rustup
 
-# 5. Set Environment Variables so tools are found in the PATH
+# Set Environment Variables so tools are found in the PATH
 ENV RUSTUP_HOME="/home/vscode/.rustup" \
     CARGO_HOME="/home/vscode/.cargo" \
     PATH="/home/vscode/.cargo/bin:/home/vscode/.local/bin:${PATH}"
@@ -76,4 +76,5 @@ RUN mkdir -p \
   /home/vscode/.npm \
   /home/vscode/.vscode-server \
   /home/vscode/.local/share/fish \
-  /home/vscode/.config
+  /home/vscode/.config \
+  /home/vscode/.gemini
