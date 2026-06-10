@@ -17,12 +17,12 @@ where
     Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
-        .with_state(AppState { context, repo })
+        .with_state(RouteState { context, repo })
         .route_layer(axum::middleware::from_fn_with_state(ctx, crate::auth::middleware))
 }
 
 #[derive(Clone)]
-struct AppState<UR>
+struct RouteState<UR>
 where
     UR: users::TRepository + Clone + 'static,
 {
@@ -73,7 +73,7 @@ impl From<users::Error> for api::Error {
 }
 
 async fn list_users<UR>(
-    State(AppState { context, repo }): State<AppState<UR>>,
+    State(RouteState { context, repo }): State<RouteState<UR>>,
     axum::extract::Query(pagination): axum::extract::Query<api::Pagination>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<ListUsersResponse>, api::Error>
@@ -98,7 +98,7 @@ where
 }
 
 async fn user_info<UR>(
-    State(AppState { context, repo }): State<AppState<UR>>,
+    State(RouteState { context, repo }): State<RouteState<UR>>,
     claims: jwt::TokenClaims,
 ) -> Result<Json<UserInfoResponse>, api::Error>
 where
