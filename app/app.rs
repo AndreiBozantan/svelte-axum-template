@@ -4,6 +4,8 @@
 #![warn(clippy::todo)]
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
 
 use std::net::SocketAddr;
 
@@ -29,8 +31,7 @@ use platform::config;
 use platform::jwt;
 use platform::migrations;
 
-#[tokio::main]
-async fn main() {
+pub async fn run() {
     #[cfg(debug_assertions)]
     {
         dotenvy::dotenv().ok();
@@ -144,7 +145,7 @@ async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResp
     }))
 }
 
-fn create_router(context: ArcContext) -> Router {
+pub fn create_router(context: ArcContext) -> Router {
     let public = Router::new()
         .route("/health", axum::routing::get(health_check))
         .with_state(context.clone());
@@ -162,7 +163,10 @@ fn create_router(context: ArcContext) -> Router {
 }
 
 #[allow(clippy::unused_async)]
-async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
+async fn static_handler(
+    uri: Uri,
+    headers: http::HeaderMap,
+) -> Result<impl IntoResponse, api::Error> {
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
     let asset = Assets::get(path_str);
@@ -170,9 +174,21 @@ async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
     let asset = asset
         .or_else(|| Assets::get(path_str))
         .ok_or_else(api::Error::not_found)?;
+
+    let etag = hex::encode(asset.metadata.sha256_hash());
+
+    // check If-None-Match header for client caching (304 Not Modified)
+    if headers
+        .get(header::IF_NONE_MATCH)
+        .and_then(|val| val.to_str().ok())
+        .is_some_and(|s| s.trim_matches('"') == etag)
+    {
+        return Ok(http::StatusCode::NOT_MODIFIED.into_response());
+    }
+
     let builder = match path_str {
-        "index.html" => create_index_response_builder(&asset),
-        _ => create_asset_response_builder(&asset, path_str),
+        "index.html" => create_index_response_builder(&asset, &etag),
+        _ => create_asset_response_builder(&asset, path_str, &etag),
     };
     let body = builder.body(Body::from(asset.data.to_vec()))?;
     Ok(body.into_response())
@@ -180,8 +196,10 @@ async fn static_handler(uri: Uri) -> Result<impl IntoResponse, api::Error> {
 
 type Builder = http::response::Builder;
 
-fn create_index_response_builder(asset: &rust_embed::EmbeddedFile) -> Builder {
-    let etag = hex::encode(asset.metadata.sha256_hash());
+fn create_index_response_builder(
+    _asset: &rust_embed::EmbeddedFile,
+    etag: &str,
+) -> Builder {
     Response::builder()
         .header(header::CONTENT_TYPE, "text/html")
         .header(header::CACHE_CONTROL, "no-cache")
@@ -191,9 +209,9 @@ fn create_index_response_builder(asset: &rust_embed::EmbeddedFile) -> Builder {
 fn create_asset_response_builder(
     asset: &rust_embed::EmbeddedFile,
     path: &str,
+    etag: &str,
 ) -> Builder {
     let mime_type = mime_guess::from_path(path).first_or_octet_stream();
-    let etag = hex::encode(asset.metadata.sha256_hash());
     let builder = Response::builder()
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")

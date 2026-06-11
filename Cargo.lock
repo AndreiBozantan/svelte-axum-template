@@ -104,6 +104,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "app"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-test",
+ "chrono",
+ "config",
+ "dotenvy",
+ "hex",
+ "mime_guess",
+ "platform",
+ "reqwest 0.13.2",
+ "rust-embed",
+ "serde",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "argon2"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2238,7 +2261,6 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "platform"
 version = "0.8.0"
 dependencies = [
- "anyhow",
  "argon2",
  "axum",
  "axum-extra",
@@ -3399,28 +3421,6 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
-
-[[package]]
-name = "svelaxum"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "config",
- "dotenvy",
- "hex",
- "mime_guess",
- "platform",
- "reqwest 0.13.2",
- "rust-embed",
- "serde",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "syn"

@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/home/vscode/.cargo/registry,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/vscode/.cargo/git,uid=1000,gid=1000 \
     --mount=type=cache,target=/build/target,uid=1000,gid=1000 \
     SQLX_OFFLINE=true cargo build --release \
-    && cp target/release/svelaxum /build/svelaxum
+    && cp target/release/app /build/app
 
 # create a completely empty directory out of reach of the build context
 RUN mkdir -p /tmp/empty_data
@@ -30,7 +30,7 @@ FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1
 USER nonroot:nonroot
 
 # copy the compiled binary from the builder stage
-COPY --from=builder /build/svelaxum /usr/local/bin/svelaxum
+COPY --from=builder /build/app /usr/local/bin/app
 
 # copy the pristine empty directory and map it to /data with nonroot ownership
 COPY --from=builder --chown=nonroot:nonroot /tmp/empty_data /data
@@ -39,4 +39,4 @@ COPY --from=builder --chown=nonroot:nonroot /tmp/empty_data /data
 WORKDIR /
 EXPOSE 3000
 VOLUME ["/data"]
-CMD ["svelaxum"]
+CMD ["app"]
