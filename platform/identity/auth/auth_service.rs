@@ -81,11 +81,12 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(auth::Error::InvalidCredentials);
         }
 
+        let dummy_hash = auth::dummy_hash()?;
         let password_hash = maybe_user
             .as_ref()
             .and_then(|record| record.password_hash.as_deref())
             .ok_or_else(|| {
-                let _ = auth::verify_password(&command.password, auth::DUMMY_HASH);
+                let _ = auth::verify_password(&command.password, dummy_hash);
                 auth::Error::InvalidCredentials
             })?;
 
