@@ -85,7 +85,7 @@ where
         })?;
 
     let (user_info, redirect_url) = service
-        .complete_google_callback(&params.code, &params.state, oauth_state_cookie)
+        .complete_google_callback(&params.code, &params.state, &oauth_state_cookie)
         .await?;
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");

@@ -3,6 +3,10 @@ use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
 use axum::response::Response;
+use axum_extra::extract::cookie::Cookie;
+use axum_extra::extract::cookie::CookieJar;
+use axum_extra::extract::cookie::SameSite;
+use cookie::time::Duration;
 use serde::Serialize;
 use sha2::Digest;
 use thiserror::Error;
@@ -46,14 +50,25 @@ pub fn decode_token_from_req(
     req: &Request,
     token_type: jwt::TokenType,
 ) -> Result<jwt::TokenClaims, Error> {
-    let token =
-        get_cookie_value_from_headers(req.headers(), "access_token").map_or_else(|| extract_bearer_token(req), Ok)?; // fallback to Authorization: Bearer for API clients
+    let headers = req.headers();
+    let jar = CookieJar::from_headers(headers);
+
+    // check cookie first, fallback to bearer token
+    let token = jar
+        .get("access_token")
+        .map(Cookie::value)
+        .ok_or(Error::InvalidToken)
+        .or_else(|_| extract_bearer_token(req))?;
+
     let claims = jwt::decode_token(context, token, token_type)?;
     Ok(claims)
 }
 
-pub fn get_refresh_token_from_cookie(headers: &http::HeaderMap) -> Result<&str, Error> {
-    get_cookie_value_from_headers(headers, "refresh_token").ok_or(Error::InvalidToken)
+pub fn get_refresh_token_from_cookie(headers: &http::HeaderMap) -> Result<String, Error> {
+    let jar = CookieJar::from_headers(headers);
+    jar.get("refresh_token")
+        .map(|c| c.value().to_string())
+        .ok_or(Error::InvalidToken)
 }
 
 pub fn add_auth_cookies(
@@ -62,25 +77,32 @@ pub fn add_auth_cookies(
     access_token: Option<&str>,
     refresh_token: Option<&str>,
 ) -> Result<Response<Body>, Error> {
+    let at_cookie = create_token_cookie(
+        "access_token",
+        access_token,
+        "/",
+        Duration::minutes(i64::from(settings.access_token_expiry_minutes)),
+    );
+
+    let rt_cookie = create_token_cookie(
+        "refresh_token",
+        refresh_token,
+        "/api/auth/",
+        Duration::days(i64::from(settings.refresh_token_expiry_days)),
+    );
+
+    let mut jar = CookieJar::new();
+    jar = jar.add(at_cookie).add(rt_cookie);
+
     let mut response = response;
     let headers = response.headers_mut();
-
-    // access token (default to empty string with Max-Age=0 to clear it if None)
-    let at_val = access_token.unwrap_or("");
-    let access_max_age = settings.access_token_expiry_minutes * 60;
-    let access_cookie = create_token_cookie("access_token", at_val, "/", access_max_age);
-    headers.append(http::header::SET_COOKIE, access_cookie.parse()?);
-
-    // refresh token (default to empty string with Max-Age=0 to clear it if None)
-    let rt_val = refresh_token.unwrap_or("");
-    let refresh_max_age = settings.refresh_token_expiry_days * 60 * 60 * 24;
-    let refresh_cookie = create_token_cookie("refresh_token", rt_val, "/api/auth/", refresh_max_age);
-    headers.append(http::header::SET_COOKIE, refresh_cookie.parse()?);
+    for cookie in jar.iter() {
+        headers.append(http::header::SET_COOKIE, cookie.to_string().parse()?);
+    }
 
     Ok(response)
 }
 
-/// Build a JSON response and attach auth cookies in one step.
 pub fn create_response_with_auth_cookies(
     settings: &config::JwtSettings,
     body: &impl Serialize,
@@ -91,39 +113,32 @@ pub fn create_response_with_auth_cookies(
     add_auth_cookies(settings, response, access_token, refresh_token)
 }
 
-pub fn get_cookie_value_from_headers<'a>(
-    headers: &'a http::HeaderMap,
+pub fn get_cookie_value_from_headers(
+    headers: &http::HeaderMap,
     name: &str,
-) -> Option<&'a str> {
-    headers
-        .get(http::header::COOKIE)
-        .and_then(|header| header.to_str().ok())
-        .and_then(|cookie_str| extract_token_from_cookie(cookie_str, name))
-}
-
-#[must_use]
-pub fn extract_token_from_cookie<'a>(
-    cookie_str: &'a str,
-    token_name: &str,
-) -> Option<&'a str> {
-    cookie_str.split(';').find_map(|cookie| {
-        let mut parts = cookie.trim().splitn(2, '=');
-        if parts.next()? == token_name {
-            parts.next()
-        } else {
-            None
-        }
-    })
+) -> Option<String> {
+    let jar = CookieJar::from_headers(headers);
+    jar.get(name).map(|c| c.value().to_string())
 }
 
 fn create_token_cookie(
-    cookie_name: &str,
-    cookie_value: &str,
-    path: &str,
-    max_age: u32,
-) -> String {
-    let max_age = if cookie_value.is_empty() { 0 } else { max_age };
-    format!("{cookie_name}={cookie_value}; HttpOnly; Secure; SameSite=Strict; Path={path}; Max-Age={max_age}")
+    name: &'static str,
+    value: Option<&str>,
+    path: &'static str,
+    max_age: Duration,
+) -> Cookie<'static> {
+    let (cookie_val, cookie_max_age) = match value {
+        Some(val) if !val.is_empty() => (val.to_string(), max_age),
+        _ => (String::new(), Duration::ZERO),
+    };
+
+    Cookie::build((name, cookie_val))
+        .path(path)
+        .max_age(cookie_max_age)
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Strict)
+        .build()
 }
 
 fn extract_bearer_token(req: &Request<Body>) -> Result<&str, Error> {

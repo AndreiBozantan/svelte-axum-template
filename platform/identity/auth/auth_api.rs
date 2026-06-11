@@ -131,7 +131,7 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     if let Ok(refresh_token) = tokens::utils::get_refresh_token_from_cookie(&headers) {
-        let _ = service.revoke_refresh_token(refresh_token).await;
+        let _ = service.revoke_refresh_token(&refresh_token).await;
     }
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
@@ -153,7 +153,7 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let refresh_token = tokens::utils::get_refresh_token_from_cookie(&headers)?;
-    let session = service.refresh(refresh_token).await?;
+    let session = service.refresh(&refresh_token).await?;
     logger::log_token_refresh(
         &headers,
         session.user.id.0,
