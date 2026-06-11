@@ -5,6 +5,8 @@ use serde_json::json;
 
 use platform::common;
 
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 mod identity {
     mod auth_tests;
     mod users_tests;
@@ -18,7 +20,7 @@ mod shared {
 pub const TEST_USER_EMAIL: &str = "test@example.com";
 pub const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
 
-pub async fn login_testuser_and_get_tokens(server: &TestServer) -> anyhow::Result<(Value, String, String)> {
+pub async fn login_testuser_and_get_tokens(server: &TestServer) -> TestResult<(Value, String, String)> {
     let response = server
         .post("/api/auth/login")
         .json(&json!({
@@ -35,10 +37,8 @@ pub async fn login_testuser_and_get_tokens(server: &TestServer) -> anyhow::Resul
     Ok((body, access_token, refresh_token))
 }
 
-pub async fn create_test_server() -> anyhow::Result<TestServer> {
-    let ctx = common::Context::create_test_context()
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
+pub async fn create_test_server() -> TestResult<TestServer> {
+    let ctx = common::Context::create_test_context().await?;
 
     let platform_router = platform::identity::router(ctx.clone()).with_state(ctx);
     let api_router = axum::Router::new().nest("/api", platform_router);

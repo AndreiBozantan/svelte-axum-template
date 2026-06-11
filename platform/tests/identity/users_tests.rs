@@ -4,8 +4,10 @@ use serde_json::Value;
 
 use super::super::*;
 
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 #[tokio::test]
-async fn protected_route_without_token() -> anyhow::Result<()> {
+async fn protected_route_without_token() -> TestResult {
     let server = create_test_server().await?;
     let response = server.get("/api/users/me").await;
     response.assert_status(StatusCode::UNAUTHORIZED);
@@ -13,7 +15,7 @@ async fn protected_route_without_token() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn protected_route_with_invalid_token() -> anyhow::Result<()> {
+async fn protected_route_with_invalid_token() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .get("/api/users/me")
@@ -24,7 +26,7 @@ async fn protected_route_with_invalid_token() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn protected_route_with_valid_token() -> anyhow::Result<()> {
+async fn protected_route_with_valid_token() -> TestResult {
     let server = create_test_server().await?;
     let (_body, access_token, _refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let api_response = server
@@ -36,7 +38,7 @@ async fn protected_route_with_valid_token() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn user_info_unauthenticated_returns_401() -> anyhow::Result<()> {
+async fn user_info_unauthenticated_returns_401() -> TestResult {
     let server = create_test_server().await?;
     let response = server.get("/api/users/me").await;
     response.assert_status(StatusCode::UNAUTHORIZED);
@@ -46,7 +48,7 @@ async fn user_info_unauthenticated_returns_401() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn list_users_invalid_query_params() -> anyhow::Result<()> {
+async fn list_users_invalid_query_params() -> TestResult {
     let server = create_test_server().await?;
     let (_body, access_token, _refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let response = server

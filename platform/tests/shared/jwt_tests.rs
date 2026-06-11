@@ -1,7 +1,9 @@
 use platform::config;
 use platform::jwt;
 
-fn test_context() -> anyhow::Result<jwt::Context> {
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+fn test_context() -> TestResult<jwt::Context> {
     let settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
         refresh_token_expiry_days: 1,
@@ -37,7 +39,7 @@ fn generate_expired_token(
 }
 
 #[test]
-fn generate_access_token_success() -> anyhow::Result<()> {
+fn generate_access_token_success() -> TestResult {
     let ctx = test_context()?;
     let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access)?;
     assert_eq!(token.value.split('.').count(), 3);
@@ -45,7 +47,7 @@ fn generate_access_token_success() -> anyhow::Result<()> {
 }
 
 #[test]
-fn generate_refresh_token_success() -> anyhow::Result<()> {
+fn generate_refresh_token_success() -> TestResult {
     let ctx = test_context()?;
     let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
     assert_eq!(token.value.split('.').count(), 3);
@@ -53,7 +55,7 @@ fn generate_refresh_token_success() -> anyhow::Result<()> {
 }
 
 #[test]
-fn decode_access_token_success() -> anyhow::Result<()> {
+fn decode_access_token_success() -> TestResult {
     let ctx = test_context()?;
     let token = jwt::generate_token(&ctx, 123, 456, "test_user@example.com", jwt::TokenType::Access)?;
     let claims = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Access)?;
@@ -65,7 +67,7 @@ fn decode_access_token_success() -> anyhow::Result<()> {
 }
 
 #[test]
-fn decode_refresh_token_success() -> anyhow::Result<()> {
+fn decode_refresh_token_success() -> TestResult {
     let ctx = test_context()?;
     let token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
     let claims = jwt::decode_token(&ctx, &token.value, jwt::TokenType::Refresh)?;
@@ -75,7 +77,7 @@ fn decode_refresh_token_success() -> anyhow::Result<()> {
 }
 
 #[test]
-fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
+fn decode_access_token_wrong_secret() -> TestResult {
     let ctx = test_context()?;
     let settings = config::JwtSettings {
         access_token_expiry_minutes: 60,
@@ -89,7 +91,7 @@ fn decode_access_token_wrong_secret() -> anyhow::Result<()> {
 }
 
 #[test]
-fn decode_malformed_token() -> anyhow::Result<()> {
+fn decode_malformed_token() -> TestResult {
     let ctx = test_context()?;
     let result = jwt::decode_token(&ctx, "not.a.valid.jwt.token", jwt::TokenType::Access);
     assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
@@ -97,7 +99,7 @@ fn decode_malformed_token() -> anyhow::Result<()> {
 }
 
 #[test]
-fn decode_invalid_token() -> anyhow::Result<()> {
+fn decode_invalid_token() -> TestResult {
     let ctx = test_context()?;
     let result = jwt::decode_token(&ctx, "invalid.token.here", jwt::TokenType::Access);
     assert!(matches!(
@@ -108,7 +110,7 @@ fn decode_invalid_token() -> anyhow::Result<()> {
 }
 
 #[test]
-fn token_expiry() -> anyhow::Result<()> {
+fn token_expiry() -> TestResult {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Access);
@@ -117,7 +119,7 @@ fn token_expiry() -> anyhow::Result<()> {
 }
 
 #[test]
-fn refresh_token_expiry() -> anyhow::Result<()> {
+fn refresh_token_expiry() -> TestResult {
     let ctx = test_context()?;
     let token_value = generate_expired_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Refresh)?;
     let result = jwt::decode_token(&ctx, &token_value, jwt::TokenType::Refresh);
@@ -126,7 +128,7 @@ fn refresh_token_expiry() -> anyhow::Result<()> {
 }
 
 #[test]
-fn future_token_valid() -> anyhow::Result<()> {
+fn future_token_valid() -> TestResult {
     use chrono::Utc;
     use jsonwebtoken as jsonwt;
     use uuid::Uuid;
@@ -161,7 +163,7 @@ fn future_token_valid() -> anyhow::Result<()> {
 }
 
 #[test]
-fn access_token_used_as_refresh_token() -> anyhow::Result<()> {
+fn access_token_used_as_refresh_token() -> TestResult {
     let ctx = test_context()?;
     let access_token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Access)?;
 
@@ -173,7 +175,7 @@ fn access_token_used_as_refresh_token() -> anyhow::Result<()> {
 }
 
 #[test]
-fn refresh_token_used_as_access_token() -> anyhow::Result<()> {
+fn refresh_token_used_as_access_token() -> TestResult {
     let ctx = test_context()?;
     let refresh_token = jwt::generate_token(&ctx, 123, 0, "test_user@example.com", jwt::TokenType::Refresh)?;
 
@@ -185,7 +187,7 @@ fn refresh_token_used_as_access_token() -> anyhow::Result<()> {
 }
 
 #[test]
-fn different_tokens_have_different_jwt_ids() -> anyhow::Result<()> {
+fn different_tokens_have_different_jwt_ids() -> TestResult {
     let ctx = test_context()?;
     let email = "test_user@example.com";
 
@@ -201,7 +203,7 @@ fn different_tokens_have_different_jwt_ids() -> anyhow::Result<()> {
 }
 
 #[test]
-fn access_token_contains_correct_tenant_info() -> anyhow::Result<()> {
+fn access_token_contains_correct_tenant_info() -> TestResult {
     let ctx = test_context()?;
     let email = "test_user@example.com";
 
@@ -219,7 +221,7 @@ fn access_token_contains_correct_tenant_info() -> anyhow::Result<()> {
 }
 
 #[test]
-fn jwt_clock_skew_leeway_validation() -> anyhow::Result<()> {
+fn jwt_clock_skew_leeway_validation() -> TestResult {
     let ctx = test_context()?;
     let now = chrono::Utc::now().timestamp();
 

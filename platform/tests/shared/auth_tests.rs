@@ -4,8 +4,10 @@ use argon2::password_hash as ar2;
 
 use platform::auth;
 
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 #[test]
-fn hash_password_creates_valid_hash() -> anyhow::Result<()> {
+fn hash_password_creates_valid_hash() -> TestResult {
     let hash = auth::hash_password("test_password_123")?;
     assert!(hash.starts_with("$argon2id$"));
     assert!(hash.len() > 50);
@@ -13,7 +15,7 @@ fn hash_password_creates_valid_hash() -> anyhow::Result<()> {
 }
 
 #[test]
-fn hash_password_generates_different_hashes() -> anyhow::Result<()> {
+fn hash_password_generates_different_hashes() -> TestResult {
     let hash1 = auth::hash_password("same_password")?;
     let hash2 = auth::hash_password("same_password")?;
     assert_ne!(hash1, hash2);
@@ -21,14 +23,14 @@ fn hash_password_generates_different_hashes() -> anyhow::Result<()> {
 }
 
 #[test]
-fn verify_password_success() -> anyhow::Result<()> {
+fn verify_password_success() -> TestResult {
     let hash = auth::hash_password("test_password")?;
     assert!(auth::verify_password("test_password", &hash)?);
     Ok(())
 }
 
 #[test]
-fn verify_password_failure() -> anyhow::Result<()> {
+fn verify_password_failure() -> TestResult {
     let hash = auth::hash_password("correct_password")?;
     assert!(!auth::verify_password("wrong_password", &hash)?);
     Ok(())
@@ -40,14 +42,14 @@ fn verify_password_with_invalid_hash() {
 }
 
 #[test]
-fn hash_empty_password() -> anyhow::Result<()> {
+fn hash_empty_password() -> TestResult {
     let hash = auth::hash_password("")?;
     assert!(auth::verify_password("", &hash)?);
     Ok(())
 }
 
 #[test]
-fn dummy_hash_parameters_match_argon2_default() -> anyhow::Result<()> {
+fn dummy_hash_parameters_match_argon2_default() -> TestResult {
     let dummy = argon2::PasswordHash::new(auth::DUMMY_HASH)?;
     let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
     let reference = Argon2::default().hash_password(b"dummy-password-for-timing", &salt)?;
@@ -56,7 +58,7 @@ fn dummy_hash_parameters_match_argon2_default() -> anyhow::Result<()> {
 }
 
 #[test]
-fn hash_long_password() -> anyhow::Result<()> {
+fn hash_long_password() -> TestResult {
     let password = "a".repeat(1000);
     let hash = auth::hash_password(&password)?;
     assert!(auth::verify_password(&password, &hash)?);
@@ -64,7 +66,7 @@ fn hash_long_password() -> anyhow::Result<()> {
 }
 
 #[test]
-fn hash_unicode_password() -> anyhow::Result<()> {
+fn hash_unicode_password() -> TestResult {
     let password = "🔐密码测试🔑";
     let hash = auth::hash_password(password)?;
     assert!(auth::verify_password(password, &hash)?);

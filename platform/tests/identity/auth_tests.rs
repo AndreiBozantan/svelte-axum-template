@@ -7,8 +7,10 @@ use platform::jwt;
 
 use super::super::*;
 
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 #[tokio::test]
-async fn login_invalid_endpoint() -> anyhow::Result<()> {
+async fn login_invalid_endpoint() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/invalid_endpoint")
@@ -22,7 +24,7 @@ async fn login_invalid_endpoint() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn login_invalid_credentials() -> anyhow::Result<()> {
+async fn login_invalid_credentials() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/auth/login")
@@ -38,7 +40,7 @@ async fn login_invalid_credentials() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn login_nonexistent_user() -> anyhow::Result<()> {
+async fn login_nonexistent_user() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/auth/login")
@@ -54,7 +56,7 @@ async fn login_nonexistent_user() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn refresh_token_invalid() -> anyhow::Result<()> {
+async fn refresh_token_invalid() -> TestResult {
     let server = create_test_server().await?;
     let response = server.post("/api/auth/refresh").await;
     response.assert_status(StatusCode::UNAUTHORIZED);
@@ -64,7 +66,7 @@ async fn refresh_token_invalid() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn login_success() -> anyhow::Result<()> {
+async fn login_success() -> TestResult {
     let server = create_test_server().await?;
     let (body, access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     assert!(!access_token.is_empty());
@@ -74,7 +76,7 @@ async fn login_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn malformed_json_login() -> anyhow::Result<()> {
+async fn malformed_json_login() -> TestResult {
     let server = create_test_server().await?;
     let response = server.post("/api/auth/login").text("not json").await;
     response.assert_status(StatusCode::UNSUPPORTED_MEDIA_TYPE);
@@ -85,7 +87,7 @@ async fn malformed_json_login() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn missing_fields_login() -> anyhow::Result<()> {
+async fn missing_fields_login() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/auth/login")
@@ -99,7 +101,7 @@ async fn missing_fields_login() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn refresh_token_success() -> anyhow::Result<()> {
+async fn refresh_token_success() -> TestResult {
     let server = create_test_server().await?;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let refresh_response = server
@@ -114,7 +116,7 @@ async fn refresh_token_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn refresh_token_reuse_detection() -> anyhow::Result<()> {
+async fn refresh_token_reuse_detection() -> TestResult {
     let server = create_test_server().await?;
     let (_body, _access_token, refresh_token_1) = login_testuser_and_get_tokens(&server).await?;
 
@@ -147,7 +149,7 @@ async fn refresh_token_reuse_detection() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn revoke_token_success() -> anyhow::Result<()> {
+async fn revoke_token_success() -> TestResult {
     let server = create_test_server().await?;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let refresh_response = server
@@ -165,7 +167,7 @@ async fn revoke_token_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn logout_success() -> anyhow::Result<()> {
+async fn logout_success() -> TestResult {
     let server = create_test_server().await?;
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let logout_response = server
@@ -183,7 +185,7 @@ async fn logout_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn access_token_expiry() -> anyhow::Result<()> {
+async fn access_token_expiry() -> TestResult {
     use chrono::Utc;
     use jsonwebtoken as jwtk;
     use uuid::Uuid;
@@ -236,7 +238,7 @@ async fn access_token_expiry() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn account_lockout_after_failed_attempts() -> anyhow::Result<()> {
+async fn account_lockout_after_failed_attempts() -> TestResult {
     let server = create_test_server().await?;
     for _ in 0..5 {
         let response = server
@@ -260,7 +262,7 @@ async fn account_lockout_after_failed_attempts() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn register_invalid_email() -> anyhow::Result<()> {
+async fn register_invalid_email() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/auth/register")
@@ -279,7 +281,7 @@ async fn register_invalid_email() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn register_invalid_password() -> anyhow::Result<()> {
+async fn register_invalid_password() -> TestResult {
     let server = create_test_server().await?;
     let response = server
         .post("/api/auth/register")
