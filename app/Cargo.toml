@@ -1,11 +1,15 @@
 [package]
-name = "svelaxum"
+name = "app"
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-name = "svelaxum"
+[lib]
+name = "app"
 path = "app.rs"
+
+[[bin]]
+name = "app"
+path = "main.rs"
 
 [dependencies]
 platform = { workspace = true }
@@ -27,3 +31,7 @@ tracing-subscriber = { workspace = true }
 
 [package.metadata.sqlx]
 offline = true
+
+[dev-dependencies]
+axum-test = { workspace = true }
+platform = { workspace = true, features = ["test-helpers"] }
