@@ -1,7 +1,3 @@
-use argon2::Argon2;
-use argon2::PasswordHasher;
-use argon2::password_hash as ar2;
-
 use platform::auth;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -45,15 +41,6 @@ fn verify_password_with_invalid_hash() {
 fn hash_empty_password() -> TestResult {
     let hash = auth::hash_password("")?;
     assert!(auth::verify_password("", &hash)?);
-    Ok(())
-}
-
-#[test]
-fn dummy_hash_parameters_match_argon2_default() -> TestResult {
-    let dummy = argon2::PasswordHash::new(auth::DUMMY_HASH)?;
-    let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
-    let reference = Argon2::default().hash_password(b"dummy-password-for-timing", &salt)?;
-    assert_eq!(dummy.algorithm, reference.algorithm);
     Ok(())
 }
 

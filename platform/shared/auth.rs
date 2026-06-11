@@ -92,13 +92,18 @@ where
 }
 
 use argon2::password_hash as ar2;
+use std::sync;
 
 /// Hash a password using Argon2
-pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
+pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
     use ar2::PasswordHasher;
-    use argon2::Argon2;
+    const ARGON2_MEM_COST: u32 = 19456;
+    const ARGON2_TIME_COST: u32 = 2;
+    const ARGON2_PARALLELISM: u32 = 1;
     let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
-    let hash = Argon2::default().hash_password(password.as_bytes(), &salt)?;
+    let params = argon2::Params::new(ARGON2_MEM_COST, ARGON2_TIME_COST, ARGON2_PARALLELISM, None)?;
+    let hasher = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+    let hash = hasher.hash_password(password.as_bytes(), &salt)?;
     Ok(hash.to_string())
 }
 
@@ -117,9 +122,12 @@ pub fn verify_password(
     }
 }
 
-/// A pre-computed Argon2 hash of a dummy password, used to perform a
-/// constant-time "wasted" verify when the requested user does not exist,
-/// preventing user-enumeration via response-time differences.
-pub static DUMMY_HASH: &str = "$argon2id$\
-    v=19$m=19456,t=2,p=1$\
-    HfRKx+hpIQ18rfUQ5TuA5g$Zq2p1OruNc6cZAgJmgnTIs3XpBLKdrM/DujpWOPAMwQ"; // semgrep: ignore
+static DUMMY_HASH: sync::LazyLock<Result<String, Error>> =
+    sync::LazyLock::new(|| Ok(hash_password("dummy_password_for_timing")?));
+
+pub fn dummy_hash() -> Result<&'static str, Error> {
+    DUMMY_HASH
+        .as_ref()
+        .map(std::string::String::as_str)
+        .map_err(|_| Error::InternalFault("dummy hash init failed".to_string()))
+}
