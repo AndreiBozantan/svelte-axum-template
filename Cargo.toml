@@ -12,6 +12,7 @@ platform = { path = "platform" }
 
 argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.8", features = ["json", "form", "multipart"] }
+axum-extra = { version = "0.12", features = ["cookie"] }
 chrono = { version = "0.4", features = ["serde", "clock"] }
 clap = { version = "4.6", features = ["derive"] }
 config = { version = "0.15" }
