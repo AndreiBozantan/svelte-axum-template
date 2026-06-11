@@ -2,11 +2,11 @@
 #![warn(clippy::nursery)]
 #![warn(clippy::pedantic)]
 #![warn(clippy::todo)]
-// #![warn(clippy::cargo)]
 #![allow(missing_docs)]
 #![allow(clippy::missing_errors_doc)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+// #![warn(clippy::cargo)]
 
 pub(crate) mod internal {
     pub mod logger;

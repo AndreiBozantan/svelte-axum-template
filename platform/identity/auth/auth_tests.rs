@@ -4,8 +4,10 @@ use crate::identity::auth;
 use crate::identity::tokens;
 use crate::identity::users;
 
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
 #[tokio::test]
-async fn oauth_login_new_user_success() -> anyhow::Result<()> {
+async fn oauth_login_new_user_success() -> TestResult {
     use crate::identity::users::TRepository;
     let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
@@ -42,7 +44,7 @@ async fn oauth_login_new_user_success() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
+async fn oauth_user_linking_existing_password_user() -> TestResult {
     use crate::identity::users::TRepository;
 
     let ctx = common::Context::create_test_context().await?;
@@ -90,7 +92,7 @@ async fn oauth_user_linking_existing_password_user() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn oauth_user_password_login_failure() -> anyhow::Result<()> {
+async fn oauth_user_password_login_failure() -> TestResult {
     let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 

@@ -45,7 +45,6 @@ test-helpers = []
 
 [dev-dependencies]
 platform = { path = ".", features = ["test-helpers"] }
-anyhow = "1.0"
 axum-test = { workspace = true }
 cookie = { workspace = true }
 tokio = { workspace = true }
