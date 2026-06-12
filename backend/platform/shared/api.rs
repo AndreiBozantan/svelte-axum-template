@@ -1,6 +1,6 @@
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -41,7 +41,7 @@ impl Error {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal_error",
-            "An unexpected error occured.",
+            "An unexpected error occurred.",
             None,
         )
     }
