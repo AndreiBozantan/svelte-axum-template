@@ -259,12 +259,8 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             .bearer_auth(access_token)
             .timeout(std::time::Duration::from_secs(10))
             .send()
-            .await?;
-
-        if !response.status().is_success() {
-            logger::log_provider_api_error(response.status(), "google");
-            return Err(Error::InvalidConfig("OAuth provider returned an error".to_string()));
-        }
+            .await?
+            .error_for_status()?;
 
         let user_info: GoogleUserInfo = response.json().await?;
 
