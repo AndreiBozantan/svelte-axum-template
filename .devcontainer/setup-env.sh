@@ -21,7 +21,7 @@ abbr -a gl "git log --oneline -n 10"
 abbr -a cb "cargo build"
 abbr -a cr "cargo run"
 abbr -a ct "cargo test"
-abbr -a cc "cargo check && cargo clippy"
+abbr -a cc "cargo check --all-targets && cargo clippy --all-targets"          
 abbr -a cf "cargo fmt"
 
 # Directory navigation shortcuts
