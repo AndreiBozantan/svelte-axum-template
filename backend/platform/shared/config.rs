@@ -128,30 +128,24 @@ impl Default for ServerSettings {
 #[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Failed to get config directory path: {0}")]
-    GetConfigDirFailed(#[source] std::io::Error),
+    #[error("I/O error: {0}")]
+    IoOperationFailed(#[from] std::io::Error),
 
     #[error("Failed to build or parse configuration: {0}")]
     ConfigParsingFailed(#[from] ::config::ConfigError),
 
-    #[error("Failed to serialize defaults: {0}")]
-    SerializeDefaultsFailed(#[source] toml::ser::Error),
-
-    #[error("Failed to serialize configuration: {0}")]
-    SerializeConfigFailed(#[source] toml::ser::Error),
-
-    #[error("Failed to write configuration file: {0}")]
-    WriteConfigFileFailed(#[source] std::io::Error),
+    #[error("TOML serialization error: {0}")]
+    SerializationFailed(#[from] toml::ser::Error),
 }
 
 impl AppSettings {
     pub fn new() -> Result<Self, Error> {
-        let config_dir = Self::get_config_dir().map_err(Error::GetConfigDirFailed)?;
+        let config_dir = Self::get_config_dir()?;
         let mut builder = ::config::Config::builder();
 
         // layer 0: set defaults from AppSettings::default()
         let default_settings = Self::default();
-        let default_toml = toml::to_string(&default_settings).map_err(Error::SerializeDefaultsFailed)?;
+        let default_toml = toml::to_string(&default_settings)?;
         builder = builder.add_source(File::from_str(&default_toml, ::config::FileFormat::Toml));
 
         // layer 1: add common configuration from files
@@ -190,8 +184,8 @@ impl AppSettings {
         // this allows users to easily modify the file without needing to copy it during deployment
         if app_run_env == constants::env::PRODUCTION && !env_config_exists {
             println!("Creating default config file at {}", env_config_path.to_string_lossy());
-            let settings_str = toml::to_string(&settings).map_err(Error::SerializeConfigFailed)?;
-            fs::write(&env_config_path, settings_str).map_err(Error::WriteConfigFileFailed)?;
+            let settings_str = toml::to_string(&settings)?;
+            fs::write(&env_config_path, settings_str)?;
         }
 
         Ok(settings)
