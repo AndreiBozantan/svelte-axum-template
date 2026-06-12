@@ -46,9 +46,7 @@ pub enum Error {
 impl From<sqlx::Error> for Error {
     fn from(error: sqlx::Error) -> Self {
         fn is_check_violation(db_err: &dyn DatabaseError) -> bool {
-            db_err
-                .code()
-                .is_some_and(|code| code.as_ref() == "2067" || code.as_ref() == "275")
+            db_err.code().is_some_and(|code| code.as_ref() == "275")
         }
 
         if let sqlx::Error::Database(db_err) = &error {

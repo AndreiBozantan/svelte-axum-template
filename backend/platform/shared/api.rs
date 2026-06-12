@@ -1,6 +1,6 @@
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -41,7 +41,7 @@ impl Error {
         Self::new(
             StatusCode::INTERNAL_SERVER_ERROR,
             "internal_error",
-            "An unexpected error occured.",
+            "An unexpected error occurred.",
             None,
         )
     }
@@ -169,7 +169,7 @@ impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
         match error {
             db::Error::DatabaseOperationFailed(_) | db::Error::RowConversionFailed(_) => {
-                tracing::error!("db error: {error}")
+                tracing::error!("db error: {error}");
             },
             _ => {},
         }

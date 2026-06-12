@@ -40,7 +40,6 @@ pub struct Context {
     pub http_client: reqwest::Client,
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum ContextCreationError {
     #[error("Database error: {0}")]

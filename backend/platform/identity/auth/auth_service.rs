@@ -38,6 +38,9 @@ pub enum Error {
     #[error("token expired or invalid")]
     InvalidToken,
 
+    #[error("user already exists")]
+    UserAlreadyExists,
+
     #[error("password hashing failed: {0}")]
     PasswordHashingFailed(#[from] argon2::password_hash::Error),
 
@@ -53,13 +56,27 @@ pub enum Error {
 
 impl From<Error> for api::Error {
     fn from(error: Error) -> Self {
-        logger::log_auth_rejection(&error);
+        #[allow(clippy::enum_glob_use)]
+        use Error::*;
+
+        match &error {
+            InvalidCredentials | InvalidToken | UserAlreadyExists => {
+                logger::log_auth_rejection(&error);
+            },
+            JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
+                logger::log_auth_rejection(&error);
+            },
+            _ => {
+                tracing::error!("Auth system error: {error}");
+            },
+        }
         match error {
-            Error::InvalidCredentials => Self::invalid_credentials(),
-            Error::InvalidToken => Self::invalid_token(),
-            Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
-            Error::JwtOperationFailed(_) => Self::invalid_token(),
-            Error::InvalidHeaderValue(_) => Self::invalid_token(),
+            JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
+            InvalidCredentials => Self::invalid_credentials(),
+            UserAlreadyExists => Self::user_already_exists(),
+            JwtOperationFailed(_) => Self::invalid_token(),
+            InvalidHeaderValue(_) => Self::invalid_token(),
+            InvalidToken => Self::invalid_token(),
             _ => Self::internal(),
         }
     }
@@ -67,7 +84,11 @@ impl From<Error> for api::Error {
 
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
-        Self::InternalFault(format!("database operation failed {error}"))
+        match error {
+            db::Error::RowNotFound => Self::InvalidToken,
+            db::Error::UniqueConstraintViolation(_) => Self::UserAlreadyExists,
+            other => Self::InternalFault(format!("database operation failed {other}")),
+        }
     }
 }
 

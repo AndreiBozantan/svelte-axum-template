@@ -13,19 +13,6 @@ pub fn log_invalid_config(
     );
 }
 
-pub fn log_provider_api_error(
-    status: axum::http::StatusCode,
-    provider: &str,
-) {
-    tracing::warn!(
-        event_type = "auth",
-        error_type = "provider_api",
-        provider,
-        status = %status,
-        message = "OAuth provider API returned error status"
-    );
-}
-
 pub fn log_invalid_user_info(
     field_name: &str,
     value: &str,

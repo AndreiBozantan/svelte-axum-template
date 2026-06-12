@@ -2,7 +2,6 @@ use axum;
 use axum::extract::State;
 use axum::http;
 use axum::response::IntoResponse;
-use reqwest::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -93,7 +92,7 @@ where
         .register(email, &request.password, request.first_name, request.last_name)
         .await?;
     let body = RegisterResponse { user: user.into() };
-    Ok((axum::http::StatusCode::CREATED, axum::Json(body)))
+    Ok((http::StatusCode::CREATED, axum::Json(body)))
 }
 
 async fn login<UR, TR>(
@@ -137,7 +136,7 @@ where
         let _ = service.revoke_refresh_token(&refresh_token).await;
     }
     let response = axum::http::Response::builder()
-        .status(StatusCode::NO_CONTENT)
+        .status(http::StatusCode::NO_CONTENT)
         .body(axum::body::Body::empty())?;
     Ok(cookies::add_auth_cookies(
         &service.context.settings.jwt,

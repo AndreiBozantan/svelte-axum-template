@@ -56,7 +56,6 @@ pub enum Error {
 
 impl From<jsonwebtoken::errors::Error> for Error {
     fn from(error: jsonwebtoken::errors::Error) -> Self {
-        tracing::error!("JWT error: {error}");
         match error.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => Self::SessionExpired,
             _ => Self::CsrfValidationFailed(error),
@@ -66,15 +65,13 @@ impl From<jsonwebtoken::errors::Error> for Error {
 
 impl From<url::ParseError> for Error {
     fn from(error: url::ParseError) -> Self {
-        tracing::error!("URL parse error: {error}");
         Self::InvalidConfig(format!("Invalid URL format: {error}"))
     }
 }
 
 impl From<oauth2::reqwest::Error> for Error {
     fn from(error: oauth2::reqwest::Error) -> Self {
-        tracing::error!("OAuth HTTP client request failed: {error}");
-        Self::InternalFault("OAuth HTTP client request failed".into())
+        Self::InternalFault(format!("OAuth HTTP client request failed: {error}"))
     }
 }
 
@@ -259,12 +256,8 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             .bearer_auth(access_token)
             .timeout(std::time::Duration::from_secs(10))
             .send()
-            .await?;
-
-        if !response.status().is_success() {
-            logger::log_provider_api_error(response.status(), "google");
-            return Err(Error::InvalidConfig("OAuth provider returned an error".to_string()));
-        }
+            .await?
+            .error_for_status()?;
 
         let user_info: GoogleUserInfo = response.json().await?;
 

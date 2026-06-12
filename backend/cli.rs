@@ -33,6 +33,12 @@ pub enum Error {
         source: std::io::Error,
     },
 
+    #[error("Database error occurred: {source}")]
+    DatabaseOperationFailed {
+        #[from]
+        source: crate::platform::db::Error,
+    },
+
     #[error("An unexpected CLI error occurred: {0}")]
     Other(String),
 }
@@ -160,8 +166,7 @@ async fn create_admin(
                 password_hash,
             },
         )
-        .await
-        .map_err(|e| Error::Other(e.to_string()))?;
+        .await?;
 
     println!("Admin user updated successfully.");
     Ok(())

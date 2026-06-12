@@ -91,7 +91,7 @@ async fn test_panic_handling() -> TestResult {
 
     let body: Value = response_panic.json();
     assert_eq!(body["code"], "internal_error");
-    assert_eq!(body["message"], "An unexpected error occured.");
+    assert_eq!(body["message"], "An unexpected error occurred.");
 
     Ok(())
 }

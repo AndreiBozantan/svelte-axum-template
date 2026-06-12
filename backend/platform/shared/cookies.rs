@@ -28,9 +28,19 @@ pub enum Error {
 
 impl From<Error> for api::Error {
     fn from(error: Error) -> Self {
-        logger::log_auth_rejection(&error);
+        #[allow(clippy::enum_glob_use)]
+        use Error::*;
+
+        match &error {
+            InvalidToken | JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
+                logger::log_auth_rejection(&error);
+            },
+            _ => {
+                tracing::error!("Cookie system error: {error}");
+            },
+        }
         match error {
-            Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
+            JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             _ => Self::invalid_token(),
         }
     }
