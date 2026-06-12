@@ -7,6 +7,7 @@
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![allow(clippy::match_same_arms)]
+#![allow(clippy::enum_variant_names)]
 
 #[tokio::main]
 async fn main() {
