@@ -1,0 +1,78 @@
+use axum::http::StatusCode;
+use axum_test::TestServer;
+use serde_json::Value;
+use serde_json::json;
+
+use crate::router;
+
+use crate::platform::common;
+
+pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
+
+pub const TEST_USER_EMAIL: &str = "test@example.com";
+pub const TEST_PASSWORD: &str = "abcdefghijklmnopqrstuvwxyz";
+
+pub async fn login_testuser_and_get_tokens(server: &TestServer) -> TestResult<(Value, String, String)> {
+    let response = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD,
+        }))
+        .await;
+    response.assert_status(StatusCode::OK);
+    let body: Value = response.json();
+    let refresh_token = response.cookie("refresh_token").value().to_string();
+    let access_token = response.cookie("access_token").value().to_string();
+    assert!(!access_token.is_empty());
+    assert!(!refresh_token.is_empty());
+    Ok((body, access_token, refresh_token))
+}
+
+pub async fn create_test_server() -> TestResult<TestServer> {
+    let ctx = common::Context::create_test_context().await?;
+    let router = router::create(ctx.clone());
+    let server = TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+
+    // register the test user via the API
+    let response = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response.assert_status(StatusCode::CREATED);
+
+    Ok(server)
+}
+
+#[tokio::test]
+async fn test_static_file_caching() -> TestResult {
+    let server = create_test_server().await?;
+
+    // Request index.html first time (should be 200 OK)
+    let response = server.get("/").await;
+    response.assert_status(StatusCode::OK);
+
+    let etag = response
+        .headers()
+        .get(axum::http::header::ETAG)
+        .ok_or("ETag header is missing")?
+        .to_str()?
+        .to_string();
+
+    assert!(!etag.is_empty(), "ETag should not be empty");
+
+    // Request index.html second time with If-None-Match (should be 304 Not Modified)
+    let response_cached = server
+        .get("/")
+        .add_header(axum::http::header::IF_NONE_MATCH, &etag)
+        .await;
+
+    response_cached.assert_status(StatusCode::NOT_MODIFIED);
+    assert!(response_cached.text().is_empty(), "304 response body should be empty");
+    Ok(())
+}

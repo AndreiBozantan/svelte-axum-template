@@ -1,2 +1,9 @@
 [env]
 DATABASE_URL = "sqlite:data/db.sqlite"
+
+[build]
+rustc-wrapper = "sccache"
+
+[target.'cfg(target_os = "linux")']
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
