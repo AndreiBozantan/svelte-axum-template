@@ -169,7 +169,7 @@ impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
         match error {
             db::Error::DatabaseOperationFailed(_) | db::Error::RowConversionFailed(_) => {
-                tracing::error!("db error: {error}")
+                tracing::error!("db error: {error}");
             },
             _ => {},
         }

@@ -125,7 +125,6 @@ impl Default for ServerSettings {
     }
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
