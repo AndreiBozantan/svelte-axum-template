@@ -89,12 +89,12 @@ where
         .await?;
     if !user_info.verified_email {
         logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
-        return Err(api::Error::invalid_credentials());
+        return Err(api::Error::sso_failed());
     }
 
     logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
 
-    let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::invalid_credentials)?;
+    let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::sso_failed)?;
     let cmd = auth::OAuthLoginCommand {
         email,
         sso_provider: "google".to_string(),

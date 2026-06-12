@@ -87,7 +87,8 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let request = request.data();
-    let email = common::Email::parse(&request.email).ok_or_else(api::Error::internal)?;
+    let email = common::Email::parse(&request.email)
+        .ok_or_else(|| api::Error::validation_failed("email", "invalid email format"))?;
     let user = service
         .register(email, &request.password, request.first_name, request.last_name)
         .await?;

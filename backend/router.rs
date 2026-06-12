@@ -5,6 +5,7 @@ use axum::http::Request;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use chrono::Utc;
+use serde::Deserialize;
 use serde::Serialize;
 
 use crate::platform::api;
@@ -12,6 +13,9 @@ use crate::platform::assets;
 use crate::platform::cookies;
 
 use crate::platform::common::ArcContext;
+
+#[derive(Clone)]
+struct CustomPanicHandler;
 
 pub fn create(context: ArcContext) -> Router {
     let api = Router::new()
@@ -25,6 +29,7 @@ pub fn create(context: ArcContext) -> Router {
         .nest("/api", api)
         .fallback(assets::static_handler)
         .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
         .with_state(context)
 }
 
@@ -64,25 +69,6 @@ fn auth_router(context: &ArcContext) -> axum::Router<ArcContext> {
         .merge(oauth::api::router(oauth_service))
 }
 
-#[derive(Serialize)]
-struct HealthCheckResponse {
-    message: String,
-    time: String,
-}
-
-#[allow(clippy::unused_async)]
-async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResponse, api::Error> {
-    sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
-        tracing::error!("Health check database ping failed: {error}");
-        api::Error::internal()
-    })?;
-
-    Ok(axum::Json(HealthCheckResponse {
-        message: "server and database are up and running".to_string(),
-        time: Utc::now().to_rfc3339(),
-    }))
-}
-
 async fn auth_middleware(
     State(context): State<ArcContext>,
     mut req: Request<Body>,
@@ -91,4 +77,71 @@ async fn auth_middleware(
     let claims = cookies::decode_access_token_from_cookie(&context.jwt, req.headers())?;
     req.extensions_mut().insert(claims);
     Ok(next.run(req).await)
+}
+
+#[derive(Serialize)]
+struct HealthCheckResponse {
+    message: String,
+    time: String,
+}
+
+#[derive(Deserialize)]
+struct HealthCheckQuery {
+    #[serde(default)]
+    panic: bool,
+}
+
+#[allow(clippy::unused_async)]
+async fn health_check(
+    State(context): State<ArcContext>,
+    query: api::Query<HealthCheckQuery>,
+) -> Result<impl IntoResponse, api::Error> {
+    sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
+        tracing::error!("Health check database ping failed: {error}");
+        api::Error::internal()
+    })?;
+
+    let api::Query(query) = query;
+    if query.panic {
+        healthy_panic();
+    }
+
+    Ok(axum::Json(HealthCheckResponse {
+        message: "server and database are up and running".to_string(),
+        time: Utc::now().to_rfc3339(),
+    }))
+}
+
+const HEALTHY_PANIC_MESSAGE: &str = "simulating a runtime crash! don't panic!";
+
+fn healthy_panic() {
+    panic!("{HEALTHY_PANIC_MESSAGE}");
+}
+
+impl tower_http::catch_panic::ResponseForPanic for CustomPanicHandler {
+    type ResponseBody = Body;
+
+    fn response_for_panic(
+        &mut self,
+        err: Box<dyn std::any::Any + Send + 'static>,
+    ) -> Response<Self::ResponseBody> {
+        let panic_message = err
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| err.downcast_ref::<String>().map(String::as_str));
+
+        match panic_message {
+            Some(HEALTHY_PANIC_MESSAGE) => {
+                tracing::info!("caught panic (simulated health check crash): {HEALTHY_PANIC_MESSAGE}");
+            },
+            Some(msg) => {
+                tracing::error!("caught panic: {msg}");
+            },
+            None => {
+                tracing::error!("caught panic: (unknown payload)");
+            },
+        }
+
+        api::Error::internal().into_response()
+    }
 }

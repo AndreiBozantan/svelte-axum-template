@@ -97,6 +97,16 @@ impl Error {
     }
 
     #[must_use]
+    pub fn validation_failed(
+        field: &str,
+        message: &str,
+    ) -> Self {
+        let mut map = std::collections::HashMap::new();
+        map.insert(field.to_string(), vec![message.to_string()]);
+        Self::validation_errors_with_status(StatusCode::BAD_REQUEST, map)
+    }
+
+    #[must_use]
     pub fn validation_failed_with_status(
         status: StatusCode,
         field: &str,
@@ -143,7 +153,10 @@ impl IntoResponse for Error {
 
 impl From<jwt::Error> for Error {
     fn from(error: jwt::Error) -> Self {
-        tracing::error!("JWT error: {error}");
+        match error {
+            jwt::Error::ExpiredToken | jwt::Error::InvalidToken => {},
+            _ => tracing::error!("jwt error: {error}"),
+        }
         match error {
             jwt::Error::ExpiredToken => Self::expired_token(),
             jwt::Error::InvalidToken => Self::invalid_token(),
@@ -154,9 +167,12 @@ impl From<jwt::Error> for Error {
 
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
-        // TODO: use structured logging here
-        tracing::error!("database error: {error}");
-
+        match error {
+            db::Error::DatabaseOperationFailed(_) | db::Error::RowConversionFailed(_) => {
+                tracing::error!("db error: {error}")
+            },
+            _ => {},
+        }
         match error {
             db::Error::RowNotFound => Self::not_found(),
             db::Error::UniqueConstraintViolation(_) => Self::db_key_violation("unique_violation"),

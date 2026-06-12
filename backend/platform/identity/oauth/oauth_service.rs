@@ -66,15 +66,15 @@ impl From<jsonwebtoken::errors::Error> for Error {
 
 impl From<url::ParseError> for Error {
     fn from(error: url::ParseError) -> Self {
-        tracing::error!("JWT error: {error}");
+        tracing::error!("URL parse error: {error}");
         Self::InvalidConfig(format!("Invalid URL format: {error}"))
     }
 }
 
 impl From<oauth2::reqwest::Error> for Error {
     fn from(error: oauth2::reqwest::Error) -> Self {
-        tracing::error!("JWT error: {error}");
-        Self::InternalFault("JWT operation failed".into())
+        tracing::error!("OAuth HTTP client request failed: {error}");
+        Self::InternalFault("OAuth HTTP client request failed".into())
     }
 }
 

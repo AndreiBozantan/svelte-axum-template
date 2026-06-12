@@ -76,3 +76,22 @@ async fn test_static_file_caching() -> TestResult {
     assert!(response_cached.text().is_empty(), "304 response body should be empty");
     Ok(())
 }
+
+#[tokio::test]
+async fn test_panic_handling() -> TestResult {
+    let server = create_test_server().await?;
+
+    // normal health check (should be 200 OK)
+    let response = server.get("/api/health").await;
+    response.assert_status(StatusCode::OK);
+
+    // health check with panic=true (should trigger panic and return 500 JSON error)
+    let response_panic = server.get("/api/health?panic=true").await;
+    response_panic.assert_status(StatusCode::INTERNAL_SERVER_ERROR);
+
+    let body: Value = response_panic.json();
+    assert_eq!(body["code"], "internal_error");
+    assert_eq!(body["message"], "An unexpected error occured.");
+
+    Ok(())
+}
