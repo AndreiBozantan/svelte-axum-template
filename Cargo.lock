@@ -105,25 +105,39 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "app"
-version = "0.1.0"
+version = "0.8.0"
 dependencies = [
+ "argon2",
  "axum",
+ "axum-extra",
  "axum-test",
  "chrono",
+ "clap",
  "config",
+ "cookie",
  "dotenvy",
  "hex",
+ "jsonwebtoken",
  "mime_guess",
- "platform",
+ "oauth2",
+ "rand 0.10.1",
  "reqwest 0.13.2",
+ "rpassword",
  "rust-embed",
  "serde",
+ "serde_json",
+ "sha2 0.11.0",
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
+ "toml 1.1.2+spec-1.1.0",
+ "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "url",
+ "uuid",
+ "validator",
 ]
 
 [[package]]
@@ -2256,40 +2270,6 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
-
-[[package]]
-name = "platform"
-version = "0.8.0"
-dependencies = [
- "argon2",
- "axum",
- "axum-extra",
- "axum-test",
- "chrono",
- "clap",
- "config",
- "cookie",
- "hex",
- "jsonwebtoken",
- "mime_guess",
- "oauth2",
- "platform",
- "rand 0.10.1",
- "reqwest 0.13.2",
- "rpassword",
- "rust-embed",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "sqlx",
- "thiserror 2.0.18",
- "tokio",
- "toml 1.1.2+spec-1.1.0",
- "tracing",
- "url",
- "uuid",
- "validator",
-]
 
 [[package]]
 name = "potential_utf"
