@@ -109,6 +109,7 @@ mod test {
 
         mod shared {
             mod auth_tests;
+            mod crypto_tests;
             mod jwt_tests;
         }
     }

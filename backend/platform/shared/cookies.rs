@@ -37,28 +37,23 @@ impl From<Error> for api::Error {
     }
 }
 
-pub fn decode_token_from_req(
+pub fn decode_access_token_from_cookie(
     context: &jwt::Context,
-    req: &Request<Body>,
-    token_type: jwt::TokenType,
+    headers: &http::HeaderMap,
 ) -> Result<jwt::TokenClaims, Error> {
-    let headers = req.headers();
+    // check cookie first with fallback to bearer token
     let jar = CookieJar::from_headers(headers);
-
-    // check cookie first, fallback to bearer token
     let token = jar
         .get("access_token")
         .map(Cookie::value)
         .ok_or(Error::InvalidToken)
-        .or_else(|_| extract_bearer_token(req))?;
-
-    let claims = jwt::decode_token(context, token, token_type)?;
-    Ok(claims)
+        .or_else(|_| extract_bearer_token(headers))?;
+    Ok(jwt::decode_token(context, token, jwt::TokenType::Access)?)
 }
 
 pub fn get_refresh_token_from_cookie(headers: &http::HeaderMap) -> Result<String, Error> {
-    let jar = CookieJar::from_headers(headers);
-    jar.get("refresh_token")
+    CookieJar::from_headers(headers)
+        .get("refresh_token")
         .map(|c| c.value().to_string())
         .ok_or(Error::InvalidToken)
 }
@@ -133,8 +128,8 @@ fn create_token_cookie(
         .build()
 }
 
-fn extract_bearer_token(req: &Request<Body>) -> Result<&str, Error> {
-    req.headers()
+fn extract_bearer_token(headers: &http::HeaderMap) -> Result<&str, Error> {
+    headers
         .get(http::header::AUTHORIZATION)
         .ok_or(Error::InvalidToken)?
         .to_str()

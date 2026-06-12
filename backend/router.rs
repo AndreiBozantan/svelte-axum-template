@@ -87,7 +87,7 @@ async fn auth_middleware(
     mut req: Request<Body>,
     next: axum::middleware::Next,
 ) -> Result<Response, api::Error> {
-    let claims = cookies::decode_token_from_req(&context.jwt, &req, jwt::TokenType::Access)?;
+    let claims = cookies::decode_access_token_from_cookie(&context.jwt, req.headers())?;
     req.extensions_mut().insert(claims);
     Ok(next.run(req).await)
 }
