@@ -27,17 +27,31 @@ where
 
 impl From<oauth::Error> for api::Error {
     fn from(error: oauth::Error) -> Self {
-        tracing::error!("oauth error: {error}");
+        #[allow(clippy::enum_glob_use)]
+        use oauth::Error::*;
+
+        match &error {
+            InvalidConfig(_) | UserInfoRetrievalFailed(_) | InternalFault(_) => {
+                tracing::error!("OAuth system error: {error}");
+            },
+            OAuth2RequestFailed(_) => {
+                tracing::warn!("OAuth provider request failed: {error}");
+            },
+            _ => {
+                tracing::info!("OAuth authentication rejection: {error}");
+            },
+        }
         match error {
-            oauth::Error::UnverifiedEmail | oauth::Error::InvalidUserInfo => Self::invalid_credentials(),
-            oauth::Error::CsrfValidationFailed(_) => Self::sso_failed(),
-            oauth::Error::CsrfMismatch => Self::sso_failed(),
-            oauth::Error::SessionExpired => Self::sso_failed(),
-            oauth::Error::OAuth2RequestFailed(_) => Self::sso_failed(),
-            oauth::Error::InvalidConfig(_) => Self::sso_failed(),
-            oauth::Error::InvalidRedirectUrl => Self::sso_failed(),
-            oauth::Error::UserInfoRetrievalFailed(_) => Self::internal(),
-            oauth::Error::InternalFault(_) => Self::internal(),
+            InvalidUserInfo => Self::invalid_credentials(),
+            UnverifiedEmail => Self::invalid_credentials(),
+            CsrfValidationFailed(_) => Self::sso_failed(),
+            CsrfMismatch => Self::sso_failed(),
+            SessionExpired => Self::sso_failed(),
+            OAuth2RequestFailed(_) => Self::sso_failed(),
+            InvalidConfig(_) => Self::sso_failed(),
+            InvalidRedirectUrl => Self::sso_failed(),
+            UserInfoRetrievalFailed(_) => Self::internal(),
+            InternalFault(_) => Self::internal(),
         }
     }
 }
