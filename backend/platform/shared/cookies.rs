@@ -8,23 +8,22 @@ use axum_extra::extract::cookie::CookieJar;
 use axum_extra::extract::cookie::SameSite;
 use cookie::time::Duration;
 use serde::Serialize;
-use sha2::Digest;
 use thiserror::Error;
 
 use crate::platform::api;
 use crate::platform::config;
-use crate::platform::internal::logger;
 use crate::platform::jwt;
+use crate::platform::logger;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Invalid header value: {0}")]
+    #[error("invalid header value: {0}")]
     InvalidHeaderValue(#[from] http::header::InvalidHeaderValue),
 
-    #[error("JWT operation failed: {0}")]
+    #[error("jwt operation failed: {0}")]
     JwtOperationFailed(#[from] jwt::Error),
 
-    #[error("Token expired or invalid")]
+    #[error("token expired or invalid")]
     InvalidToken,
 }
 
@@ -38,16 +37,9 @@ impl From<Error> for api::Error {
     }
 }
 
-#[must_use]
-pub fn get_token_hash_as_hex(token: &str) -> String {
-    let mut hasher = sha2::Sha256::new();
-    hasher.update(token);
-    hex::encode(hasher.finalize())
-}
-
 pub fn decode_token_from_req(
     context: &jwt::Context,
-    req: &Request,
+    req: &Request<Body>,
     token_type: jwt::TokenType,
 ) -> Result<jwt::TokenClaims, Error> {
     let headers = req.headers();

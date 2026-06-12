@@ -8,10 +8,12 @@ use serde::Serialize;
 
 use crate::platform::api;
 use crate::platform::common;
+use crate::platform::cookies;
+use crate::platform::logger;
+
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
-use crate::platform::internal::logger;
 
 pub fn router<UR, TR>(service: auth::Service<UR, TR>) -> axum::Router<common::ArcContext>
 where
@@ -114,7 +116,7 @@ where
     let body = LoginResponse {
         user: session.user.into(),
     };
-    Ok(tokens::utils::create_response_with_auth_cookies(
+    Ok(cookies::create_response_with_auth_cookies(
         &service.context.settings.jwt,
         &body,
         Some(&session.access_token.value),
@@ -130,13 +132,13 @@ where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
-    if let Ok(refresh_token) = tokens::utils::get_refresh_token_from_cookie(&headers) {
+    if let Ok(refresh_token) = cookies::get_refresh_token_from_cookie(&headers) {
         let _ = service.revoke_refresh_token(&refresh_token).await;
     }
     let response = axum::http::Response::builder()
         .status(StatusCode::NO_CONTENT)
         .body(axum::body::Body::empty())?;
-    Ok(tokens::utils::add_auth_cookies(
+    Ok(cookies::add_auth_cookies(
         &service.context.settings.jwt,
         response,
         None,
@@ -152,7 +154,7 @@ where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
-    let refresh_token = tokens::utils::get_refresh_token_from_cookie(&headers)?;
+    let refresh_token = cookies::get_refresh_token_from_cookie(&headers)?;
     let session = service.refresh(&refresh_token).await?;
     logger::log_token_refresh(
         &headers,
@@ -164,7 +166,7 @@ where
         expires_in: service.context.jwt.access_token_expiry,
         user: session.user.into(),
     };
-    Ok(tokens::utils::create_response_with_auth_cookies(
+    Ok(cookies::create_response_with_auth_cookies(
         &service.context.settings.jwt,
         &body,
         Some(&session.access_token.value),

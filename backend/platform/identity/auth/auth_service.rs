@@ -1,9 +1,13 @@
-use crate::platform::auth;
+use crate::platform::api;
 use crate::platform::common;
 use crate::platform::constants;
+use crate::platform::crypto;
+use crate::platform::db;
+use crate::platform::jwt;
+use crate::platform::logger;
+
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
-use crate::platform::jwt;
 
 #[derive(Debug, Clone)]
 pub struct LoginCommand {
@@ -24,6 +28,47 @@ pub struct AuthResult {
     pub access_token: jwt::TokenWithClaims,
     pub refresh_token: jwt::TokenWithClaims,
     pub old_jti: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("invalid credentials")]
+    InvalidCredentials,
+
+    #[error("token expired or invalid")]
+    InvalidToken,
+
+    #[error("password hashing failed: {0}")]
+    PasswordHashingFailed(#[from] argon2::password_hash::Error),
+
+    #[error("jwt operation failed: {0}")]
+    JwtOperationFailed(#[from] jwt::Error),
+
+    #[error("invalid header value: {0}")]
+    InvalidHeaderValue(#[from] axum::http::header::InvalidHeaderValue),
+
+    #[error("internal error: {0}")]
+    InternalFault(String),
+}
+
+impl From<Error> for api::Error {
+    fn from(error: Error) -> Self {
+        logger::log_auth_rejection(&error);
+        match error {
+            Error::InvalidCredentials => Self::invalid_credentials(),
+            Error::InvalidToken => Self::invalid_token(),
+            Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
+            Error::JwtOperationFailed(_) => Self::invalid_token(),
+            Error::InvalidHeaderValue(_) => Self::invalid_token(),
+            _ => Self::internal(),
+        }
+    }
+}
+
+impl From<db::Error> for Error {
+    fn from(error: db::Error) -> Self {
+        Self::InternalFault(format!("database operation failed {error}"))
+    }
 }
 
 #[derive(Clone)]
@@ -49,8 +94,8 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         password: &str,
         first_name: Option<String>,
         last_name: Option<String>,
-    ) -> Result<users::User, auth::Error> {
-        let password_hash = auth::hash_password(password)?;
+    ) -> Result<users::User, Error> {
+        let password_hash = crypto::hash_password(password)?;
         let cmd = users::CreateUserCommand {
             tenant_id: common::TenantId(0),
             status: users::UserStatus::Active,
@@ -69,7 +114,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     pub async fn login(
         &self,
         command: LoginCommand,
-    ) -> Result<AuthResult, auth::Error> {
+    ) -> Result<AuthResult, Error> {
         let maybe_user = self
             .users
             .find_auth_details_by_email(&self.context.db, &command.email)
@@ -78,28 +123,28 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         if let Some(ref record) = maybe_user
             && is_temporarily_locked(record)
         {
-            return Err(auth::Error::InvalidCredentials);
+            return Err(Error::InvalidCredentials);
         }
 
-        let dummy_hash = auth::dummy_hash()?;
+        let dummy_hash = crypto::dummy_hash()?;
         let password_hash = maybe_user
             .as_ref()
             .and_then(|record| record.password_hash.as_deref())
             .ok_or_else(|| {
-                let _ = auth::verify_password(&command.password, dummy_hash);
-                auth::Error::InvalidCredentials
+                let _ = crypto::verify_password(&command.password, dummy_hash);
+                Error::InvalidCredentials
             })?;
 
-        if !auth::verify_password(&command.password, password_hash)? {
+        if !crypto::verify_password(&command.password, password_hash)? {
             if let Some(record) = &maybe_user {
                 self.users
                     .increment_failed_login_count(&self.context.db, record.user.id)
                     .await?;
             }
-            return Err(auth::Error::InvalidCredentials);
+            return Err(Error::InvalidCredentials);
         }
 
-        let record = maybe_user.ok_or(auth::Error::InvalidCredentials)?;
+        let record = maybe_user.ok_or(Error::InvalidCredentials)?;
         self.users
             .reset_failed_login_count(&self.context.db, record.user.id)
             .await?;
@@ -109,7 +154,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     pub async fn login_oauth(
         &self,
         command: OAuthLoginCommand,
-    ) -> Result<AuthResult, auth::Error> {
+    ) -> Result<AuthResult, Error> {
         let cmd = users::LinkSsoUserCommand {
             email: command.email,
             tenant_id: common::TenantId(constants::db::DEFAULT_TENANT_ID_FOR_NEW_SSO_USERS),
@@ -124,10 +169,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     pub async fn issue_session(
         &self,
         user: users::User,
-    ) -> Result<AuthResult, auth::Error> {
+    ) -> Result<AuthResult, Error> {
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
-        let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = crypto::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         let cmd = tokens::CreateRefreshTokenCommand {
@@ -151,7 +196,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     pub async fn revoke_refresh_token(
         &self,
         refresh_token_value: &str,
-    ) -> Result<(), auth::Error> {
+    ) -> Result<(), Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
         Ok(())
@@ -160,7 +205,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     pub async fn refresh(
         &self,
         refresh_token_value: &str,
-    ) -> Result<AuthResult, auth::Error> {
+    ) -> Result<AuthResult, Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let stored_token = self
             .tokens
@@ -178,12 +223,12 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
                     stored_token.user_id,
                 )
                 .await;
-            return Err(auth::Error::InvalidToken);
+            return Err(Error::InvalidToken);
         }
 
-        let token_hash = tokens::utils::get_token_hash_as_hex(refresh_token_value);
+        let token_hash = crypto::get_token_hash_as_hex(refresh_token_value);
         if stored_token.token_hash != token_hash {
-            return Err(auth::Error::InvalidToken);
+            return Err(Error::InvalidToken);
         }
 
         self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
@@ -191,7 +236,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let user = self.users.find_by_id(&self.context.db, stored_token.user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
-        let refresh_token_hash = tokens::utils::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = crypto::get_token_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         self.tokens
@@ -228,7 +273,7 @@ fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
 fn generate_refresh_token(
     ctx: &common::ArcContext,
     user: &users::User,
-) -> Result<jwt::TokenWithClaims, auth::Error> {
+) -> Result<jwt::TokenWithClaims, Error> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -241,7 +286,7 @@ fn generate_refresh_token(
 fn generate_access_token(
     ctx: &common::ArcContext,
     user: &users::User,
-) -> Result<jwt::TokenWithClaims, auth::Error> {
+) -> Result<jwt::TokenWithClaims, Error> {
     Ok(jwt::generate_token(
         &ctx.jwt,
         user.id.0,
@@ -251,8 +296,7 @@ fn generate_access_token(
     )?)
 }
 
-#[allow(clippy::match_same_arms)]
-impl From<users::Error> for auth::Error {
+impl From<users::Error> for Error {
     fn from(error: users::Error) -> Self {
         match error {
             users::Error::NotFound => Self::InvalidCredentials,

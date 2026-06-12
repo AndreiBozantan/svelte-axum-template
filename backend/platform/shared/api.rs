@@ -157,7 +157,6 @@ impl From<db::Error> for Error {
         // TODO: use structured logging here
         tracing::error!("database error: {error}");
 
-        #[allow(clippy::match_same_arms)]
         match error {
             db::Error::RowNotFound => Self::not_found(),
             db::Error::UniqueConstraintViolation(_) => Self::db_key_violation("unique_violation"),
@@ -335,5 +334,19 @@ where
             Error::validation_errors_with_status(StatusCode::BAD_REQUEST, errs)
         })?;
         Ok(Self(value))
+    }
+}
+
+impl<S> axum::extract::FromRequestParts<S> for jwt::TokenClaims
+where
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        parts.extensions.get().cloned().ok_or_else(Error::invalid_token)
     }
 }

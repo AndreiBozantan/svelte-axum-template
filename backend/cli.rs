@@ -4,8 +4,8 @@ use std::io::Write;
 use clap::Parser;
 use clap::Subcommand;
 
-use crate::platform::auth;
 use crate::platform::common;
+use crate::platform::crypto;
 use crate::platform::migrations;
 
 use crate::platform::identity::users;
@@ -148,7 +148,7 @@ async fn create_admin(
         return Err(Error::Other("Password cannot be empty".to_string()));
     }
 
-    let password_hash = auth::hash_password(password.trim())?;
+    let password_hash = crypto::hash_password(password.trim())?;
     let parsed_email = common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address".to_string()))?;
 
     users::db::Repository

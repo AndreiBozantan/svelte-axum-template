@@ -5,11 +5,13 @@ use axum::response::IntoResponse;
 
 use crate::platform::api;
 use crate::platform::common;
+use crate::platform::cookies;
+use crate::platform::logger;
+
 use crate::platform::identity::auth;
 use crate::platform::identity::oauth;
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
-use crate::platform::internal::logger;
 
 pub fn router<UR, TR>(service: oauth::Service<UR, TR>) -> axum::Router<common::ArcContext>
 where
@@ -23,7 +25,6 @@ where
         .with_state(service)
 }
 
-#[allow(clippy::match_same_arms)]
 impl From<oauth::Error> for api::Error {
     fn from(error: oauth::Error) -> Self {
         tracing::error!("oauth error: {error}");
@@ -78,11 +79,10 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let params = params.data();
-    let oauth_state_cookie =
-        tokens::utils::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
-            logger::log_cookie_error(&headers, "missing_oauth_state");
-            api::Error::sso_failed()
-        })?;
+    let oauth_state_cookie = cookies::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
+        logger::log_cookie_error(&headers, "missing_oauth_state");
+        api::Error::sso_failed()
+    })?;
 
     let (user_info, redirect_url) = service
         .complete_google_callback(&params.code, &params.state, &oauth_state_cookie)
@@ -104,7 +104,7 @@ where
     let session = service.auth.login_oauth(cmd).await?;
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
-    let mut response = tokens::utils::add_auth_cookies(
+    let mut response = cookies::add_auth_cookies(
         &service.context.settings.jwt,
         response,
         Some(&session.access_token.value),

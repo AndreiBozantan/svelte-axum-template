@@ -3,7 +3,6 @@ use axum::extract::State;
 use serde::Serialize;
 
 use crate::platform::api;
-use crate::platform::auth;
 use crate::platform::common;
 use crate::platform::identity::users;
 use crate::platform::jwt;
@@ -13,12 +12,10 @@ where
     UR: users::TRepository + Clone + 'static,
 {
     use axum::routing::get;
-    let ctx = service.context.clone();
     axum::Router::new()
         .route("/users", get(list_users::<UR>))
         .route("/users/me", get(user_info::<UR>))
         .with_state(service)
-        .route_layer(axum::middleware::from_fn_with_state(ctx, auth::middleware))
 }
 
 #[derive(Serialize)]

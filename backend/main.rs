@@ -6,6 +6,7 @@
 #![allow(clippy::missing_errors_doc)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
+#![allow(clippy::match_same_arms)]
 
 #[tokio::main]
 async fn main() {
@@ -69,30 +70,21 @@ mod platform {
             #[path = "tokens_service.rs"]
             mod service;
 
-            #[path = "tokens_utils.rs"]
-            pub mod utils;
-
             pub use service::*;
-
-            #[cfg(test)]
-            #[path = "tokens_tests.rs"]
-            mod tests;
         }
-    }
-
-    pub mod internal {
-        pub mod logger;
     }
 
     pub mod shared {
         pub mod api;
         pub mod assets;
-        pub mod auth;
         pub mod common;
         pub mod config;
         pub mod constants;
+        pub mod cookies;
+        pub mod crypto;
         pub mod db;
         pub mod jwt;
+        pub mod logger;
         pub mod migrations;
     }
 

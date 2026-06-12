@@ -8,10 +8,12 @@ use url::Url;
 
 use crate::platform::common;
 use crate::platform::config;
+use crate::platform::crypto;
+use crate::platform::logger;
+
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
-use crate::platform::internal::logger;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -149,6 +151,12 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
     Ok(())
 }
 
+pub fn check_oauth_config(config: &config::OAuthSettings) {
+    if let Err(error) = validate_google_config(config) {
+        tracing::warn!("Google OAuth config is incomplete. {error}");
+    }
+}
+
 fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
@@ -204,7 +212,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let now = Utc::now().timestamp();
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
         let claims = OAuthStateClaims {
-            csrf_token_hash: tokens::utils::get_token_hash_as_hex(csrf_token.secret()),
+            csrf_token_hash: crypto::get_token_hash_as_hex(csrf_token.secret()),
             iat: now,
             exp: now + (timeout_minutes * 60),
             redirect_url,
@@ -229,7 +237,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let token_data =
             jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &self.context.jwt.decoding_key, &validation)?;
 
-        let incoming_hash = tokens::utils::get_token_hash_as_hex(state);
+        let incoming_hash = crypto::get_token_hash_as_hex(state);
         if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
             logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
             return Err(Error::CsrfMismatch);

@@ -35,7 +35,6 @@ pub enum Error {
 }
 
 /// Maps jsonwebtoken errors to our custom `JwtError` type
-#[allow(clippy::match_same_arms)]
 impl From<jwt::errors::Error> for Error {
     fn from(e: jwt::errors::Error) -> Self {
         match e.kind() {

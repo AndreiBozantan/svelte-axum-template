@@ -115,10 +115,7 @@ async fn oauth_user_password_login_failure() -> TestResult {
     let password_login_res = auth_service.login(cmd).await;
 
     assert!(password_login_res.is_err());
-    assert!(matches!(
-        password_login_res,
-        Err(crate::platform::auth::Error::InvalidCredentials)
-    ));
+    assert!(matches!(password_login_res, Err(auth::Error::InvalidCredentials)));
 
     Ok(())
 }

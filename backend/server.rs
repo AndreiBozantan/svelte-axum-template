@@ -6,7 +6,6 @@ use tracing_subscriber::util::SubscriberInitExt;
 use crate::cli;
 use crate::router;
 
-use crate::platform::auth;
 use crate::platform::common;
 use crate::platform::config;
 use crate::platform::jwt;
@@ -85,7 +84,7 @@ async fn start_server() -> Result<(), Error> {
         let router = router::create(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
-        auth::check_oauth_config(&ctx.settings.oauth);
+        crate::platform::identity::oauth::check_oauth_config(&ctx.settings.oauth);
         axum::serve(listener, router)
             .with_graceful_shutdown(shutdown_signal())
             .await?;

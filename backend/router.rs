@@ -1,12 +1,17 @@
 use axum::Router;
+use axum::body::Body;
 use axum::extract::State;
+use axum::http::Request;
 use axum::response::IntoResponse;
+use axum::response::Response;
 use chrono::Utc;
 use serde::Serialize;
 
 use crate::platform::api;
 use crate::platform::assets;
-use crate::platform::auth;
+use crate::platform::cookies;
+use crate::platform::jwt;
+
 use crate::platform::common::ArcContext;
 
 pub fn create(context: ArcContext) -> Router {
@@ -15,7 +20,8 @@ pub fn create(context: ArcContext) -> Router {
         .with_state(context.clone());
 
     let api = Router::new()
-        .merge(identity_router(context.clone()))
+        .merge(auth_router(context.clone()))
+        .merge(users_router(context.clone()))
         .merge(app_router(context.clone()))
         .merge(public)
         .fallback(|| async { api::Error::not_found() });
@@ -27,15 +33,24 @@ pub fn create(context: ArcContext) -> Router {
         .with_state(context)
 }
 
-pub fn app_router(ctx: ArcContext) -> axum::Router<ArcContext> {
+fn app_router(ctx: ArcContext) -> axum::Router<ArcContext> {
     use crate::app;
 
     axum::Router::new()
         .merge(app::sample::api::router())
-        .route_layer(axum::middleware::from_fn_with_state(ctx, auth::middleware))
+        .route_layer(axum::middleware::from_fn_with_state(ctx, auth_middleware))
 }
 
-pub fn identity_router(ctx: ArcContext) -> axum::Router<ArcContext> {
+fn users_router(ctx: ArcContext) -> axum::Router<ArcContext> {
+    use crate::platform::identity::users;
+
+    let users_service = users::Service::new(users::db::Repository, ctx.clone());
+    axum::Router::new()
+        .merge(users::api::router(users_service))
+        .route_layer(axum::middleware::from_fn_with_state(ctx, auth_middleware))
+}
+
+fn auth_router(ctx: ArcContext) -> axum::Router<ArcContext> {
     use crate::platform::identity::auth;
     use crate::platform::identity::oauth;
     use crate::platform::identity::tokens;
@@ -43,12 +58,9 @@ pub fn identity_router(ctx: ArcContext) -> axum::Router<ArcContext> {
 
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
     let oauth_service = oauth::Service::new(ctx.clone(), auth_service.clone());
-    let users_service = users::Service::new(users::db::Repository, ctx);
-
     axum::Router::new()
         .merge(auth::api::router(auth_service))
         .merge(oauth::api::router(oauth_service))
-        .merge(users::api::router(users_service))
 }
 
 #[derive(Serialize)]
@@ -68,4 +80,14 @@ async fn health_check(State(context): State<ArcContext>) -> Result<impl IntoResp
         message: "server and database are up and running".to_string(),
         time: Utc::now().to_rfc3339(),
     }))
+}
+
+async fn auth_middleware(
+    State(context): State<ArcContext>,
+    mut req: Request<Body>,
+    next: axum::middleware::Next,
+) -> Result<Response, api::Error> {
+    let claims = cookies::decode_token_from_req(&context.jwt, &req, jwt::TokenType::Access)?;
+    req.extensions_mut().insert(claims);
+    Ok(next.run(req).await)
 }
