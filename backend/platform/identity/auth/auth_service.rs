@@ -56,14 +56,27 @@ pub enum Error {
 
 impl From<Error> for api::Error {
     fn from(error: Error) -> Self {
-        logger::log_auth_rejection(&error);
+        #[allow(clippy::enum_glob_use)]
+        use Error::*;
+
+        match &error {
+            InvalidCredentials | InvalidToken | UserAlreadyExists => {
+                logger::log_auth_rejection(&error);
+            },
+            JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
+                logger::log_auth_rejection(&error);
+            },
+            _ => {
+                tracing::error!("Auth system error: {error}");
+            },
+        }
         match error {
-            Error::InvalidCredentials => Self::invalid_credentials(),
-            Error::InvalidToken => Self::invalid_token(),
-            Error::UserAlreadyExists => Self::user_already_exists(),
-            Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
-            Error::JwtOperationFailed(_) => Self::invalid_token(),
-            Error::InvalidHeaderValue(_) => Self::invalid_token(),
+            JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
+            InvalidCredentials => Self::invalid_credentials(),
+            UserAlreadyExists => Self::user_already_exists(),
+            JwtOperationFailed(_) => Self::invalid_token(),
+            InvalidHeaderValue(_) => Self::invalid_token(),
+            InvalidToken => Self::invalid_token(),
             _ => Self::internal(),
         }
     }
