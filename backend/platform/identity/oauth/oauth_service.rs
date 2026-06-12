@@ -56,7 +56,6 @@ pub enum Error {
 
 impl From<jsonwebtoken::errors::Error> for Error {
     fn from(error: jsonwebtoken::errors::Error) -> Self {
-        tracing::error!("JWT error: {error}");
         match error.kind() {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => Self::SessionExpired,
             _ => Self::CsrfValidationFailed(error),
@@ -66,15 +65,13 @@ impl From<jsonwebtoken::errors::Error> for Error {
 
 impl From<url::ParseError> for Error {
     fn from(error: url::ParseError) -> Self {
-        tracing::error!("URL parse error: {error}");
         Self::InvalidConfig(format!("Invalid URL format: {error}"))
     }
 }
 
 impl From<oauth2::reqwest::Error> for Error {
     fn from(error: oauth2::reqwest::Error) -> Self {
-        tracing::error!("OAuth HTTP client request failed: {error}");
-        Self::InternalFault("OAuth HTTP client request failed".into())
+        Self::InternalFault(format!("OAuth HTTP client request failed: {error}"))
     }
 }
 
