@@ -41,6 +41,15 @@ impl From<jwt::errors::Error> for Error {
             jwt::errors::ErrorKind::ExpiredSignature => Self::ExpiredToken,
             jwt::errors::ErrorKind::InvalidToken => Self::InvalidToken,
             jwt::errors::ErrorKind::Json(_) => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidSignature => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidAlgorithmName => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidAlgorithm => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidIssuer => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidAudience => Self::InvalidToken,
+            jwt::errors::ErrorKind::InvalidSubject => Self::InvalidToken,
+            jwt::errors::ErrorKind::ImmatureSignature => Self::InvalidToken,
+            jwt::errors::ErrorKind::Base64(_) => Self::InvalidToken,
+            jwt::errors::ErrorKind::Utf8(_) => Self::InvalidToken,
             _ => Self::DecodingFailed(e),
         }
     }

@@ -30,6 +30,9 @@ pub enum Error {
     #[error("Failed to fetch applied migrations")]
     FetchAppliedMigrationsFailed { #[from] source: sqlx::Error },
 
+    #[error("Failed to execute database seed query: {source}")]
+    SeedExecutionFailed { source: sqlx::Error },
+
     #[error("File system error")]
     FileSystemOperationFailed { #[from] source: std::io::Error },
 }
@@ -65,7 +68,10 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
         let seed_sql = fs::read_to_string(seed_path)?;
 
         // execute the raw script directly on the database handle
-        sqlx::query(&seed_sql).execute(&ctx.db).await?;
+        sqlx::query(&seed_sql)
+            .execute(&ctx.db)
+            .await
+            .map_err(|e| Error::SeedExecutionFailed { source: e })?;
 
         tracing::info!("Database seeding completed.");
     }

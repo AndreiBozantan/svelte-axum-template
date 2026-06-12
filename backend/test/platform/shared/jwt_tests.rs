@@ -86,7 +86,7 @@ fn decode_access_token_wrong_secret() -> TestResult {
     let wrong_ctx = jwt::create_context(&settings, "wrong_secret_key_for_jwt_testing");
     let token = jwt::generate_token(&ctx, 123, 0, "test@example.com", jwt::TokenType::Access)?;
     let result = jwt::decode_token(&wrong_ctx, &token.value, jwt::TokenType::Access);
-    assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
     Ok(())
 }
 
@@ -94,17 +94,14 @@ fn decode_access_token_wrong_secret() -> TestResult {
 fn decode_malformed_token() {
     let ctx = test_context();
     let result = jwt::decode_token(&ctx, "not.a.valid.jwt.token", jwt::TokenType::Access);
-    assert!(matches!(result, Err(jwt::Error::DecodingFailed(_))));
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
 }
 
 #[test]
 fn decode_invalid_token() {
     let ctx = test_context();
     let result = jwt::decode_token(&ctx, "invalid.token.here", jwt::TokenType::Access);
-    assert!(matches!(
-        result,
-        Err(jwt::Error::InvalidToken | jwt::Error::DecodingFailed(_))
-    ));
+    assert!(matches!(result, Err(jwt::Error::InvalidToken)));
 }
 
 #[test]

@@ -38,6 +38,9 @@ pub enum Error {
     #[error("token expired or invalid")]
     InvalidToken,
 
+    #[error("user already exists")]
+    UserAlreadyExists,
+
     #[error("password hashing failed: {0}")]
     PasswordHashingFailed(#[from] argon2::password_hash::Error),
 
@@ -57,6 +60,7 @@ impl From<Error> for api::Error {
         match error {
             Error::InvalidCredentials => Self::invalid_credentials(),
             Error::InvalidToken => Self::invalid_token(),
+            Error::UserAlreadyExists => Self::user_already_exists(),
             Error::JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             Error::JwtOperationFailed(_) => Self::invalid_token(),
             Error::InvalidHeaderValue(_) => Self::invalid_token(),
@@ -67,7 +71,11 @@ impl From<Error> for api::Error {
 
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
-        Self::InternalFault(format!("database operation failed {error}"))
+        match error {
+            db::Error::RowNotFound => Self::InvalidToken,
+            db::Error::UniqueConstraintViolation(_) => Self::UserAlreadyExists,
+            other => Self::InternalFault(format!("database operation failed {other}")),
+        }
     }
 }
 

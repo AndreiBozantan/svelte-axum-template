@@ -296,3 +296,73 @@ async fn register_invalid_password() -> TestResult {
     assert_eq!(r["details"]["password"][0], "password must be at least 8 characters");
     Ok(())
 }
+
+#[tokio::test]
+async fn register_already_exists() -> TestResult {
+    let server = create_test_server().await?;
+    // Register once
+    let response1 = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "already_exists@example.com",
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response1.assert_status(StatusCode::CREATED);
+
+    // Register again with the same email
+    let response2 = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "already_exists@example.com",
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response2.assert_status(StatusCode::CONFLICT);
+    let r: Value = response2.json();
+    assert_eq!(r["code"], "user_already_exists");
+    Ok(())
+}
+
+#[tokio::test]
+async fn refresh_token_not_in_db() -> TestResult {
+    use chrono::Utc;
+    use jsonwebtoken as jwtk;
+    use uuid::Uuid;
+
+    let server = create_test_server().await?;
+
+    // construct a JWT refresh token that is signed with our key, but its JTI does not exist in the database
+    let jwt_settings = config::JwtSettings {
+        access_token_expiry_minutes: 60,
+        refresh_token_expiry_days: 1,
+    };
+    let jwt_secret = "test__secret__key__for__jwt__testing";
+    let jwt_context = jwt::create_context(&jwt_settings, jwt_secret);
+
+    let now = Utc::now().timestamp();
+    let header = jwtk::Header::new(jwtk::Algorithm::HS256);
+    let claims = jwt::TokenClaims {
+        sub: "1".to_string(),
+        tenant_id: 0,
+        email: TEST_USER_EMAIL.to_string(),
+        exp: now + 3600,
+        iat: now,
+        jti: Uuid::new_v4().to_string(), // JTI that won't exist in DB
+        token_type: jwt::TokenType::Refresh,
+    };
+    let token = jwtk::encode(&header, &claims, &jwt_context.encoding_key)?;
+
+    let response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("refresh_token", token))
+        .await;
+    response.assert_status(StatusCode::UNAUTHORIZED);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "invalid_token");
+    Ok(())
+}
