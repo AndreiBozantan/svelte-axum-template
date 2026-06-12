@@ -30,11 +30,9 @@ pub async fn login_testuser_and_get_tokens(server: &TestServer) -> TestResult<(V
 }
 
 pub async fn create_test_server() -> TestResult<TestServer> {
-
     let ctx = common::Context::create_test_context().await?;
     let router = router::create(ctx.clone());
-    let api_router = axum::Router::new().nest("/api", router);
-    let server = TestServer::new(api_router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let server = TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>());
 
     // register the test user via the API
     let response = server

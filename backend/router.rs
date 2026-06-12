@@ -5,8 +5,8 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::platform::api;
-use crate::platform::auth;
 use crate::platform::assets;
+use crate::platform::auth;
 use crate::platform::common::ArcContext;
 
 pub fn create(context: ArcContext) -> Router {
@@ -32,10 +32,7 @@ pub fn app_router(ctx: ArcContext) -> axum::Router<ArcContext> {
 
     axum::Router::new()
         .merge(app::sample::api::router())
-        .route_layer(axum::middleware::from_fn_with_state(
-            ctx,
-            auth::middleware,
-        ))
+        .route_layer(axum::middleware::from_fn_with_state(ctx, auth::middleware))
 }
 
 pub fn identity_router(ctx: ArcContext) -> axum::Router<ArcContext> {
