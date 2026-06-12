@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::cookies;
-use crate::platform::logger;
+use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
@@ -97,7 +97,6 @@ where
 
 async fn login<UR, TR>(
     State(service): State<auth::Service<UR, TR>>,
-    headers: http::HeaderMap,
     request: api::Json<LoginRequest>,
 ) -> Result<impl IntoResponse, api::Error>
 where
@@ -105,14 +104,14 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let request = request.data();
-    logger::log_user_login_attempt(&headers, &request.email);
+    log_info!("auth", "login", message = "attempt", email = request.email);
     let email = common::Email::parse(&request.email).ok_or_else(api::Error::invalid_credentials)?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
     };
     let session = service.login(cmd).await?;
-    logger::log_user_login_success(&headers, session.user.email.as_str());
+    log_info!("auth", "login", message = "success", email = session.user.email);
     let body = LoginResponse {
         user: session.user.into(),
     };
@@ -156,11 +155,11 @@ where
 {
     let refresh_token = cookies::get_refresh_token_from_cookie(&headers)?;
     let session = service.refresh(&refresh_token).await?;
-    logger::log_token_refresh(
-        &headers,
-        session.user.id.0,
-        session.old_jti.as_deref().unwrap_or(""),
-        &session.user.id.0.to_string(),
+    log_info!(
+        "auth",
+        "refresh",
+        user_id = session.user.id.0,
+        jti = session.old_jti.as_deref().unwrap_or(""),
     );
     let body = RefreshResponse {
         expires_in: service.context.jwt.access_token_expiry,

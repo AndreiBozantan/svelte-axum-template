@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::platform::db;
 use crate::platform::jwt;
+use crate::platform::logger::*;
 
 #[derive(Debug, Clone, thiserror::Error, Serialize)]
 #[error("{message}")]
@@ -155,7 +156,7 @@ impl From<jwt::Error> for Error {
     fn from(error: jwt::Error) -> Self {
         match error {
             jwt::Error::ExpiredToken | jwt::Error::InvalidToken => {},
-            _ => tracing::error!("jwt error: {error}"),
+            _ => log_error!("jwt", "", error),
         }
         match error {
             jwt::Error::ExpiredToken => Self::expired_token(),
@@ -168,8 +169,11 @@ impl From<jwt::Error> for Error {
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
         match error {
-            db::Error::DatabaseOperationFailed(_) | db::Error::RowConversionFailed(_) => {
-                tracing::error!("db error: {error}");
+            db::Error::DatabaseOperationFailed(_) => {
+                log_error!("db", "operation", error);
+            },
+            db::Error::RowConversionFailed(_) => {
+                log_error!("db", "row_conversion", error);
             },
             _ => {},
         }
@@ -186,14 +190,14 @@ impl From<db::Error> for Error {
 
 impl From<axum::http::Error> for Error {
     fn from(error: axum::http::Error) -> Self {
-        tracing::error!("HTTP error: {error}");
+        log_error!("http", "", error);
         Self::internal()
     }
 }
 
 impl From<axum::http::header::InvalidHeaderValue> for Error {
     fn from(error: axum::http::header::InvalidHeaderValue) -> Self {
-        tracing::error!("Invalid header value: {error}");
+        log_error!("invalid_header", "", error);
         Self::internal()
     }
 }

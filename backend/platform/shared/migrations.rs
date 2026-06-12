@@ -8,6 +8,7 @@ use thiserror::Error;
 
 use crate::platform::common;
 use crate::platform::db;
+use crate::platform::logger::*;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -53,15 +54,19 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
         .run(&ctx.db)
         .await
         .map_err(|e| Error::EmbeddedMigrationFailed { source: e })?;
-    tracing::info!("Database migrations completed successfully.");
+    log_info!("migrations", "success");
 
     // conditionally run seed data ONLY in local/dev/test environments
     if ctx.is_dev_env() || ctx.is_test_env() {
-        tracing::info!("Non-production environment detected. Running test data seed...");
+        log_info!(
+            "migrations",
+            "seed",
+            details = "non-production environment detected - running test data seed"
+        );
 
         let seed_path = Path::new("./data/test-data.sql");
         if !seed_path.exists() {
-            tracing::warn!("Seed file not found at expected path: {seed_path:?}");
+            log_warning!("migrations", "seed_file_missing", seed_path.display());
             return Ok(());
         }
 
@@ -73,7 +78,7 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
             .await
             .map_err(|e| Error::SeedExecutionFailed { source: e })?;
 
-        tracing::info!("Database seeding completed.");
+        log_info!("migrations", "completed");
     }
     Ok(())
 }
@@ -132,6 +137,6 @@ pub fn create_migration(name: &str) -> Result<String, Error> {
     writeln!(file, "--")?;
     writeln!(file, "-- Add migration script here")?;
 
-    tracing::info!("Created new migration file: {}.", filepath.display());
+    log_info!("migrations", "file_created", filepath = filepath);
     Ok(filename)
 }

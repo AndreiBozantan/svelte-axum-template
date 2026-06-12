@@ -6,7 +6,8 @@ use axum::response::IntoResponse;
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::cookies;
-use crate::platform::logger;
+use crate::platform::crypto;
+use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::oauth;
@@ -32,13 +33,13 @@ impl From<oauth::Error> for api::Error {
 
         match &error {
             InvalidConfig(_) | UserInfoRetrievalFailed(_) | InternalFault(_) => {
-                tracing::error!("OAuth system error: {error}");
+                log_error!("oauth", "", error);
             },
             OAuth2RequestFailed(_) => {
-                tracing::warn!("OAuth provider request failed: {error}");
+                log_warning!("oauth", "request_failed", error);
             },
             _ => {
-                tracing::info!("OAuth authentication rejection: {error}");
+                log_info!("oauth", "", error = error);
             },
         }
         match error {
@@ -58,7 +59,6 @@ impl From<oauth::Error> for api::Error {
 
 async fn google_auth_init<UR, TR>(
     State(service): State<oauth::Service<UR, TR>>,
-    headers: http::HeaderMap,
     params: api::Query<std::collections::BTreeMap<String, String>>,
 ) -> Result<impl IntoResponse, api::Error>
 where
@@ -66,10 +66,20 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let redirect_url = params.data().get("redirect_url").cloned();
-    logger::log_oauth_flow_initiated(&headers, redirect_url.as_ref(), "google");
+    log_info!(
+        "oauth",
+        "initiate",
+        provider = "google",
+        redirect_url = redirect_url,
+    );
 
     let (auth_url, state_jwt) = service.begin_google_flow(redirect_url)?;
-    logger::log_oauth_redirecting(&headers, &auth_url, "google");
+    log_info!(
+        "auth",
+        "redirect",
+        provider = "google",
+        auth_url = auth_url,
+    );
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
     let cookie_max_age = service.context.settings.oauth.session_timeout_minutes * 60;
@@ -94,7 +104,7 @@ where
 {
     let params = params.data();
     let oauth_state_cookie = cookies::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
-        logger::log_cookie_error(&headers, "missing_oauth_state");
+        log_info!("oauth", "google_auth_callback", message = "oauth_state_cookie_missing");
         api::Error::sso_failed()
     })?;
 
@@ -102,11 +112,25 @@ where
         .complete_google_callback(&params.code, &params.state, &oauth_state_cookie)
         .await?;
     if !user_info.verified_email {
-        logger::log_oauth_security_violation(&headers, &params.state, &user_info.email, "unverified_email", "google");
+        log_warning!(
+            "oauth",
+            "security_violation",
+            "",
+            state_hash = crypto::get_hash_as_hex(&params.state),
+            violation_type = "unverified_email",
+            email = user_info.email,
+            provider = "google",
+        );
         return Err(api::Error::sso_failed());
     }
 
-    logger::log_oauth_user_authenticated(&headers, &params.state, &user_info.email, "google");
+    log_info!(
+        "oauth",
+        "authenticated",
+        state_hash = crypto::get_hash_as_hex(&params.state),
+        provider = "google",
+        email = user_info.email,
+    );
 
     let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::sso_failed)?;
     let cmd = auth::OAuthLoginCommand {

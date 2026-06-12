@@ -1,5 +1,5 @@
 #[must_use]
-pub fn get_token_hash_as_hex(token: &str) -> String {
+pub fn get_hash_as_hex(token: &str) -> String {
     use sha2::Digest;
 
     let mut hasher = sha2::Sha256::new();

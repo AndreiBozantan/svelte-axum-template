@@ -6,6 +6,7 @@ use clap::Subcommand;
 
 use crate::platform::common;
 use crate::platform::crypto;
+use crate::platform::logger::*;
 use crate::platform::migrations;
 
 use crate::platform::identity::users;
@@ -76,7 +77,11 @@ pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, Error> {
     let cli = Cli::parse();
     match cli.command {
         None => {
-            tracing::info!("CLI command not provided. Use --help for CLI usage.");
+            log_info!(
+                "cli",
+                "command_missing",
+                details = "CLI command not provided. Use --help for CLI usage."
+            );
             Ok(false)
         },
         Some(CliCommand::Migrate { action }) => {

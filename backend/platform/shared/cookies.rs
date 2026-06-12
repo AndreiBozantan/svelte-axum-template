@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::platform::api;
 use crate::platform::config;
 use crate::platform::jwt;
-use crate::platform::logger;
+use crate::platform::logger::*;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -33,10 +33,10 @@ impl From<Error> for api::Error {
 
         match &error {
             InvalidToken | JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
-                logger::log_auth_rejection(&error);
+                log_info!("cookies", "token", error = error);
             },
             _ => {
-                tracing::error!("Cookie system error: {error}");
+                log_error!("cookies", "", error);
             },
         }
         match error {

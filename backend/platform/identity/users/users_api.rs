@@ -6,6 +6,7 @@ use crate::platform::api;
 use crate::platform::common;
 use crate::platform::identity::users;
 use crate::platform::jwt;
+use crate::platform::logger::*;
 
 pub fn router<UR>(service: users::Service<UR>) -> axum::Router<common::ArcContext>
 where
@@ -52,10 +53,10 @@ impl From<users::Error> for api::Error {
     fn from(error: users::Error) -> Self {
         match &error {
             users::Error::DatabaseOperationFailed(_) => {
-                tracing::error!("user database error: {error}");
+                log_error!("users", "database", error);
             },
             _ => {
-                tracing::info!("user operation rejection: {error}");
+                log_info!("users", "", error = error);
             },
         }
         match error {
