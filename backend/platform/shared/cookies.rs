@@ -1,5 +1,4 @@
 use axum::body::Body;
-use axum::extract::Request;
 use axum::http;
 use axum::response::IntoResponse;
 use axum::response::Response;
