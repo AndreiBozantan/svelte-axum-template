@@ -1,0 +1,11 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+# No external dependencies are strictly required. Keeping dependencies empty ensures near-instant build/execution time.

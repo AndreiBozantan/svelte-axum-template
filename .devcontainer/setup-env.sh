@@ -23,6 +23,8 @@ abbr -a cr "cargo run"
 abbr -a ct "cargo test"
 abbr -a cc "cargo check --all-targets && cargo clippy --all-targets"          
 abbr -a cf "cargo fmt"
+abbr -a cx "cargo xtask"
+abbr -a cxd "cargo xtask dev"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."
@@ -32,6 +34,10 @@ abbr -a .... "cd ../../.."
 # Syntax highlighting custom colors
 set -g fish_color_command green --bold
 set -g fish_color_keyword green --bold
+
+# Cargo xtask completions
+complete -c cargo -n "__fish_seen_subcommand_from xtask" -f
+complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug help"
 
 bind `` history-pager
 EOF

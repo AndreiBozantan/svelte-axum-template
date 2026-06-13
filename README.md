@@ -23,10 +23,10 @@ Work in progress (new features coming), but should be usable as a starting point
     - `cd <your-project-name>` - to go to the project root folder.
 
 - Initialization - run once before starting in dev mode:
-    - `npm run dev:init`
+    - `cargo xtask dev-init`
 
 - Run the project in dev mode, with hot reloading:
-    - `npm run dev`
+    - `cargo xtask dev`
 
 By default, the backend will be available at `http://localhost:3000` and the frontend at `http://localhost:5173`.
 
@@ -34,10 +34,10 @@ In dev mode, the vite config is set to proxy the backend API requests to the bac
 
 
 # Build the release version
-Execute `npm run build` in the project root folder, to build the frontend and backend in release mode. The npm script will build the frontend **before** the backend, as the frontend static files are embedded in the backend binary.
+Execute `cargo xtask release` in the project root folder, to build the frontend and backend in release mode. The task will build the frontend **before** the backend, as the frontend static files are embedded in the backend binary.
 
-Optionally, you can execute `npm run clean` before the build, to remove all previous build artifacts, including the `node_modules` folders, so that the build starts from a clean state.
-After running the clean command, you have to run `npm run dev:init` once, to reinitialize the project before running in dev mode.
+Optionally, you can execute `cargo xtask clean` before the build, to remove all previous build artifacts, including the `node_modules` folders, so that the build starts from a clean state.
+After running the clean command, you have to run `cargo xtask dev-init` once, to reinitialize the project before running in dev mode.
 
 # Embedded Assets & Updates
 The frontend static files are embedded directly into the Rust binary at **compile time** using the `rust-embed` crate.
@@ -49,7 +49,7 @@ Whenever you make changes to the frontend code and want them to be reflected in 
 
 ### Debug vs Release Mode
 - **Embedding works in both modes**: Whether you use `cargo run` (debug) or `cargo build --release`, the files currently sitting in `frontend/dist` will be baked into the resulting executable.
-- **Development Workflow**: During active development (`npm run dev`), you typically don't need to worry about embedding. The Vite dev server (port `5173`) serves the frontend with hot-reloading and proxies API requests to the backend. You only need to build/embed when preparing for a production-like test or final deployment.
+- **Development Workflow**: During active development (`cargo xtask dev`), you typically don't need to worry about embedding. The Vite dev server (port `5173`) serves the frontend with hot-reloading and proxies API requests to the backend. You only need to build/embed when preparing for a production-like test or final deployment.
 
 # Backend - Rust Axum
 - located in `./backend`
@@ -130,7 +130,7 @@ Alternatively, you can use environment variables: `APP_OAUTH_GOOGLE_CLIENT_ID` a
 
 ## 3. Using OAuth2 Login
 
-1. Start the application with `npm run dev`
+1. Start the application with `cargo xtask dev`
 2. Navigate to the login page
 3. Click "Sign in with Google"
 4. Complete the Google OAuth flow

@@ -36,15 +36,15 @@ To scan the entire project using the configuration defined in `.semgrep.yml`:
 semgrep --config r/all
 ```
 
-Alternatively, you can use the npm script:
+Alternatively, you can use the cargo xtask command:
 
 ```bash
-npm run lint:security
+cargo xtask lint-security
 ```
 
 ## Configuration
 
-The configuration is kept very simple - just run all rules (r/all), both in the local setup (package.json) and in the Github workflow config.
+The configuration is kept very simple - just run all rules (r/all), both in the local setup (xtask) and in the Github workflow config.
 
 ## CI/CD Integration
 

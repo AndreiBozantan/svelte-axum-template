@@ -2,8 +2,6 @@
 **
 
 # Allow the actual source code
-!package.json
-!package-lock.json
 !Cargo.toml
 !Cargo.lock
 !.cargo/

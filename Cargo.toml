@@ -3,6 +3,10 @@ resolver = "3"
 
 members = [
     "backend",
+    "xtask",
+]
+default-members = [
+    "backend",
 ]
 
 [profile.dev.package."*"]
