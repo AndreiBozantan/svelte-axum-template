@@ -1,5 +1,7 @@
 use std::net::SocketAddr;
 
+use tracing::error;
+use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -9,7 +11,6 @@ use crate::router;
 use crate::platform::common;
 use crate::platform::config;
 use crate::platform::jwt;
-use crate::platform::logger::*;
 use crate::platform::migrations;
 
 #[derive(Debug, thiserror::Error)]
@@ -65,15 +66,15 @@ async fn start_server() -> Result<(), Error> {
     let settings = config::AppSettings::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
-        .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_file(true).with_line_number(true))
         .init();
 
-    tracing::info!("starting server... 🚀 ");
-    tracing::info!("logging: {}", settings.server.log_directives);
-    tracing::info!("app_env: {}", settings.server.env);
-    tracing::info!("sql_url: {}", settings.database.url);
-    tracing::info!("cfg_dir: {}", settings.get_config_dir_str()?);
-    tracing::info!("address: http://{}", settings.get_server_address());
+    info!("starting server... 🚀 ");
+    info!("logging: {}", settings.server.log_directives);
+    info!("app_env: {}", settings.server.env);
+    info!("sql_url: {}", settings.database.url);
+    info!("cfg_dir: {}", settings.get_config_dir_str()?);
+    info!("address: http://{}", settings.get_server_address());
 
     let jwt_secret = jwt::get_jwt_secret()?;
     let ctx = common::Context::create(settings, &jwt_secret).await?;
@@ -96,7 +97,7 @@ async fn start_server() -> Result<(), Error> {
 
 async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
-        Ok(()) => log_info!("server", "shutdown", details = "gracefull shutdown"),
-        Err(error) => log_error!("server", "shutdown", error),
+        Ok(()) => info!("graceful shutdown initiated"),
+        Err(error) => error!(%error, "error during shutdown"),
     }
 }

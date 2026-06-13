@@ -9,11 +9,12 @@ use axum::response::Response;
 use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
+use tracing::error;
+use tracing::info;
 
 use crate::platform::api;
 use crate::platform::assets;
 use crate::platform::cookies;
-use crate::platform::logger::*;
 
 use crate::platform::common::ArcContext;
 
@@ -113,7 +114,7 @@ async fn health_check(
     query: api::Query<HealthCheckQuery>,
 ) -> Result<impl IntoResponse, api::Error> {
     sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
-        log_error!("router", "health_check", error);
+        error!(%error, "health_check_failed");
         api::Error::internal()
     })?;
 
@@ -148,13 +149,13 @@ impl tower_http::catch_panic::ResponseForPanic for CustomPanicHandler {
 
         match panic_message {
             Some(HEALTHY_PANIC_MESSAGE) => {
-                log_info!("router", "panic", details = HEALTHY_PANIC_MESSAGE);
+                info!(HEALTHY_PANIC_MESSAGE);
             },
             Some(message) => {
-                log_error!("router", "panic", message);
+                error!(error = %message, "server panic occurred");
             },
             None => {
-                log_error!("router", "panic", "unknown_payload");
+                error!(error = "unknown_panic", "server panic occurred");
             },
         }
 

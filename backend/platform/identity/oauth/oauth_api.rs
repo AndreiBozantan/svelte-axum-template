@@ -2,12 +2,13 @@ use axum;
 use axum::extract::State;
 use axum::http;
 use axum::response::IntoResponse;
+use tracing::info;
+use tracing::warn;
 
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::cookies;
 use crate::platform::crypto;
-use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::oauth;
@@ -55,10 +56,10 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let redirect_url = params.data().get("redirect_url").cloned();
-    log_info!("oauth", "initiate", provider = "google", redirect_url = redirect_url,);
+    info!(provider = "google", ?redirect_url, "sso_initiate");
 
     let (auth_url, state_jwt) = service.begin_google_flow(redirect_url)?;
-    log_info!("auth", "redirect", provider = "google", auth_url = auth_url,);
+    info!(provider = "google", %auth_url, "sso_redirect");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
     let cookie_max_age = service.context.settings.oauth.session_timeout_minutes * 60;
@@ -83,7 +84,7 @@ where
 {
     let params = params.data();
     let oauth_state_cookie = cookies::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
-        log_info!("oauth", "google_auth_callback", message = "oauth_state_cookie_missing");
+        info!("oauth_state_cookie_missing");
         api::Error::sso_failed()
     })?;
 
@@ -91,24 +92,20 @@ where
         .complete_google_callback(&params.code, &params.state, &oauth_state_cookie)
         .await?;
     if !user_info.verified_email {
-        log_warning!(
-            "oauth",
-            "security_violation",
-            "unverified_email",
-            state_hash = crypto::get_hash_as_hex(&params.state),
-            violation_type = "unverified_email",
-            email_hash = crypto::get_hash_as_hex(&user_info.email),
+        warn!(
+            state_hash = %crypto::get_hash_as_hex(&params.state),
+            email_hash = %crypto::get_hash_as_hex(&user_info.email),
             provider = "google",
+            "unverified_email"
         );
         return Err(api::Error::sso_failed());
     }
 
-    log_info!(
-        "oauth",
-        "authenticated",
-        state_hash = crypto::get_hash_as_hex(&params.state),
+    info!(
+        state_hash = %crypto::get_hash_as_hex(&params.state),
+        email_hash = %crypto::get_hash_as_hex(&user_info.email),
         provider = "google",
-        email_hash = crypto::get_hash_as_hex(&user_info.email),
+        "success"
     );
 
     let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::sso_failed)?;

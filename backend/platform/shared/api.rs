@@ -3,10 +3,11 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use serde::Deserialize;
 use serde::Serialize;
+use tracing::error;
+use tracing::info;
 
 use crate::platform::db;
 use crate::platform::jwt;
-use crate::platform::logger::*;
 
 #[derive(Debug, Clone, thiserror::Error, Serialize)]
 #[error("{message}")]
@@ -149,9 +150,9 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status;
         if status.is_server_error() {
-            log_error!("api", "internal_server_error", self.message, code = self.code);
+            error!(code = %self.code, error = %self.message, "internal_server_error");
         } else {
-            log_info!("api", "client_error", status = status.as_u16(), code = self.code);
+            info!(status = status.as_u16(), code = %self.code, "client_error");
         }
         (status, axum::Json(self)).into_response()
     }
