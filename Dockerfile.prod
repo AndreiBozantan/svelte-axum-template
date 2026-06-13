@@ -35,9 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy cargo configuration files
 COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml backend/Cargo.toml
+COPY xtask/Cargo.toml xtask/Cargo.toml
 
 # Create a dummy main.rs to build and cache dependencies
 RUN mkdir -p backend && echo "fn main() {}" > backend/main.rs
+RUN mkdir -p xtask/src && echo "fn main() {}" > xtask/src/main.rs
 
 # Build dependencies only (SQLX_OFFLINE=true is not needed since no macros are in dummy main)
 # We disable sccache during the docker build to avoid sccache overhead/errors in standard environment

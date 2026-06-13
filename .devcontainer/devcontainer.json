@@ -62,5 +62,5 @@
     }
   },
 
-  "postCreateCommand": "bash ./.devcontainer/setup-env.sh && npm install && cargo fetch"
+  "postCreateCommand": "bash ./.devcontainer/setup-env.sh && npm install --prefix frontend && cargo fetch"
 }
