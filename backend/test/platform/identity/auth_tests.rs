@@ -185,7 +185,6 @@ async fn logout_success() -> TestResult {
 #[tokio::test]
 async fn access_token_expiry() -> TestResult {
     use chrono::Utc;
-    use jsonwebtoken as jwtk;
     use uuid::Uuid;
 
     let server = create_test_server().await?;
@@ -213,7 +212,7 @@ async fn access_token_expiry() -> TestResult {
 
     let now = Utc::now().timestamp();
     let expired_time = now - 3600;
-    let header = jwtk::Header::new(jwtk::Algorithm::HS256);
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let expired_claims = jwt::TokenClaims {
         sub: "1".to_string(),
         tenant_id: 0,
@@ -223,7 +222,7 @@ async fn access_token_expiry() -> TestResult {
         jti: Uuid::new_v4().to_string(),
         token_type: jwt::TokenType::Access,
     };
-    let expired_token = jwtk::encode(&header, &expired_claims, &jwt_context.encoding_key)?;
+    let expired_token = jsonwebtoken::encode(&header, &expired_claims, &jwt_context.encoding_key)?;
 
     let response_expired = server
         .get("/api/users/me")
@@ -331,7 +330,7 @@ async fn register_already_exists() -> TestResult {
 #[tokio::test]
 async fn refresh_token_not_in_db() -> TestResult {
     use chrono::Utc;
-    use jsonwebtoken as jwtk;
+    use jsonwebtoken;
     use uuid::Uuid;
 
     let server = create_test_server().await?;
@@ -345,7 +344,7 @@ async fn refresh_token_not_in_db() -> TestResult {
     let jwt_context = jwt::create_context(&jwt_settings, jwt_secret);
 
     let now = Utc::now().timestamp();
-    let header = jwtk::Header::new(jwtk::Algorithm::HS256);
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let claims = jwt::TokenClaims {
         sub: "1".to_string(),
         tenant_id: 0,
@@ -355,7 +354,7 @@ async fn refresh_token_not_in_db() -> TestResult {
         jti: Uuid::new_v4().to_string(), // JTI that won't exist in DB
         token_type: jwt::TokenType::Refresh,
     };
-    let token = jwtk::encode(&header, &claims, &jwt_context.encoding_key)?;
+    let token = jsonwebtoken::encode(&header, &claims, &jwt_context.encoding_key)?;
 
     let response = server
         .post("/api/auth/refresh")
@@ -364,5 +363,71 @@ async fn refresh_token_not_in_db() -> TestResult {
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();
     assert_eq!(body["code"], "invalid_token");
+    Ok(())
+}
+
+#[tokio::test]
+async fn login_rehashes_outdated_password_hash_api() -> TestResult {
+    use crate::platform::common;
+    use crate::platform::crypto;
+    use crate::platform::identity::users;
+    use crate::platform::identity::users::TRepository;
+    use argon2::password_hash::{PasswordHasher, SaltString};
+    use axum::http::StatusCode;
+    use serde_json::json;
+
+    // 1. manually instantiate the context and router so we retain access to  `ctx.db`
+    let (ctx, server) = create_test_context_and_server().await?;
+    let email = common::Email::parse("api_rehash_test@example.com").ok_or("invalid email")?;
+
+    // 2. register the user via HTTP
+    let register_resp = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": email.as_str(),
+            "password": "my_secure_password_123",
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    register_resp.assert_status(StatusCode::CREATED);
+
+    // 3. modify their password hash to be outdated in the database
+    let salt = SaltString::generate(argon2::password_hash::rand_core::OsRng);
+    let outdated_params = argon2::Params::new(9999, 1, 1, None)?;
+    let hasher = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, outdated_params);
+    let outdated_hash = hasher.hash_password(b"my_secure_password_123", &salt)?.to_string();
+
+    let user_record = users::db::Repository
+        .find_auth_details_by_email(&ctx.db, &email)
+        .await?
+        .ok_or("user record not found")?;
+
+    users::db::Repository
+        .update_password_hash(&ctx.db, user_record.user.id, &outdated_hash)
+        .await?;
+
+    // 4. log in over HTTP (this triggers the upgrade logic inside the service layer)
+    let login_resp = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": email.as_str(),
+            "password": "my_secure_password_123"
+        }))
+        .await;
+    login_resp.assert_status(StatusCode::OK);
+
+    // 5. verify the password hash has been upgraded in the database
+    let auth_record_after = users::db::Repository
+        .find_auth_details_by_email(&ctx.db, &email)
+        .await?
+        .ok_or("user record not found after login")?;
+    let updated_hash = auth_record_after
+        .password_hash
+        .as_deref()
+        .ok_or("password hash not found")?;
+    assert_ne!(updated_hash, outdated_hash.as_str());
+    assert!(!crypto::needs_rehash(updated_hash)?);
+
     Ok(())
 }

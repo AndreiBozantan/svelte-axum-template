@@ -59,3 +59,20 @@ fn hash_unicode_password() -> TestResult {
     assert!(crypto::verify_password(password, &hash)?);
     Ok(())
 }
+
+#[test]
+fn needs_rehash_checks_correctly() -> TestResult {
+    use argon2::password_hash::{PasswordHasher, SaltString};
+
+    let hash_current = crypto::hash_password("my_password")?;
+    assert!(!crypto::needs_rehash(&hash_current)?);
+
+    // hash with outdated params (m_cost = 9999, t_cost = 1, p_cost = 1)
+    let salt = SaltString::generate(argon2::password_hash::rand_core::OsRng);
+    let outdated_params = argon2::Params::new(9999, 1, 1, None)?;
+    let hasher = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, outdated_params);
+    let hash_outdated = hasher.hash_password(b"my_password", &salt)?.to_string();
+
+    assert!(crypto::needs_rehash(&hash_outdated)?);
+    Ok(())
+}
