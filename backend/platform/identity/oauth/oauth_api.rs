@@ -66,20 +66,10 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let redirect_url = params.data().get("redirect_url").cloned();
-    log_info!(
-        "oauth",
-        "initiate",
-        provider = "google",
-        redirect_url = redirect_url,
-    );
+    log_info!("oauth", "initiate", provider = "google", redirect_url = redirect_url,);
 
     let (auth_url, state_jwt) = service.begin_google_flow(redirect_url)?;
-    log_info!(
-        "auth",
-        "redirect",
-        provider = "google",
-        auth_url = auth_url,
-    );
+    log_info!("auth", "redirect", provider = "google", auth_url = auth_url,);
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
     let cookie_max_age = service.context.settings.oauth.session_timeout_minutes * 60;
@@ -115,10 +105,10 @@ where
         log_warning!(
             "oauth",
             "security_violation",
-            "",
+            "unverified_email",
             state_hash = crypto::get_hash_as_hex(&params.state),
             violation_type = "unverified_email",
-            email = user_info.email,
+            email_hash = crypto::get_hash_as_hex(&user_info.email),
             provider = "google",
         );
         return Err(api::Error::sso_failed());
@@ -129,7 +119,7 @@ where
         "authenticated",
         state_hash = crypto::get_hash_as_hex(&params.state),
         provider = "google",
-        email = user_info.email,
+        email_hash = crypto::get_hash_as_hex(&user_info.email),
     );
 
     let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::sso_failed)?;

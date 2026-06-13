@@ -8,6 +8,7 @@ use serde::Serialize;
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::cookies;
+use crate::platform::crypto;
 use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
@@ -104,14 +105,22 @@ where
     TR: tokens::TRepository + Clone + 'static,
 {
     let request = request.data();
-    log_info!("auth", "login", message = "attempt", email = request.email);
+    let email_hash = crypto::get_hash_as_hex(&request.email);
+    log_info!("auth", "login", message = "attempt", email_hash = email_hash);
     let email = common::Email::parse(&request.email).ok_or_else(api::Error::invalid_credentials)?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
         password: request.password,
     };
     let session = service.login(cmd).await?;
-    log_info!("auth", "login", message = "success", email = session.user.email);
+    let success_email_hash = crypto::get_hash_as_hex(session.user.email.as_str());
+    log_info!(
+        "auth",
+        "login",
+        message = "success",
+        user_id = session.user.id.0,
+        email_hash = success_email_hash,
+    );
     let body = LoginResponse {
         user: session.user.into(),
     };

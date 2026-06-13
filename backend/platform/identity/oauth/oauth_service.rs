@@ -279,14 +279,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let user_info: GoogleUserInfo = response.json().await?;
 
         if user_info.email.is_empty() {
-            log_warning!(
-                "oauth",
-                "complete_callback",
-                "",
-                field = "email",
-                value = &user_info.email,
-                provider = "google"
-            );
+            log_warning!("oauth", "complete_callback", "empty email", provider = "google");
             return Err(Error::InvalidUserInfo);
         }
 
@@ -294,10 +287,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             log_warning!(
                 "oauth",
                 "complete_callback",
-                "",
-                field = "verified_email",
-                value = false,
-                provider = "google"
+                "unverified email",
+                provider = "google",
+                email_hash = crypto::get_hash_as_hex(&user_info.email),
             );
             return Err(Error::UnverifiedEmail);
         }
@@ -306,10 +298,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             log_warning!(
                 "oauth",
                 "complete_callback",
-                "",
-                field = "id",
-                value = user_info.id,
-                provider = "google"
+                "empty_user_id",
+                provider = "google",
+                email_hash = crypto::get_hash_as_hex(&user_info.email),
             );
             return Err(Error::InvalidUserInfo);
         }
