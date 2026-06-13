@@ -27,5 +27,9 @@ Rust + Svelte fullstack template. Backend: Axum + SQLite + sqlx. Frontend: Svelt
 - avoid map_err and use error conversions instead
 - use chaining of method calls when possible, in a functional programming style
 - use validator::Validate to validate the inputs
-- use idiomatic Rust and work like an world-expert Rust senior software engineer
+- structured logging: log message must be short, lowercase, using underscores, no spaces; use key-value fields; example:
+`warn!(user_id = user.id.0, error = %err, "password_rehash_failed");`
+- run `cargo check --all-targets && cargo clippy --all-targets` after every change and fix the issues
+- follow the already existing patterns from the code, use idiomatic Rust and work like an world-expert Rust senior software engineer
+
 
