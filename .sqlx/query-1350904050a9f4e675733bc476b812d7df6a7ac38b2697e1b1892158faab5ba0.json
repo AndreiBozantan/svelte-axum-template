@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE users SET\n                failed_login_count = CASE\n                    WHEN last_failed_login > datetime('now', ?) THEN failed_login_count + 1\n                    ELSE 1\n                END,\n                last_failed_login = CURRENT_TIMESTAMP\n            WHERE id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "1350904050a9f4e675733bc476b812d7df6a7ac38b2697e1b1892158faab5ba0"
+}
