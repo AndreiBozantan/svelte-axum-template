@@ -29,7 +29,7 @@ async fn protected_route_with_valid_token() -> TestResult {
     let (_body, access_token, _refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let api_response = server
         .get("/api/users/me")
-        .add_cookie(cookie::Cookie::new("access_token", access_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Host-access_token", access_token.clone()))
         .await;
     api_response.assert_status(StatusCode::OK);
     Ok(())
@@ -51,7 +51,7 @@ async fn list_users_invalid_query_params() -> TestResult {
     let (_body, access_token, _refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let response = server
         .get("/api/users?limit=not_a_number")
-        .add_cookie(cookie::Cookie::new("access_token", access_token))
+        .add_cookie(cookie::Cookie::new("__Host-access_token", access_token))
         .await;
     response.assert_status(StatusCode::BAD_REQUEST);
     let r: Value = response.json();

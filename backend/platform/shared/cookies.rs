@@ -44,7 +44,7 @@ pub fn decode_access_token_from_cookie(
     // check cookie first with fallback to bearer token
     let jar = CookieJar::from_headers(headers);
     let token = jar
-        .get("access_token")
+        .get("__Host-access_token")
         .map(Cookie::value)
         .ok_or(Error::InvalidToken)
         .or_else(|_| extract_bearer_token(headers))?;
@@ -53,7 +53,7 @@ pub fn decode_access_token_from_cookie(
 
 pub fn get_refresh_token_from_cookie(headers: &http::HeaderMap) -> Result<String, Error> {
     CookieJar::from_headers(headers)
-        .get("refresh_token")
+        .get("__Secure-refresh_token")
         .map(|c| c.value().to_string())
         .ok_or(Error::InvalidToken)
 }
@@ -65,14 +65,14 @@ pub fn add_auth_cookies(
     refresh_token: Option<&str>,
 ) -> Result<Response<Body>, Error> {
     let at_cookie = create_token_cookie(
-        "access_token",
+        "__Host-access_token",
         access_token,
         "/",
         Duration::minutes(i64::from(settings.access_token_expiry_minutes)),
     );
 
     let rt_cookie = create_token_cookie(
-        "refresh_token",
+        "__Secure-refresh_token",
         refresh_token,
         "/api/auth/",
         Duration::days(i64::from(settings.refresh_token_expiry_days)),
