@@ -2,7 +2,8 @@
   "name": "svelte-axum-project",
   "description": "svelte front end with axum backend template",
   "author": "Andrei Bozantan",
-  "version": "0.7.2",
+  "license": "MIT",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
