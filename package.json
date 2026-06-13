@@ -2,7 +2,8 @@
   "name": "svelaxum",
   "description": "webapp template with svelte frontend and axum backend",
   "author": "Andrei Bozantan",
-  "version": "0.7.2",
+  "license": "MIT",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "clean": "node -e \"targets=['.sqlx','node_modules','target','frontend/dist','frontend/node_modules'];fs=require('fs');targets.forEach(p=>{try{if(fs.existsSync(p)){fs.rmSync(p,{recursive:true,force:true});console.log('\\x1b[32m','removed:',p,'\\x1b[0m')}else{console.log('\\x1b[33m','missing:',p,'\\x1b[0m')}}catch(e){console.error('\\x1b[31m','error!!:','t','('+e.message+')','\\x1b[0m')}})\"",
