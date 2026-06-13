@@ -29,8 +29,6 @@ abbr -a .. "cd .."
 abbr -a ... "cd ../.."
 abbr -a .... "cd ../../.."
 
-alias cat bat
-
 # Syntax highlighting custom colors
 set -g fish_color_command green --bold
 set -g fish_color_keyword green --bold

@@ -66,6 +66,7 @@ RUN ARCH=$(uname -m) \
  
 RUN cargo binstall cargo-watch --no-confirm
 RUN cargo binstall sqlx-cli --no-confirm
+RUN cargo binstall sccache --no-confirm
 
 
 # Prepare volume mount points

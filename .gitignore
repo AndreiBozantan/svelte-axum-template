@@ -1,5 +1,8 @@
 # editor config folder
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
 
 # rust build folder
 target/
