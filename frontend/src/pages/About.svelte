@@ -1,22 +1,22 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount } from 'svelte';
 
-    let healthStatus = $state("Checking...");
-    let healthColor = $state("#64748b");
+    let healthStatus = $state('Checking...');
+    let healthColor = $state('#64748b');
 
     onMount(async () => {
         try {
-            const res = await fetch("/api/health");
+            const res = await fetch('/api/health');
             if (res.ok) {
-                healthStatus = "Operational";
-                healthColor = "#10b981";
+                healthStatus = 'Operational';
+                healthColor = '#10b981';
             } else {
-                healthStatus = "Service issues";
-                healthColor = "#f59e0b";
+                healthStatus = 'Service issues';
+                healthColor = '#f59e0b';
             }
         } catch (e) {
-            healthStatus = "Offline";
-            healthColor = "#ef4444";
+            healthStatus = 'Offline';
+            healthColor = '#ef4444';
         }
     });
 </script>
@@ -27,10 +27,11 @@
         <div class="page-header-block">
             <h1 class="page-main-header">about</h1>
             <p class="header-desc">
-                Svelaxum is a modern full-stack template built with <strong>Svelte 5</strong> and <strong>Axum</strong>.
+                Svelaxum is a modern full-stack template built with <strong>Svelte 5</strong> and
+                <strong>Axum</strong>.
             </p>
         </div>
-        
+
         <!-- Details Section Group -->
         <div class="content-group">
             <div class="section-header-block">
@@ -40,8 +41,9 @@
             <div class="group-body">
                 <div class="item-row description-row">
                     <p>
-                        This project provides a solid foundation for building fast, scalable, and type-safe web applications 
-                        with a focus on developer experience and performance.
+                        This project provides a solid foundation for building fast, scalable, and
+                        type-safe web applications with a focus on developer experience and
+                        performance.
                     </p>
                 </div>
 
@@ -49,7 +51,7 @@
                     <div class="info-label">Version</div>
                     <div class="info-value">v1.0.0-beta</div>
                 </div>
-                
+
                 <div class="item-row">
                     <div class="info-label">System Status</div>
                     <div class="info-value" style="color: {healthColor}; font-weight: 600;">

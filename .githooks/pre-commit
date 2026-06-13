@@ -1,0 +1,28 @@
+#!/bin/bash
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}Running pre-commit hooks...${NC}"
+
+# 1. Cargo fmt check
+echo "Checking Rust formatting (cargo fmt)..."
+cargo fmt --check
+
+# 2. Cargo clippy check
+echo "Running Rust lints (cargo clippy)..."
+cargo clippy --workspace --all-targets -- -D warnings
+
+# 3. Prettier check (Frontend)
+echo "Checking frontend formatting (Prettier)..."
+cd frontend
+npm run format:check
+
+# 4. Svelte check (Frontend types)
+echo "Checking frontend types (svelte-check)..."
+npm run check
+
+echo -e "${GREEN}Pre-commit checks passed!${NC}"

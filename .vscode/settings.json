@@ -2,5 +2,43 @@
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
         "configs.common.toml": "configs.*.toml"
+    },
+    "cSpell.words": [
+        "agentic",
+        "clippy",
+        "distroless",
+        "fuser",
+        "rfind",
+        "rustup",
+        "sqlx",
+        "subfeature",
+        "svelaxum",
+        "tlnp",
+        "xtask"
+    ],
+    "editor.formatOnSave": true,
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "[svelte]": {
+        "editor.defaultFormatter": "svelte.svelte-vscode"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[css]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
     }
 }

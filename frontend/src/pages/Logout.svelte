@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { AppState } from "../AppState.svelte";
-    import { api } from "../lib/api";
-    import { onMount } from "svelte";
+    import { AppState } from '../AppState.svelte';
+    import { api } from '../lib/api';
+    import { onMount } from 'svelte';
 
     onMount(async () => {
         try {

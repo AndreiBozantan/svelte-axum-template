@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { AppState } from "../AppState.svelte";
-    import { api } from "../lib/api";
+    import { AppState } from '../AppState.svelte';
+    import { api } from '../lib/api';
 
-    let response = $state("");
+    let response = $state('');
 
     async function handleApiCheck(): Promise<void> {
         AppState.startLoading();
-        response = "";
+        response = '';
         try {
             const data = await api.getUserInfo();
             response = JSON.stringify(data, null, 2);
@@ -23,18 +23,23 @@
         <!-- Page Header Group -->
         <div class="page-header-block">
             <h1 class="page-main-header">secure api check</h1>
-            <p class="header-desc">This page demonstrates how to make a secure, authenticated request to the backend API.</p>
+            <p class="header-desc">
+                This page demonstrates how to make a secure, authenticated request to the backend
+                API.
+            </p>
         </div>
 
         <!-- API Action Group -->
         <div class="section-block">
             <div class="section-header">
                 <h2>Protected API Endpoint</h2>
-                <p class="">Click the button to call a protected API endpoint that requires authentication.</p>
+                <p class="">
+                    Click the button to call a protected API endpoint that requires authentication.
+                </p>
             </div>
             <div>
                 <button class="btn-primary" onclick={handleApiCheck} disabled={AppState.isLoading}>
-                    {AppState.isLoading ? "Calling API..." : "Call Protected API endpoint"}
+                    {AppState.isLoading ? 'Calling API...' : 'Call Protected API endpoint'}
                 </button>
 
                 {#if response}
@@ -50,14 +55,16 @@
 
 <style>
     /* Local specialized styles */
-    .response-container { margin-top: 24px; }
-    .response-box { 
-        background: #f1f5f9; 
-        padding: 16px; 
+    .response-container {
+        margin-top: 24px;
+    }
+    .response-box {
+        background: #f1f5f9;
+        padding: 16px;
         border-radius: 8px;
-        font-family: ui-monospace, monospace; 
-        font-size: 0.85rem; 
-        color: #334155; 
+        font-family: ui-monospace, monospace;
+        font-size: 0.85rem;
+        color: #334155;
         overflow-x: auto;
         white-space: pre-wrap;
         word-break: break-all;

@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { PageDefinition } from './AppPages.svelte';
     import { Pages } from './AppPages.svelte';
-    import { AppState } from "./AppState.svelte";
+    import { AppState } from './AppState.svelte';
 
     import { Fa } from 'svelte-fa';
     import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
@@ -16,7 +16,7 @@
         return id === 'welcome' ? '/' : `/${id}`;
     }
 
-    function topItems() : PageDefinition[] {
+    function topItems(): PageDefinition[] {
         return Pages.filter((item) => item.navPosition === 'top' && item.visible());
     }
 
@@ -69,8 +69,12 @@
 
             const handleGlobalClick = (e: MouseEvent) => {
                 // Don't close if clicking the popup itself or the logout button that triggers it
-                if (popupElement && !popupElement.contains(e.target as Node) && 
-                    logoutButton && !logoutButton.contains(e.target as Node)) {
+                if (
+                    popupElement &&
+                    !popupElement.contains(e.target as Node) &&
+                    logoutButton &&
+                    !logoutButton.contains(e.target as Node)
+                ) {
                     showLogoutConfirm = false;
                 }
             };
@@ -80,7 +84,7 @@
             const timer = setTimeout(() => {
                 window.addEventListener('click', handleGlobalClick);
             }, 10);
-            
+
             return () => {
                 window.removeEventListener('mousemove', handleGlobalMouseMove);
                 window.removeEventListener('click', handleGlobalClick);
@@ -92,14 +96,14 @@
 
 <aside class="sidebar">
     <div class="sidebar-header">
-        <div 
-            class="logo-wrapper" 
+        <div
+            class="logo-wrapper"
             onmouseenter={pickRandomHover}
-            onmouseleave={() => logoHoverType = 0}
+            onmouseleave={() => (logoHoverType = 0)}
             role="presentation"
         >
-            <div 
-                class="logo-icon-box" 
+            <div
+                class="logo-icon-box"
                 class:loading={AppState.isLoading}
                 class:hover-v1={logoHoverType === 1}
                 class:hover-v2={logoHoverType === 2}
@@ -116,10 +120,10 @@
         <ul>
             {#each topItems() as item}
                 <li class:active={AppState.activePage === item.id}>
-                    <a 
+                    <a
                         href={getPagePath(item.id)}
                         class="nav-link"
-                        onmouseenter={() => showLogoutConfirm = false}
+                        onmouseenter={() => (showLogoutConfirm = false)}
                     >
                         <span class="nav-icon">
                             <Fa icon={item.icon} />
@@ -134,24 +138,24 @@
     <div class="sidebar-footer">
         <div class="footer-content">
             {#each footerLinks() as item}
-                <a 
+                <a
                     href={getPagePath(item.id)}
                     class="footer-btn"
                     class:active={AppState.activePage === item.id}
-                    onmouseenter={() => showLogoutConfirm = false}
+                    onmouseenter={() => (showLogoutConfirm = false)}
                 >
                     <span class="footer-icon"><Fa icon={item.icon} /></span>
                     <span class="tooltip">{item.label}</span>
                 </a>
             {/each}
-            
+
             <!-- Logout Wrapper (Visible when logged in) -->
             <div class="logout-wrapper" hidden={!AppState.isLoggedIn}>
-                <button 
+                <button
                     bind:this={logoutButton}
-                    class="footer-btn logout" 
+                    class="footer-btn logout"
                     class:active={showLogoutConfirm}
-                    onmouseenter={() => showLogoutConfirm = true}
+                    onmouseenter={() => (showLogoutConfirm = true)}
                     onclick={handleLogoutSidebarClick}
                 >
                     <span class="footer-icon"><Fa icon={faSignOutAlt} /></span>
@@ -159,8 +163,8 @@
 
                 <!-- Logout Confirm Popup -->
                 <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-                <div 
-                    bind:this={popupElement} 
+                <div
+                    bind:this={popupElement}
                     class="logout-confirm-tooltip-popup"
                     hidden={!showLogoutConfirm}
                 >
@@ -170,8 +174,8 @@
                         </span>
                         <span class="confirm-user-email">{AppState.user?.email}</span>
                     </div>
-                    <button 
-                        class="confirm-action-btn" 
+                    <button
+                        class="confirm-action-btn"
                         class:animating={isConfirmAnimating}
                         onclick={confirmLogout}
                     >
@@ -187,7 +191,9 @@
     @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
 
     /* Global utility for the hidden attribute */
-    [hidden] { display: none !important; }
+    [hidden] {
+        display: none !important;
+    }
 
     .sidebar {
         width: 72px;
@@ -223,17 +229,19 @@
         height: 100%;
     }
 
-    .logo-icon-box { 
+    .logo-icon-box {
         width: 42px;
         height: 42px;
         background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
         border-radius: 12px;
-        color: #10b981; 
+        color: #10b981;
         display: flex;
         align-items: center;
         justify-content: center;
         transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1), 0 2px 4px -1px rgba(16, 185, 129, 0.06);
+        box-shadow:
+            0 4px 6px -1px rgba(16, 185, 129, 0.1),
+            0 2px 4px -1px rgba(16, 185, 129, 0.06);
     }
 
     .logo-text {
@@ -256,68 +264,117 @@
     }
 
     /* Random Animation Variants (Combinations of tilt and shift) */
-    .logo-wrapper:hover .hover-v1 .logo-text { animation: tilt-v1 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
-    .logo-wrapper:hover .hover-v2 .logo-text { animation: tilt-v2 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
-    .logo-wrapper:hover .hover-v3 .logo-text { animation: tilt-v3 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
-    .logo-wrapper:hover .hover-v4 .logo-text { animation: tilt-v4 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
-    .logo-wrapper:hover .hover-v5 .logo-text { animation: tilt-v5 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .logo-wrapper:hover .hover-v1 .logo-text {
+        animation: tilt-v1 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .logo-wrapper:hover .hover-v2 .logo-text {
+        animation: tilt-v2 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .logo-wrapper:hover .hover-v3 .logo-text {
+        animation: tilt-v3 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .logo-wrapper:hover .hover-v4 .logo-text {
+        animation: tilt-v4 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .logo-wrapper:hover .hover-v5 .logo-text {
+        animation: tilt-v5 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
 
     @keyframes tilt-v1 {
-        0% { transform: rotate(0deg) scale(1); }
-        40% { transform: rotate(25deg) scale(1.2); }
-        100% { transform: rotate(0deg) scale(1); }
+        0% {
+            transform: rotate(0deg) scale(1);
+        }
+        40% {
+            transform: rotate(25deg) scale(1.2);
+        }
+        100% {
+            transform: rotate(0deg) scale(1);
+        }
     }
 
     @keyframes tilt-v2 {
-        0% { transform: rotate(0deg) translateY(0); }
-        40% { transform: rotate(-25deg) translateY(-8px); }
-        100% { transform: rotate(0deg) translateY(0); }
+        0% {
+            transform: rotate(0deg) translateY(0);
+        }
+        40% {
+            transform: rotate(-25deg) translateY(-8px);
+        }
+        100% {
+            transform: rotate(0deg) translateY(0);
+        }
     }
 
     @keyframes tilt-v3 {
-        0% { transform: translateX(0) scale(1); }
-        40% { transform: translateX(8px) scale(1.1) rotate(10deg); }
-        100% { transform: translateX(0) scale(1); }
+        0% {
+            transform: translateX(0) scale(1);
+        }
+        40% {
+            transform: translateX(8px) scale(1.1) rotate(10deg);
+        }
+        100% {
+            transform: translateX(0) scale(1);
+        }
     }
 
     @keyframes tilt-v4 {
-        0% { transform: scale(1) rotate(0); }
-        40% { transform: scale(0.8) rotate(-15deg); }
-        100% { transform: scale(1) rotate(0); }
+        0% {
+            transform: scale(1) rotate(0);
+        }
+        40% {
+            transform: scale(0.8) rotate(-15deg);
+        }
+        100% {
+            transform: scale(1) rotate(0);
+        }
     }
 
     @keyframes tilt-v5 {
-        0% { transform: translateY(0) rotate(0); }
-        40% { transform: translateY(6px) rotate(20deg) scale(1.1); }
-        100% { transform: translateY(0) rotate(0); }
-    }    @keyframes logo-pulse {
-        0% { 
-            transform: scale(1); 
+        0% {
+            transform: translateY(0) rotate(0);
         }
-        50% { 
-            transform: scale(1.25); 
+        40% {
+            transform: translateY(6px) rotate(20deg) scale(1.1);
+        }
+        100% {
+            transform: translateY(0) rotate(0);
+        }
+    }
+    @keyframes logo-pulse {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.25);
             box-shadow: 0 0 30px 8px rgba(16, 185, 129, 0.35);
         }
-        100% { 
-            transform: scale(1); 
+        100% {
+            transform: scale(1);
         }
     }
 
     .logo-icon-box.loading {
         animation: logo-pulse 1.2s ease-in-out infinite;
     }
-    
-    .sidebar-nav { 
-        flex: 1; 
-        padding: 16px 0; 
+
+    .sidebar-nav {
+        flex: 1;
+        padding: 16px 0;
         display: flex;
         flex-direction: column;
         justify-content: center;
     }
 
-    .sidebar-nav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+    .sidebar-nav ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
 
-    .sidebar-nav .nav-link, .footer-btn {
+    .sidebar-nav .nav-link,
+    .footer-btn {
         width: 100%;
         height: 48px;
         display: flex;
@@ -335,24 +392,28 @@
         text-decoration: none;
     }
 
-    .nav-icon, .footer-icon { 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        font-size: 20px; 
+    .nav-icon,
+    .footer-icon {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 20px;
     }
 
-    .sidebar-nav li .nav-link:hover, .footer-btn:hover { 
-        background-color: #eefdfd; 
-        color: #0f172a; 
+    .sidebar-nav li .nav-link:hover,
+    .footer-btn:hover {
+        background-color: #eefdfd;
+        color: #0f172a;
     }
 
-    .sidebar-nav li.active .nav-link, .footer-btn.active { 
-        background-color: #eefdfd; 
-        color: #059669; 
+    .sidebar-nav li.active .nav-link,
+    .footer-btn.active {
+        background-color: #eefdfd;
+        color: #059669;
     }
-    
-    .sidebar-nav li.active .nav-icon, .footer-btn.active .footer-icon {
+
+    .sidebar-nav li.active .nav-icon,
+    .footer-btn.active .footer-icon {
         color: #10b981;
     }
 
@@ -363,10 +424,14 @@
         top: 50%;
         transform: translateY(-50%) scale(0.95);
         background-color: #eefdfd;
-        color: #10b981; 
+        color: #10b981;
         font-size: 1rem;
         font-weight: 700;
-        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; 
+        font-family:
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            sans-serif;
         letter-spacing: 0.2em;
         padding: 10px 16px;
         border-radius: 8px;
@@ -401,8 +466,14 @@
     }
 
     @keyframes slideIn {
-        from { opacity: 0; transform: translateX(-5px); }
-        to { opacity: 1; transform: translateX(0); }
+        from {
+            opacity: 0;
+            transform: translateX(-5px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
     }
 
     .popup-user-header {
@@ -430,9 +501,9 @@
         background: #ecfdf5;
     }
 
-    .confirm-user-email { 
-        margin: 0; 
-        font-size: 13px; 
+    .confirm-user-email {
+        margin: 0;
+        font-size: 13px;
         font-weight: 400;
         color: #475569;
         display: block;
@@ -451,32 +522,81 @@
         width: 100%;
     }
 
-    .confirm-action-btn:hover { background: #be123c; }
-    .confirm-action-btn.animating { transform: scale(1.05); background: #be123c; }
-
-    a:hover .tooltip { 
-        opacity: 1; 
-        transform: translateY(-50%) scale(1); 
+    .confirm-action-btn:hover {
+        background: #be123c;
+    }
+    .confirm-action-btn.animating {
+        transform: scale(1.05);
+        background: #be123c;
     }
 
-    .sidebar-footer { 
+    a:hover .tooltip {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
+
+    .sidebar-footer {
         padding: 16px 0;
-        border-top: 1px solid #f1f5f9; 
+        border-top: 1px solid #f1f5f9;
     }
 
-    .footer-content { display: flex; flex-direction: column; width: 100%; gap: 4px; }
+    .footer-content {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        gap: 4px;
+    }
 
-    .logout-wrapper { position: relative; width: 100%; padding: 0 8px; box-sizing: border-box; }
-    .logout:hover, .logout.active { color: #e11d48; background-color: #fff1f2; }
-    .logout:hover .footer-icon, .logout.active .footer-icon { color: #e11d48; }
-    .logout:hover  { color: #e11d48; }
+    .logout-wrapper {
+        position: relative;
+        width: 100%;
+        padding: 0 8px;
+        box-sizing: border-box;
+    }
+    .logout:hover,
+    .logout.active {
+        color: #e11d48;
+        background-color: #fff1f2;
+    }
+    .logout:hover .footer-icon,
+    .logout.active .footer-icon {
+        color: #e11d48;
+    }
+    .logout:hover {
+        color: #e11d48;
+    }
 
     @media only screen and (max-width: 768px) {
-        .sidebar { width: 100%; height: auto; position: fixed; bottom: 0; top: auto; border-right: none; border-top: 1px solid #f1f5f9; flex-direction: row; }
-        .sidebar-header { display: none; }
-        .sidebar-nav { padding: 8px; }
-        .sidebar-nav ul { flex-direction: row; justify-content: space-around; width: 100%; }
-        .sidebar-footer { border-top: none; padding: 8px; flex: 1; display: flex; justify-content: flex-end; }
-        .tooltip { display: none; }
+        .sidebar {
+            width: 100%;
+            height: auto;
+            position: fixed;
+            bottom: 0;
+            top: auto;
+            border-right: none;
+            border-top: 1px solid #f1f5f9;
+            flex-direction: row;
+        }
+        .sidebar-header {
+            display: none;
+        }
+        .sidebar-nav {
+            padding: 8px;
+        }
+        .sidebar-nav ul {
+            flex-direction: row;
+            justify-content: space-around;
+            width: 100%;
+        }
+        .sidebar-footer {
+            border-top: none;
+            padding: 8px;
+            flex: 1;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .tooltip {
+            display: none;
+        }
     }
 </style>
