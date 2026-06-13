@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libsqlite3-dev \
         fish \
         bat \
+        clang \
+        lld \
     && ln -s /usr/bin/batcat /usr/local/bin/bat \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
