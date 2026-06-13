@@ -5,10 +5,11 @@ use std::path::Path;
 
 use chrono;
 use thiserror::Error;
+use tracing::info;
+use tracing::warn;
 
 use crate::platform::common;
 use crate::platform::db;
-use crate::platform::logger::*;
 
 #[rustfmt::skip]
 #[derive(Debug, Error)]
@@ -54,19 +55,15 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
         .run(&ctx.db)
         .await
         .map_err(|e| Error::EmbeddedMigrationFailed { source: e })?;
-    log_info!("migrations", "success");
+    info!("embedded migrations executed successfully");
 
     // conditionally run seed data ONLY in local/dev/test environments
     if ctx.is_dev_env() || ctx.is_test_env() {
-        log_info!(
-            "migrations",
-            "seed",
-            details = "non-production environment detected - running test data seed"
-        );
+        info!("non-production environment detected - running test data seed");
 
         let seed_path = Path::new("./data/test-data.sql");
         if !seed_path.exists() {
-            log_warning!("migrations", "seed_file_missing", seed_path.display());
+            warn!(file_path = %seed_path.display(), "seed file missing");
             return Ok(());
         }
 
@@ -78,7 +75,7 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
             .await
             .map_err(|e| Error::SeedExecutionFailed { source: e })?;
 
-        log_info!("migrations", "completed");
+        info!("database migrations and seeding completed successfully");
     }
     Ok(())
 }
@@ -127,16 +124,16 @@ pub fn create_migration(name: &str) -> Result<String, Error> {
 
     // Construct filename and path
     let normalized_name = name.replace(' ', "_").to_lowercase();
-    let filename = format!("{version_string}_{normalized_name}.sql");
-    let filepath = migrations_path.join(&filename);
+    let file_name = format!("{version_string}_{normalized_name}.sql");
+    let file_path = migrations_path.join(&file_name);
 
     // Create the migration file with template content
-    let mut file = File::create(&filepath)?;
+    let mut file = File::create(&file_path)?;
     writeln!(file, "-- Migration: {name}")?;
     writeln!(file, "-- Created at: {timestamp}")?;
     writeln!(file, "--")?;
     writeln!(file, "-- Add migration script here")?;
 
-    log_info!("migrations", "file_created", filepath = filepath);
-    Ok(filename)
+    info!(file_path = %file_path.display(), "migration file created");
+    Ok(file_name)
 }

@@ -4,12 +4,12 @@ use axum::http;
 use axum::response::IntoResponse;
 use serde::Deserialize;
 use serde::Serialize;
+use tracing::info;
 
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::cookies;
 use crate::platform::crypto;
-use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
@@ -106,7 +106,7 @@ where
 {
     let request = request.data();
     let email_hash = crypto::get_hash_as_hex(&request.email);
-    log_info!("auth", "login", message = "attempt", email_hash = email_hash);
+    info!(%email_hash, "login_attempt");
     let email = common::Email::parse(&request.email).ok_or_else(api::Error::invalid_credentials)?;
     let cmd = auth::LoginCommand {
         email: email.clone(),
@@ -114,12 +114,10 @@ where
     };
     let session = service.login(cmd).await?;
     let success_email_hash = crypto::get_hash_as_hex(session.user.email.as_str());
-    log_info!(
-        "auth",
-        "login",
-        message = "success",
+    info!(
         user_id = session.user.id.0,
-        email_hash = success_email_hash,
+        email_hash = %success_email_hash,
+        "login_success"
     );
     let body = LoginResponse {
         user: session.user.into(),
@@ -164,11 +162,10 @@ where
 {
     let refresh_token = cookies::get_refresh_token_from_cookie(&headers)?;
     let session = service.refresh(&refresh_token).await?;
-    log_info!(
-        "auth",
-        "refresh",
+    info!(
         user_id = session.user.id.0,
         jti = session.old_jti.as_deref().unwrap_or(""),
+        "session_refresh"
     );
     let body = RefreshResponse {
         expires_in: service.context.jwt.access_token_expiry,

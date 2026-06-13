@@ -3,12 +3,14 @@ use jsonwebtoken;
 use oauth2;
 use serde::Deserialize;
 use serde::Serialize;
+use tracing::error;
+use tracing::info;
+use tracing::warn;
 use url::Url;
 
 use crate::platform::common;
 use crate::platform::config;
 use crate::platform::crypto;
-use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
@@ -138,13 +140,10 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
     let host = parsed.host_str().unwrap_or("");
     let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
     if parsed.scheme() != "https" && !is_localhost {
-        log_error!(
-            "oauth",
-            "validate",
-            "",
+        error!(
+            value = %config.google_redirect_uri,
             provider = "google",
-            field = "oauth.google_redirect_uri",
-            value = config.google_redirect_uri
+            "invalid_redirect_uri"
         );
         return Err(Error::InvalidConfig(
             "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
@@ -156,13 +155,7 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
 
 pub fn check_oauth_config(config: &config::OAuthSettings) {
     if let Err(error) = validate_google_config(config) {
-        log_warning!(
-            "oauth",
-            "validate",
-            error,
-            provider = "google",
-            message = "incomplete config"
-        );
+        warn!(error = error.to_string(), provider = "google", "incomplete_config");
     }
 }
 
@@ -248,11 +241,11 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
 
         let incoming_hash = crypto::get_hash_as_hex(state);
         if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
-            log_info!(
-                "oauth",
+            info!(
+                expected_hash = %crypto::get_hash_as_hex(&token_data.claims.csrf_token_hash),
+                actual_hash = %crypto::get_hash_as_hex(&incoming_hash),
                 "csrf_token_mismatch",
-                expected_hash = crypto::get_hash_as_hex(&token_data.claims.csrf_token_hash),
-                got_hash = crypto::get_hash_as_hex(&incoming_hash),
+
             );
             return Err(Error::CsrfMismatch);
         }
@@ -279,28 +272,24 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let user_info: GoogleUserInfo = response.json().await?;
 
         if user_info.email.is_empty() {
-            log_warning!("oauth", "complete_callback", "empty email", provider = "google");
+            warn!(provider = "google", "empty_email");
             return Err(Error::InvalidUserInfo);
         }
 
         if !user_info.verified_email {
-            log_warning!(
-                "oauth",
-                "complete_callback",
-                "unverified email",
+            warn!(
                 provider = "google",
-                email_hash = crypto::get_hash_as_hex(&user_info.email),
+                email_hash = %crypto::get_hash_as_hex(&user_info.email),
+                "unverified_email"
             );
             return Err(Error::UnverifiedEmail);
         }
 
         if user_info.id.is_empty() {
-            log_warning!(
-                "oauth",
-                "complete_callback",
-                "empty_user_id",
+            warn!(
                 provider = "google",
-                email_hash = crypto::get_hash_as_hex(&user_info.email),
+                email_hash = %crypto::get_hash_as_hex(&user_info.email),
+                "empty_user_id"
             );
             return Err(Error::InvalidUserInfo);
         }
