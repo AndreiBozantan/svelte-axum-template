@@ -54,7 +54,7 @@ fn extract_json_u64(content: &str, key: &str) -> Option<u64> {
 
 fn run_clippy_and_count() -> usize {
     let output = Command::new("cargo")
-        .args(["clippy", "--message-format=json"])
+        .args(["clippy", "--workspace --message-format=json"])
         .output();
     
     let mut count = 0;
