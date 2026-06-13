@@ -7,8 +7,13 @@
         "agentic",
         "clippy",
         "distroless",
+        "fuser",
+        "rfind",
         "rustup",
+        "sqlx",
+        "subfeature",
         "svelaxum",
+        "tlnp",
         "xtask"
     ]
 }
