@@ -38,6 +38,9 @@ fn main() {
         "docker-run" => {
             docker_run().expect("failed to run docker container");
         }
+        "docker-down" => {
+            docker_down().expect("failed to stop docker container");
+        }
         "docker-debug" => {
             docker_debug().expect("failed to run docker debug container");
         }
@@ -63,6 +66,7 @@ Available commands:
   dev           - Runs backend watch and frontend dev server concurrently
   docker-build  - Builds the production Docker image (svelaxum:release)
   docker-run    - Runs the production Docker container locally
+  docker-down   - Stops and removes the production Docker container
   docker-debug  - Runs a debug container mounting the data volume"#
     );
 }
@@ -312,39 +316,18 @@ fn dev() {
 }
 
 fn docker_build() -> std::io::Result<ExitStatus> {
-    println!("Building production docker image (svelaxum:release)...");
-    run_command("docker", &["build", "-f", "Dockerfile.prod", "-t", "svelaxum:release", "."], None)
+    println!("Building production docker image via docker compose...");
+    run_command("docker", &["compose", "build"], None)
 }
 
 fn docker_run() -> std::io::Result<ExitStatus> {
-    println!("Stopping existing container if running...");
-    let _ = run_command("docker", &["rm", "-f", "svelaxum"], None);
+    println!("Running release container via docker compose...");
+    run_command("docker", &["compose", "up", "-d"], None)
+}
 
-    println!("Running release container...");
-    run_command(
-        "docker",
-        &[
-            "run",
-            "-d",
-            "--name",
-            "svelaxum",
-            "--restart",
-            "unless-stopped",
-            "--read-only",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges",
-            "--tmpfs",
-            "/tmp:size=32m,noexec,nosuid",
-            "--mount",
-            "type=volume,src=svelaxum-data,dst=/data",
-            "-p",
-            "127.0.0.1:8080:3000",
-            "svelaxum:release",
-        ],
-        None,
-    )
+fn docker_down() -> std::io::Result<ExitStatus> {
+    println!("Stopping and removing release container via docker compose...");
+    run_command("docker", &["compose", "down"], None)
 }
 
 fn docker_debug() -> std::io::Result<ExitStatus> {

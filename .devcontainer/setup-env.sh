@@ -37,7 +37,7 @@ set -g fish_color_keyword green --bold
 
 # Cargo xtask completions
 complete -c cargo -n "__fish_seen_subcommand_from xtask" -f
-complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug help"
+complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug docker-down help"
 
 bind `` history-pager
 EOF
