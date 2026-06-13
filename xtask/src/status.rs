@@ -54,7 +54,7 @@ fn extract_json_u64(content: &str, key: &str) -> Option<u64> {
 
 fn run_clippy_and_count() -> usize {
     let output = Command::new("cargo")
-        .args(["clippy", "--workspace --message-format=json"])
+        .args(["clippy", "--workspace --all-targets --message-format=json"])
         .output();
     
     let mut count = 0;
@@ -84,19 +84,17 @@ fn run_tests_and_count() -> (usize, usize) {
                 let mut failed = 0;
                 if let Some(passed_idx) = line.find("passed") {
                     let start = line[..passed_idx].trim_end();
-                    if let Some(space_idx) = start.rfind(' ') {
-                        if let Ok(num) = start[space_idx..].trim().parse::<usize>() {
+                    if let Some(space_idx) = start.rfind(' ')
+                        && let Ok(num) = start[space_idx..].trim().parse::<usize>() {
                             passed = num;
                         }
-                    }
                 }
                 if let Some(failed_idx) = line.find("failed") {
                     let start = line[..failed_idx].trim_end();
-                    if let Some(space_idx) = start.rfind(' ') {
-                        if let Ok(num) = start[space_idx..].trim().parse::<usize>() {
+                    if let Some(space_idx) = start.rfind(' ')
+                        && let Ok(num) = start[space_idx..].trim().parse::<usize>() {
                             failed = num;
                         }
-                    }
                 }
                 total_passed += passed;
                 total_failed += failed;
@@ -123,18 +121,15 @@ fn refresh_cache_sync() -> CacheData {
 
 fn get_branch_name() -> String {
     let mut branch = String::new();
-    if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output() {
-        if output.status.success() {
+    if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output()
+        && output.status.success() {
             branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
         }
-    }
-    if branch.is_empty() {
-        if let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output() {
-            if output.status.success() {
+    if branch.is_empty()
+        && let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output()
+            && output.status.success() {
                 branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
             }
-        }
-    }
     if branch.is_empty() {
         branch = "unknown".to_string();
     }
@@ -165,8 +160,7 @@ fn get_db_info() -> String {
             "SELECT (SELECT COUNT(*) FROM _sqlx_migrations), version, description FROM _sqlx_migrations ORDER BY version DESC LIMIT 1;",
         ])
         .output()
-    {
-        if output.status.success() {
+        && output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let trimmed = stdout.trim();
             if !trimmed.is_empty() {
@@ -204,7 +198,6 @@ fn get_db_info() -> String {
                 }
             }
         }
-    }
 
     format!(
         "db.sqlite ({}, {} migrations applied, head: {})",
@@ -213,15 +206,15 @@ fn get_db_info() -> String {
 }
 
 fn get_pid_for_port(port: u16) -> Option<u32> {
-    if let Ok(output) = Command::new("ss").args(["-tlnp"]).output() {
-        if output.status.success() {
+    if let Ok(output) = Command::new("ss").args(["-tlnp"]).output()
+        && output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 6 {
                     let local_addr = parts[3];
-                    if let Some(port_str) = local_addr.split(':').last() {
-                        if port_str == port.to_string() {
+                    if let Some(port_str) = local_addr.split(':').next_back()
+                        && port_str == port.to_string() {
                             let process_info = parts[5];
                             if let Some(pid_idx) = process_info.find("pid=") {
                                 let start = pid_idx + 4;
@@ -232,33 +225,27 @@ fn get_pid_for_port(port: u16) -> Option<u32> {
                                 }
                             }
                         }
-                    }
                 }
             }
         }
-    }
 
-    if let Ok(output) = Command::new("lsof").args(["-t", &format!("-i:{}", port)]).output() {
-        if output.status.success() {
+    if let Ok(output) = Command::new("lsof").args(["-t", &format!("-i:{}", port)]).output()
+        && output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(first_line) = stdout.lines().next() {
-                if let Ok(pid) = first_line.trim().parse::<u32>() {
+            if let Some(first_line) = stdout.lines().next()
+                && let Ok(pid) = first_line.trim().parse::<u32>() {
                     return Some(pid);
                 }
-            }
         }
-    }
 
-    if let Ok(output) = Command::new("fuser").arg(&format!("{}/tcp", port)).output() {
-        if output.status.success() {
+    if let Ok(output) = Command::new("fuser").arg(format!("{}/tcp", port)).output()
+        && output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(pid_str) = stdout.trim().split_whitespace().next() {
-                if let Ok(pid) = pid_str.parse::<u32>() {
+            if let Some(pid_str) = stdout.split_whitespace().next()
+                && let Ok(pid) = pid_str.parse::<u32>() {
                     return Some(pid);
                 }
-            }
         }
-    }
 
     None
 }
@@ -338,22 +325,20 @@ fn count_dir_size(dir: &Path, exclude_dirs: &[&str], exclude_files: &[&str]) -> 
                     {
                         continue;
                     }
-                    if let Ok(metadata) = entry.metadata() {
-                        if metadata.len() > 1_024_000 {
+                    if let Ok(metadata) = entry.metadata()
+                        && metadata.len() > 1_024_000 {
                             continue;
                         }
-                    }
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                     let text_extensions = [
                         "rs", "toml", "svelte", "ts", "js", "css", "html", "json", "md", "sql", "sh",
                         "yml", "yaml",
                     ];
-                    if text_extensions.contains(&ext) || ext.is_empty() {
-                        if let Ok(content) = fs::read_to_string(&path) {
+                    if (text_extensions.contains(&ext) || ext.is_empty())
+                        && let Ok(content) = fs::read_to_string(&path) {
                             file_count += 1;
                             line_count += content.lines().count();
                         }
-                    }
                 }
             }
         }
@@ -480,14 +465,13 @@ fn get_toolchain_info() -> String {
 }
 
 fn get_tool_version(cmd: &str, args: &[&str]) -> String {
-    if let Ok(output) = Command::new(cmd).args(args).output() {
-        if output.status.success() {
+    if let Ok(output) = Command::new(cmd).args(args).output()
+        && output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
             let val = stdout.trim();
             if !val.is_empty() {
                 return val.to_string();
             }
         }
-    }
     "unknown".to_string()
 }

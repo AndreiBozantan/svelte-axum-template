@@ -29,7 +29,7 @@ Rust + Svelte fullstack template. Backend: Axum + SQLite + sqlx. Frontend: Svelt
 - use validator::Validate to validate the inputs
 - structured logging: log message must be short, lowercase, using underscores, no spaces; use key-value fields; example:
 `warn!(user_id = user.id.0, error = %err, "password_rehash_failed");`
-- run `cargo check --workspace && cargo clippy --workspace` after every change and fix the issues
+- run `cargo check --workspace --all-targets && cargo clippy --workspace --all-targets` after every change and fix the issues
 - follow the already existing patterns from the code, use idiomatic Rust and work like an world-expert Rust senior software engineer
 
 
