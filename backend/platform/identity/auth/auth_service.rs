@@ -4,7 +4,6 @@ use crate::platform::constants;
 use crate::platform::crypto;
 use crate::platform::db;
 use crate::platform::jwt;
-use crate::platform::logger::*;
 
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
@@ -59,17 +58,6 @@ impl From<Error> for api::Error {
         #[allow(clippy::enum_glob_use)]
         use Error::*;
 
-        match &error {
-            InvalidCredentials | InvalidToken | UserAlreadyExists => {
-                log_info!("auth", "", error = error);
-            },
-            JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
-                log_info!("auth", "jwt_operation_failed", error = error);
-            },
-            _ => {
-                log_error!("auth", "", error);
-            },
-        }
         match error {
             JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             InvalidCredentials => Self::invalid_credentials(),

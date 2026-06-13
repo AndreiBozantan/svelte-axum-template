@@ -148,16 +148,17 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status;
+        if status.is_server_error() {
+            log_error!("api", "internal_server_error", self.message, code = self.code);
+        } else {
+            log_info!("api", "client_error", status = status.as_u16(), code = self.code);
+        }
         (status, axum::Json(self)).into_response()
     }
 }
 
 impl From<jwt::Error> for Error {
     fn from(error: jwt::Error) -> Self {
-        match error {
-            jwt::Error::ExpiredToken | jwt::Error::InvalidToken => {},
-            _ => log_error!("jwt", "", error),
-        }
         match error {
             jwt::Error::ExpiredToken => Self::expired_token(),
             jwt::Error::InvalidToken => Self::invalid_token(),
@@ -168,15 +169,6 @@ impl From<jwt::Error> for Error {
 
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
-        match error {
-            db::Error::DatabaseOperationFailed(_) => {
-                log_error!("db", "operation", error);
-            },
-            db::Error::RowConversionFailed(_) => {
-                log_error!("db", "row_conversion", error);
-            },
-            _ => {},
-        }
         match error {
             db::Error::RowNotFound => Self::not_found(),
             db::Error::UniqueConstraintViolation(_) => Self::db_key_violation("unique_violation"),
@@ -189,15 +181,13 @@ impl From<db::Error> for Error {
 }
 
 impl From<axum::http::Error> for Error {
-    fn from(error: axum::http::Error) -> Self {
-        log_error!("http", "", error);
+    fn from(_error: axum::http::Error) -> Self {
         Self::internal()
     }
 }
 
 impl From<axum::http::header::InvalidHeaderValue> for Error {
-    fn from(error: axum::http::header::InvalidHeaderValue) -> Self {
-        log_error!("invalid_header", "", error);
+    fn from(_error: axum::http::header::InvalidHeaderValue) -> Self {
         Self::internal()
     }
 }

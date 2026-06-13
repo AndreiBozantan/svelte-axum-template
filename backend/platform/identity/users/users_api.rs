@@ -6,7 +6,6 @@ use crate::platform::api;
 use crate::platform::common;
 use crate::platform::identity::users;
 use crate::platform::jwt;
-use crate::platform::logger::*;
 
 pub fn router<UR>(service: users::Service<UR>) -> axum::Router<common::ArcContext>
 where
@@ -51,14 +50,6 @@ pub struct UserInfoResponse {
 
 impl From<users::Error> for api::Error {
     fn from(error: users::Error) -> Self {
-        match &error {
-            users::Error::DatabaseOperationFailed(_) => {
-                log_error!("users", "database", error);
-            },
-            _ => {
-                log_info!("users", "", error = error);
-            },
-        }
         match error {
             users::Error::NotFound => Self::not_found(),
             users::Error::AlreadyExists => Self::user_already_exists(),

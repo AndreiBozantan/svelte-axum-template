@@ -31,17 +31,6 @@ impl From<oauth::Error> for api::Error {
         #[allow(clippy::enum_glob_use)]
         use oauth::Error::*;
 
-        match &error {
-            InvalidConfig(_) | UserInfoRetrievalFailed(_) | InternalFault(_) => {
-                log_error!("oauth", "", error);
-            },
-            OAuth2RequestFailed(_) => {
-                log_warning!("oauth", "request_failed", error);
-            },
-            _ => {
-                log_info!("oauth", "", error = error);
-            },
-        }
         match error {
             InvalidUserInfo => Self::invalid_credentials(),
             UnverifiedEmail => Self::invalid_credentials(),
