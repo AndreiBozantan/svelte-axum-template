@@ -34,7 +34,10 @@ fn save_cache(cache: &CacheData) -> std::io::Result<()> {
     fs::write("target/xtask-status-cache.json", content)
 }
 
-fn extract_json_num(content: &str, key: &str) -> Option<usize> {
+fn extract_json_num(
+    content: &str,
+    key: &str,
+) -> Option<usize> {
     let pattern = format!("\"{}\":", key);
     let idx = content.find(&pattern)?;
     let start = idx + pattern.len();
@@ -43,7 +46,10 @@ fn extract_json_num(content: &str, key: &str) -> Option<usize> {
     content[start..end].trim().parse::<usize>().ok()
 }
 
-fn extract_json_u64(content: &str, key: &str) -> Option<u64> {
+fn extract_json_u64(
+    content: &str,
+    key: &str,
+) -> Option<u64> {
     let pattern = format!("\"{}\":", key);
     let idx = content.find(&pattern)?;
     let start = idx + pattern.len();
@@ -56,12 +62,14 @@ fn run_clippy_and_count() -> usize {
     let output = Command::new("cargo")
         .args(["clippy", "--workspace --all-targets --message-format=json"])
         .output();
-    
+
     let mut count = 0;
     if let Ok(out) = output {
         let stdout = String::from_utf8_lossy(&out.stdout);
         for line in stdout.lines() {
-            if line.contains("\"reason\":\"compiler-message\"") && (line.contains("\"level\":\"warning\"") || line.contains("\"level\":\"error\"")) {
+            if line.contains("\"reason\":\"compiler-message\"")
+                && (line.contains("\"level\":\"warning\"") || line.contains("\"level\":\"error\""))
+            {
                 count += 1;
             }
         }
@@ -70,10 +78,8 @@ fn run_clippy_and_count() -> usize {
 }
 
 fn run_tests_and_count() -> (usize, usize) {
-    let output = Command::new("cargo")
-        .args(["test"])
-        .output();
-    
+    let output = Command::new("cargo").args(["test"]).output();
+
     let mut total_passed = 0;
     let mut total_failed = 0;
     if let Ok(out) = output {
@@ -85,16 +91,18 @@ fn run_tests_and_count() -> (usize, usize) {
                 if let Some(passed_idx) = line.find("passed") {
                     let start = line[..passed_idx].trim_end();
                     if let Some(space_idx) = start.rfind(' ')
-                        && let Ok(num) = start[space_idx..].trim().parse::<usize>() {
-                            passed = num;
-                        }
+                        && let Ok(num) = start[space_idx..].trim().parse::<usize>()
+                    {
+                        passed = num;
+                    }
                 }
                 if let Some(failed_idx) = line.find("failed") {
                     let start = line[..failed_idx].trim_end();
                     if let Some(space_idx) = start.rfind(' ')
-                        && let Ok(num) = start[space_idx..].trim().parse::<usize>() {
-                            failed = num;
-                        }
+                        && let Ok(num) = start[space_idx..].trim().parse::<usize>()
+                    {
+                        failed = num;
+                    }
                 }
                 total_passed += passed;
                 total_failed += failed;
@@ -122,14 +130,16 @@ fn refresh_cache_sync() -> CacheData {
 fn get_branch_name() -> String {
     let mut branch = String::new();
     if let Ok(output) = Command::new("git").args(["branch", "--show-current"]).output()
-        && output.status.success() {
-            branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        }
+        && output.status.success()
+    {
+        branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    }
     if branch.is_empty()
         && let Ok(output) = Command::new("git").args(["rev-parse", "--short", "HEAD"]).output()
-            && output.status.success() {
-                branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            }
+        && output.status.success()
+    {
+        branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    }
     if branch.is_empty() {
         branch = "unknown".to_string();
     }
@@ -207,45 +217,54 @@ fn get_db_info() -> String {
 
 fn get_pid_for_port(port: u16) -> Option<u32> {
     if let Ok(output) = Command::new("ss").args(["-tlnp"]).output()
-        && output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            for line in stdout.lines() {
-                let parts: Vec<&str> = line.split_whitespace().collect();
-                if parts.len() >= 6 {
-                    let local_addr = parts[3];
-                    if let Some(port_str) = local_addr.split(':').next_back()
-                        && port_str == port.to_string() {
-                            let process_info = parts[5];
-                            if let Some(pid_idx) = process_info.find("pid=") {
-                                let start = pid_idx + 4;
-                                let rest = &process_info[start..];
-                                let end = rest.find(|c: char| !c.is_numeric()).map(|i| start + i).unwrap_or(process_info.len());
-                                if let Ok(pid) = process_info[start..end].parse::<u32>() {
-                                    return Some(pid);
-                                }
-                            }
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 6 {
+                let local_addr = parts[3];
+                if let Some(port_str) = local_addr.split(':').next_back()
+                    && port_str == port.to_string()
+                {
+                    let process_info = parts[5];
+                    if let Some(pid_idx) = process_info.find("pid=") {
+                        let start = pid_idx + 4;
+                        let rest = &process_info[start..];
+                        let end = rest
+                            .find(|c: char| !c.is_numeric())
+                            .map(|i| start + i)
+                            .unwrap_or(process_info.len());
+                        if let Ok(pid) = process_info[start..end].parse::<u32>() {
+                            return Some(pid);
                         }
+                    }
                 }
             }
         }
+    }
 
     if let Ok(output) = Command::new("lsof").args(["-t", &format!("-i:{}", port)]).output()
-        && output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(first_line) = stdout.lines().next()
-                && let Ok(pid) = first_line.trim().parse::<u32>() {
-                    return Some(pid);
-                }
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Some(first_line) = stdout.lines().next()
+            && let Ok(pid) = first_line.trim().parse::<u32>()
+        {
+            return Some(pid);
         }
+    }
 
     if let Ok(output) = Command::new("fuser").arg(format!("{}/tcp", port)).output()
-        && output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            if let Some(pid_str) = stdout.split_whitespace().next()
-                && let Ok(pid) = pid_str.parse::<u32>() {
-                    return Some(pid);
-                }
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if let Some(pid_str) = stdout.split_whitespace().next()
+            && let Ok(pid) = pid_str.parse::<u32>()
+        {
+            return Some(pid);
         }
+    }
 
     None
 }
@@ -254,7 +273,7 @@ fn get_service_info(port: u16) -> String {
     use std::net::SocketAddr;
     let addr_str = format!("127.0.0.1:{}", port);
     let addr: Result<SocketAddr, _> = addr_str.parse();
-    
+
     let is_running = if let Ok(a) = addr {
         TcpStream::connect_timeout(&a, Duration::from_millis(50)).is_ok()
     } else {
@@ -303,7 +322,11 @@ fn get_dirty_files_info() -> String {
     }
 }
 
-fn count_dir_size(dir: &Path, exclude_dirs: &[&str], exclude_files: &[&str]) -> (usize, usize) {
+fn count_dir_size(
+    dir: &Path,
+    exclude_dirs: &[&str],
+    exclude_files: &[&str],
+) -> (usize, usize) {
     let mut file_count = 0;
     let mut line_count = 0;
 
@@ -319,26 +342,24 @@ fn count_dir_size(dir: &Path, exclude_dirs: &[&str], exclude_files: &[&str]) -> 
                     file_count += c;
                     line_count += l;
                 } else if path.is_file() {
-                    if exclude_files.contains(&name)
-                        || name.starts_with('.')
-                        || name == "package-lock.json"
-                    {
+                    if exclude_files.contains(&name) || name.starts_with('.') || name == "package-lock.json" {
                         continue;
                     }
                     if let Ok(metadata) = entry.metadata()
-                        && metadata.len() > 1_024_000 {
-                            continue;
-                        }
+                        && metadata.len() > 1_024_000
+                    {
+                        continue;
+                    }
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                     let text_extensions = [
-                        "rs", "toml", "svelte", "ts", "js", "css", "html", "json", "md", "sql", "sh",
-                        "yml", "yaml",
+                        "rs", "toml", "svelte", "ts", "js", "css", "html", "json", "md", "sql", "sh", "yml", "yaml",
                     ];
                     if (text_extensions.contains(&ext) || ext.is_empty())
-                        && let Ok(content) = fs::read_to_string(&path) {
-                            file_count += 1;
-                            line_count += content.lines().count();
-                        }
+                        && let Ok(content) = fs::read_to_string(&path)
+                    {
+                        file_count += 1;
+                        line_count += content.lines().count();
+                    }
                 }
             }
         }
@@ -347,11 +368,17 @@ fn count_dir_size(dir: &Path, exclude_dirs: &[&str], exclude_files: &[&str]) -> 
     (file_count, line_count)
 }
 
-fn print_row(key: &str, value: &str) {
+fn print_row(
+    key: &str,
+    value: &str,
+) {
     println!("{:<15}{}", key, value);
 }
 
-pub fn status(refresh: bool, refresh_silent: bool) {
+pub fn status(
+    refresh: bool,
+    refresh_silent: bool,
+) {
     if refresh_silent {
         let cache = refresh_cache_sync();
         let _ = save_cache(&cache);
@@ -378,13 +405,13 @@ pub fn status(refresh: bool, refresh_silent: bool) {
                         .spawn();
                 }
                 c
-            }
+            },
             None => {
                 println!("Initializing status cache (running clippy and tests)...");
                 let c = refresh_cache_sync();
                 let _ = save_cache(&c);
                 c
-            }
+            },
         }
     };
 
@@ -436,11 +463,7 @@ pub fn status(refresh: bool, refresh_silent: bool) {
     let fe_size_info = format!("{} files; {} lines of code", fe_files, fe_lines);
     print_row("Frontend size:", &fe_size_info);
 
-    let (be_files, be_lines) = count_dir_size(
-        Path::new("backend"),
-        &["target", ".sqlx", ".git"],
-        &[".DS_Store"],
-    );
+    let (be_files, be_lines) = count_dir_size(Path::new("backend"), &["target", ".sqlx", ".git"], &[".DS_Store"]);
     let be_size_info = format!("{} files; {} lines of code", be_files, be_lines);
     print_row("Backend size:", &be_size_info);
 
@@ -451,27 +474,31 @@ pub fn status(refresh: bool, refresh_silent: bool) {
 fn get_toolchain_info() -> String {
     let rustc_ver = get_tool_version("rustc", &["--version"]);
     let rustc_short = rustc_ver.split_whitespace().nth(1).unwrap_or("unknown");
-    
+
     let cargo_ver = get_tool_version("cargo", &["--version"]);
     let cargo_short = cargo_ver.split_whitespace().nth(1).unwrap_or("unknown");
-    
+
     let node_ver = get_tool_version("node", &["--version"]);
     let npm_ver = get_tool_version("npm", &["--version"]);
-    
+
     format!(
         "rustc {}; cargo {}; node {}; npm {}",
         rustc_short, cargo_short, node_ver, npm_ver
     )
 }
 
-fn get_tool_version(cmd: &str, args: &[&str]) -> String {
+fn get_tool_version(
+    cmd: &str,
+    args: &[&str],
+) -> String {
     if let Ok(output) = Command::new(cmd).args(args).output()
-        && output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let val = stdout.trim();
-            if !val.is_empty() {
-                return val.to_string();
-            }
+        && output.status.success()
+    {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let val = stdout.trim();
+        if !val.is_empty() {
+            return val.to_string();
         }
+    }
     "unknown".to_string()
 }
