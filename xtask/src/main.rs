@@ -15,42 +15,46 @@ fn main() {
     match task {
         "clean" => clean(),
         "status" => {
-            let refresh = args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
+            let refresh =
+                args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
             let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
             status::status(refresh, refresh_silent);
-        }
+        },
         "release" => release(),
         "lint-security" => {
             lint_security().expect("failed to run semgrep");
-        }
+        },
         "db-create" => {
             db_create().expect("failed to create database");
-        }
+        },
         "db-migrate" => {
             db_migrate().expect("failed to run migrations");
-        }
+        },
         "db-prepare" => {
             db_prepare().expect("failed to prepare sqlx queries");
-        }
+        },
         "db-drop" => {
             db_drop().expect("failed to drop database");
-        }
+        },
         "db-init" => db_init(),
         "db-reset" => db_reset(),
         "dev-init" => dev_init(),
+        "setup-hooks" => {
+            setup_hooks().expect("failed to set up git hooks");
+        },
         "dev" => dev(),
         "docker-build" => {
             docker_build().expect("failed to build docker image");
-        }
+        },
         "docker-run" => {
             docker_run().expect("failed to run docker container");
-        }
+        },
         "docker-down" => {
             docker_down().expect("failed to stop docker container");
-        }
+        },
         "docker-debug" => {
             docker_debug().expect("failed to run docker debug container");
-        }
+        },
         _ => print_help(),
     }
 }
@@ -71,6 +75,7 @@ Available commands:
   db-drop       - Drops the SQLite database
   db-reset      - Drops database and re-initializes it
   dev-init      - Installs frontend packages, initializes DB, and seeds admin user
+  setup-hooks   - Sets up workspace git hooks
   dev           - Runs backend watch and frontend dev server concurrently
   docker-build  - Builds the production Docker image (svelaxum:release)
   docker-run    - Runs the production Docker container locally
@@ -79,7 +84,11 @@ Available commands:
     );
 }
 
-fn run_command(cmd: &str, args: &[&str], dir: Option<&str>) -> std::io::Result<ExitStatus> {
+fn run_command(
+    cmd: &str,
+    args: &[&str],
+    dir: Option<&str>,
+) -> std::io::Result<ExitStatus> {
     let mut command = Command::new(cmd);
     command.args(args);
     if let Some(d) = dir {
@@ -160,9 +169,7 @@ fn ensure_cargo_watch() {
             .status();
         if status.is_err() || !status.unwrap().success() {
             eprintln!("cargo-binstall failed. Falling back to cargo install cargo-watch...");
-            let status2 = Command::new("cargo")
-                .args(["install", "cargo-watch"])
-                .status();
+            let status2 = Command::new("cargo").args(["install", "cargo-watch"]).status();
             if status2.is_err() || !status2.unwrap().success() {
                 eprintln!("Error: failed to install cargo-watch. Please install it manually.");
                 std::process::exit(1);
@@ -209,6 +216,9 @@ fn dev_init() {
     println!("Initializing development environment...");
     ensure_cargo_watch();
 
+    // Set up git hooks
+    setup_hooks().expect("failed to set up git hooks");
+
     // Install frontend dependencies
     println!("Installing frontend dependencies...");
     let status = run_command("npm", &["install"], Some("frontend"));
@@ -230,7 +240,11 @@ fn dev_init() {
 
     // Seed admin user
     println!("Seeding default admin user...");
-    let status = run_command("cargo", &["run", "--package", "app", "--", "create-admin", "--email", "a@b.cc"], None);
+    let status = run_command(
+        "cargo",
+        &["run", "--package", "app", "--", "create-admin", "--email", "a@b.cc"],
+        None,
+    );
     if status.is_err() || !status.unwrap().success() {
         eprintln!("Failed to seed admin user.");
         std::process::exit(1);
@@ -258,7 +272,12 @@ fn open_browser(url: &str) {
     } else if cfg!(target_os = "windows") {
         ("cmd", vec!["/c", "start", url])
     } else {
-        if Command::new("xdg-open").arg(url).status().map(|s| s.success()).unwrap_or(false) {
+        if Command::new("xdg-open")
+            .arg(url)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
             return;
         }
         ("python3", vec!["-m", "webbrowser", url])
@@ -287,7 +306,15 @@ fn dev() {
 
     println!("Starting backend development watch server...");
     let mut backend = Command::new("cargo")
-        .args(["watch", "--ignore", "data/db.sqlite", "--watch", "backend", "--exec", "run --package app"])
+        .args([
+            "watch",
+            "--ignore",
+            "data/db.sqlite",
+            "--watch",
+            "backend",
+            "--exec",
+            "run --package app",
+        ])
         .spawn()
         .expect("failed to start backend watch");
 
@@ -357,7 +384,7 @@ fn docker_debug() -> std::io::Result<ExitStatus> {
 
 fn release() {
     println!("Building frontend and backend in release mode...");
-    
+
     // 1. Install frontend dependencies
     println!("Installing frontend dependencies...");
     let status = run_command("npm", &["install"], Some("frontend"));
@@ -392,4 +419,35 @@ fn lint_security() -> std::io::Result<ExitStatus> {
     run_command("semgrep", &["--config", "r/all"], None)
 }
 
+fn setup_hooks() -> std::io::Result<()> {
+    let git_dir = Path::new(".git");
+    if !git_dir.exists() {
+        println!("Not a git repository (no .git folder found). Skipping hooks setup.");
+        return Ok(());
+    }
 
+    let hooks_dir = git_dir.join("hooks");
+    fs::create_dir_all(&hooks_dir)?;
+
+    let src = Path::new(".githooks/pre-commit");
+    let dst = hooks_dir.join("pre-commit");
+
+    if !src.exists() {
+        println!("Source hook file .githooks/pre-commit does not exist.");
+        return Ok(());
+    }
+
+    println!("Installing pre-commit hook to .git/hooks/pre-commit...");
+    fs::copy(src, &dst)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&dst)?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&dst, perms)?;
+    }
+
+    println!("Pre-commit hook installed successfully.");
+    Ok(())
+}
