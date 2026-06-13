@@ -1,27 +1,26 @@
-# editor files
-.vscode
+# editor config folder
+.vscode/
 
-# rust files
-.env
-.jwt.secret
-Cargo.lock
-configs.local.toml
-target
+# rust build folder
+target/
 
-# svelte files
+# svelte build config folder
 frontend/dist/
 
-# npm files
-node_modules
-
-# sqlx files
-.sqlx
+# npm folder
+node_modules/
 
 # db files
 data/db.sqlite*
 
+# local config and secret files
+*local*
+*secret*
+
 # misc
-tmp
-.DS_Store
+tmp/
 .aicode/
 .ai_coding.db
+.DS_Store
+.env
+
