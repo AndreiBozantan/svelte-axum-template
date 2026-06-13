@@ -4,7 +4,6 @@ use crate::platform::constants;
 use crate::platform::crypto;
 use crate::platform::db;
 use crate::platform::jwt;
-use crate::platform::logger;
 
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
@@ -59,17 +58,6 @@ impl From<Error> for api::Error {
         #[allow(clippy::enum_glob_use)]
         use Error::*;
 
-        match &error {
-            InvalidCredentials | InvalidToken | UserAlreadyExists => {
-                logger::log_auth_rejection(&error);
-            },
-            JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
-                logger::log_auth_rejection(&error);
-            },
-            _ => {
-                tracing::error!("Auth system error: {error}");
-            },
-        }
         match error {
             JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             InvalidCredentials => Self::invalid_credentials(),
@@ -193,7 +181,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     ) -> Result<AuthResult, Error> {
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
-        let refresh_token_hash = crypto::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         let cmd = tokens::CreateRefreshTokenCommand {
@@ -247,7 +235,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidToken);
         }
 
-        let token_hash = crypto::get_token_hash_as_hex(refresh_token_value);
+        let token_hash = crypto::get_hash_as_hex(refresh_token_value);
         if stored_token.token_hash != token_hash {
             return Err(Error::InvalidToken);
         }
@@ -257,7 +245,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let user = self.users.find_by_id(&self.context.db, stored_token.user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
-        let refresh_token_hash = crypto::get_token_hash_as_hex(&refresh_token.value);
+        let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
         self.tokens

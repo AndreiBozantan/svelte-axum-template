@@ -9,6 +9,7 @@ use crate::router;
 use crate::platform::common;
 use crate::platform::config;
 use crate::platform::jwt;
+use crate::platform::logger::*;
 use crate::platform::migrations;
 
 #[derive(Debug, thiserror::Error)]
@@ -95,7 +96,7 @@ async fn start_server() -> Result<(), Error> {
 
 async fn shutdown_signal() {
     match tokio::signal::ctrl_c().await {
-        Ok(()) => tracing::info!("Shutdown signal received, shutting down gracefully"),
-        Err(error) => tracing::error!("Failed to listen for shutdown signal: {}", error),
+        Ok(()) => log_info!("server", "shutdown", details = "gracefull shutdown"),
+        Err(error) => log_error!("server", "shutdown", error),
     }
 }

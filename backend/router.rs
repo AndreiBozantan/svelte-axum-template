@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
@@ -11,6 +13,7 @@ use serde::Serialize;
 use crate::platform::api;
 use crate::platform::assets;
 use crate::platform::cookies;
+use crate::platform::logger::*;
 
 use crate::platform::common::ArcContext;
 
@@ -28,7 +31,20 @@ pub fn create(context: ArcContext) -> Router {
     Router::new()
         .nest("/api", api)
         .fallback(assets::static_handler)
-        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+                let client_ip = extract_client_ip(request);
+                let user_agent = extract_user_agent(request);
+                tracing::info_span!(
+                    "request",
+                    method = %request.method(),
+                    uri = %request.uri(),
+                    version = ?request.version(),
+                    client_ip = %client_ip,
+                    user_agent = user_agent,
+                )
+            }),
+        )
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
         .with_state(context)
 }
@@ -97,7 +113,7 @@ async fn health_check(
     query: api::Query<HealthCheckQuery>,
 ) -> Result<impl IntoResponse, api::Error> {
     sqlx::query("SELECT 1").execute(&context.db).await.map_err(|error| {
-        tracing::error!("Health check database ping failed: {error}");
+        log_error!("router", "health_check", error);
         api::Error::internal()
     })?;
 
@@ -132,16 +148,46 @@ impl tower_http::catch_panic::ResponseForPanic for CustomPanicHandler {
 
         match panic_message {
             Some(HEALTHY_PANIC_MESSAGE) => {
-                tracing::info!("caught panic (simulated health check crash): {HEALTHY_PANIC_MESSAGE}");
+                log_info!("router", "panic", details = HEALTHY_PANIC_MESSAGE);
             },
-            Some(msg) => {
-                tracing::error!("caught panic: {msg}");
+            Some(message) => {
+                log_error!("router", "panic", message);
             },
             None => {
-                tracing::error!("caught panic: (unknown payload)");
+                log_error!("router", "panic", "unknown_payload");
             },
         }
 
         api::Error::internal().into_response()
     }
+}
+
+fn extract_client_ip(req: &Request<Body>) -> String {
+    // check common proxy headers
+    if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
+        && let Ok(value) = forwarded_for.to_str()
+        && let Some(ip) = value.split(',').next()
+    {
+        return ip.trim().to_string();
+    }
+
+    if let Some(real_ip) = req.headers().get("x-real-ip")
+        && let Ok(value) = real_ip.to_str()
+    {
+        return value.to_string();
+    }
+
+    // fallback to Axum's SocketAddr ConnectInfo
+    if let Some(axum::extract::ConnectInfo(addr)) = req.extensions().get::<axum::extract::ConnectInfo<SocketAddr>>() {
+        return addr.ip().to_string();
+    }
+
+    "unknown".to_string()
+}
+
+fn extract_user_agent(req: &Request<Body>) -> Option<String> {
+    req.headers()
+        .get("user-agent")
+        .and_then(|ua| ua.to_str().ok())
+        .map(std::string::ToString::to_string)
 }

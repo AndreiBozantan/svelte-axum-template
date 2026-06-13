@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::platform::db;
 use crate::platform::jwt;
+use crate::platform::logger::*;
 
 #[derive(Debug, Clone, thiserror::Error, Serialize)]
 #[error("{message}")]
@@ -147,16 +148,17 @@ impl Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let status = self.status;
+        if status.is_server_error() {
+            log_error!("api", "internal_server_error", self.message, code = self.code);
+        } else {
+            log_info!("api", "client_error", status = status.as_u16(), code = self.code);
+        }
         (status, axum::Json(self)).into_response()
     }
 }
 
 impl From<jwt::Error> for Error {
     fn from(error: jwt::Error) -> Self {
-        match error {
-            jwt::Error::ExpiredToken | jwt::Error::InvalidToken => {},
-            _ => tracing::error!("jwt error: {error}"),
-        }
         match error {
             jwt::Error::ExpiredToken => Self::expired_token(),
             jwt::Error::InvalidToken => Self::invalid_token(),
@@ -167,12 +169,6 @@ impl From<jwt::Error> for Error {
 
 impl From<db::Error> for Error {
     fn from(error: db::Error) -> Self {
-        match error {
-            db::Error::DatabaseOperationFailed(_) | db::Error::RowConversionFailed(_) => {
-                tracing::error!("db error: {error}");
-            },
-            _ => {},
-        }
         match error {
             db::Error::RowNotFound => Self::not_found(),
             db::Error::UniqueConstraintViolation(_) => Self::db_key_violation("unique_violation"),
@@ -185,15 +181,13 @@ impl From<db::Error> for Error {
 }
 
 impl From<axum::http::Error> for Error {
-    fn from(error: axum::http::Error) -> Self {
-        tracing::error!("HTTP error: {error}");
+    fn from(_error: axum::http::Error) -> Self {
         Self::internal()
     }
 }
 
 impl From<axum::http::header::InvalidHeaderValue> for Error {
-    fn from(error: axum::http::header::InvalidHeaderValue) -> Self {
-        tracing::error!("Invalid header value: {error}");
+    fn from(_error: axum::http::header::InvalidHeaderValue) -> Self {
         Self::internal()
     }
 }

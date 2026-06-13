@@ -12,7 +12,6 @@ use thiserror::Error;
 use crate::platform::api;
 use crate::platform::config;
 use crate::platform::jwt;
-use crate::platform::logger;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -31,14 +30,6 @@ impl From<Error> for api::Error {
         #[allow(clippy::enum_glob_use)]
         use Error::*;
 
-        match &error {
-            InvalidToken | JwtOperationFailed(jwt::Error::ExpiredToken | jwt::Error::InvalidToken) => {
-                logger::log_auth_rejection(&error);
-            },
-            _ => {
-                tracing::error!("Cookie system error: {error}");
-            },
-        }
         match error {
             JwtOperationFailed(jwt::Error::ExpiredToken) => Self::expired_token(),
             _ => Self::invalid_token(),

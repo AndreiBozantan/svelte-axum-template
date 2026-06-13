@@ -50,14 +50,6 @@ pub struct UserInfoResponse {
 
 impl From<users::Error> for api::Error {
     fn from(error: users::Error) -> Self {
-        match &error {
-            users::Error::DatabaseOperationFailed(_) => {
-                tracing::error!("user database error: {error}");
-            },
-            _ => {
-                tracing::info!("user operation rejection: {error}");
-            },
-        }
         match error {
             users::Error::NotFound => Self::not_found(),
             users::Error::AlreadyExists => Self::user_already_exists(),

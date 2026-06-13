@@ -3,19 +3,18 @@ use jsonwebtoken;
 use oauth2;
 use serde::Deserialize;
 use serde::Serialize;
-use thiserror::Error;
 use url::Url;
 
 use crate::platform::common;
 use crate::platform::config;
 use crate::platform::crypto;
-use crate::platform::logger;
+use crate::platform::logger::*;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("internal error: {0}")]
     InternalFault(String),
@@ -139,7 +138,14 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
     let host = parsed.host_str().unwrap_or("");
     let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
     if parsed.scheme() != "https" && !is_localhost {
-        logger::log_invalid_config("oauth.google_redirect_uri", &config.google_redirect_uri);
+        log_error!(
+            "oauth",
+            "validate",
+            "",
+            provider = "google",
+            field = "oauth.google_redirect_uri",
+            value = config.google_redirect_uri
+        );
         return Err(Error::InvalidConfig(
             "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
         ));
@@ -150,7 +156,13 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
 
 pub fn check_oauth_config(config: &config::OAuthSettings) {
     if let Err(error) = validate_google_config(config) {
-        tracing::warn!("Google OAuth config is incomplete. {error}");
+        log_warning!(
+            "oauth",
+            "validate",
+            error,
+            provider = "google",
+            message = "incomplete config"
+        );
     }
 }
 
@@ -209,7 +221,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let now = Utc::now().timestamp();
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
         let claims = OAuthStateClaims {
-            csrf_token_hash: crypto::get_token_hash_as_hex(csrf_token.secret()),
+            csrf_token_hash: crypto::get_hash_as_hex(csrf_token.secret()),
             iat: now,
             exp: now + (timeout_minutes * 60),
             redirect_url,
@@ -234,9 +246,14 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let token_data =
             jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &self.context.jwt.decoding_key, &validation)?;
 
-        let incoming_hash = crypto::get_token_hash_as_hex(state);
+        let incoming_hash = crypto::get_hash_as_hex(state);
         if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
-            logger::log_csrf_mismatch(None, &token_data.claims.csrf_token_hash, &incoming_hash);
+            log_info!(
+                "oauth",
+                "csrf_token_mismatch",
+                expected_hash = crypto::get_hash_as_hex(&token_data.claims.csrf_token_hash),
+                got_hash = crypto::get_hash_as_hex(&incoming_hash),
+            );
             return Err(Error::CsrfMismatch);
         }
 
@@ -262,17 +279,29 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let user_info: GoogleUserInfo = response.json().await?;
 
         if user_info.email.is_empty() {
-            logger::log_invalid_user_info("email", &user_info.email, "google");
+            log_warning!("oauth", "complete_callback", "empty email", provider = "google");
             return Err(Error::InvalidUserInfo);
         }
 
         if !user_info.verified_email {
-            logger::log_invalid_user_info("verified_email", "false", "google");
+            log_warning!(
+                "oauth",
+                "complete_callback",
+                "unverified email",
+                provider = "google",
+                email_hash = crypto::get_hash_as_hex(&user_info.email),
+            );
             return Err(Error::UnverifiedEmail);
         }
 
         if user_info.id.is_empty() {
-            logger::log_invalid_user_info("id", &user_info.id, "google");
+            log_warning!(
+                "oauth",
+                "complete_callback",
+                "empty_user_id",
+                provider = "google",
+                email_hash = crypto::get_hash_as_hex(&user_info.email),
+            );
             return Err(Error::InvalidUserInfo);
         }
 
