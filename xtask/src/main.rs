@@ -6,12 +6,19 @@ use std::process::{Command, ExitStatus};
 use std::thread;
 use std::time::Duration;
 
+mod status;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let task = args.get(1).map(String::as_str).unwrap_or("help");
 
     match task {
         "clean" => clean(),
+        "status" => {
+            let refresh = args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
+            let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
+            status::status(refresh, refresh_silent);
+        }
         "release" => release(),
         "lint-security" => {
             lint_security().expect("failed to run semgrep");
@@ -54,6 +61,7 @@ fn print_help() {
 
 Available commands:
   clean         - Deletes build files, target, .sqlx, and node_modules
+  status        - Displays project development status (branch, DB, services, tests, clippy, size)
   release       - Builds the frontend and backend in release mode
   lint-security - Runs semgrep security scan
   db-init       - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries
@@ -383,3 +391,5 @@ fn lint_security() -> std::io::Result<ExitStatus> {
     println!("Running Semgrep security scan...");
     run_command("semgrep", &["--config", "r/all"], None)
 }
+
+

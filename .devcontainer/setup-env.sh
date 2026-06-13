@@ -17,6 +17,7 @@ abbr -a ga "git add"
 abbr -a gca "git commit -a"
 abbr -a gp "git push"
 abbr -a gl "git log --oneline -n 10"
+abbr -a gcb "git-cleanup-branches"
 
 abbr -a cb "cargo build"
 abbr -a cr "cargo run"
@@ -25,6 +26,7 @@ abbr -a cc "cargo check --all-targets && cargo clippy --all-targets"
 abbr -a cf "cargo fmt"
 abbr -a cx "cargo xtask"
 abbr -a cxd "cargo xtask dev"
+abbr -a cxs "cargo -q xtask status"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."
@@ -37,7 +39,40 @@ set -g fish_color_keyword green --bold
 
 # Cargo xtask completions
 complete -c cargo -n "__fish_seen_subcommand_from xtask" -f
-complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug docker-down help"
+complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean status release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug docker-down help"
+
+# Prune local branches tracking remote branches deleted on GitHub (> 1 week old)
+function git-cleanup-branches
+    echo "Fetching and pruning remote branches..."
+    git fetch --prune
+    
+    set -l current_time (date +%s)
+    set -l current_branch (git branch --show-current)
+    
+    for branch in (git branch -vv | grep ': gone]' | string replace -r '^\*?\s*' '' | awk '{print $1}')
+        if test "$branch" = "$current_branch"
+            echo "Skipping active branch '$branch'"
+            continue
+        end
+        if contains -- $branch main master
+            continue
+        end
+        
+        # Get the timestamp of the last commit on this branch
+        set -l commit_time (git log -1 --format=%ct $branch)
+        set -l age (math "$current_time - $commit_time")
+        
+        # 604800 seconds = 1 week
+        if test $age -gt 604800
+            set -l relative_age (git log -1 --format=%cr $branch)
+            echo "Deleting branch '$branch' (last commit was $relative_age)..."
+            git branch -D $branch
+        else
+            set -l relative_age (git log -1 --format=%cr $branch)
+            echo "Skipping branch '$branch' (only $relative_age)"
+        end
+    end
+end
 
 bind `` history-pager
 EOF
