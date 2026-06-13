@@ -8,5 +8,6 @@
 !.sqlx/
 
 !backend/
+!xtask/
 !frontend/
 !migrations/
