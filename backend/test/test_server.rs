@@ -49,6 +49,13 @@ pub async fn create_test_server() -> TestResult<TestServer> {
     Ok(server)
 }
 
+pub async fn create_test_context_and_server() -> TestResult<(common::ArcContext, TestServer)> {
+    let ctx = common::Context::create_test_context().await?;
+    let router = router::create(ctx.clone());
+    let server = TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    Ok((ctx, server))
+}
+
 #[tokio::test]
 async fn test_static_file_caching() -> TestResult {
     let server = create_test_server().await?;

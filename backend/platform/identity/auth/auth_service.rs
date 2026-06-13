@@ -4,6 +4,7 @@ use crate::platform::constants;
 use crate::platform::crypto;
 use crate::platform::db;
 use crate::platform::jwt;
+use tracing::error;
 
 use crate::platform::identity::tokens;
 use crate::platform::identity::users;
@@ -136,27 +137,30 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         }
 
         let dummy_hash = crypto::dummy_hash()?;
-        let password_hash = maybe_user
-            .as_ref()
-            .and_then(|record| record.password_hash.as_deref())
-            .ok_or_else(|| {
-                let _ = crypto::verify_password(&command.password, dummy_hash);
-                Error::InvalidCredentials
-            })?;
+        let record = maybe_user.ok_or_else(|| {
+            let _ = crypto::verify_password(&command.password, dummy_hash);
+            Error::InvalidCredentials
+        })?;
+
+        let password_hash = record.password_hash.as_deref().ok_or_else(|| {
+            let _ = crypto::verify_password(&command.password, dummy_hash);
+            Error::InvalidCredentials
+        })?;
 
         if !crypto::verify_password(&command.password, password_hash)? {
-            if let Some(record) = &maybe_user {
-                self.users
-                    .increment_failed_login_count(&self.context.db, record.user.id)
-                    .await?;
-            }
+            self.users
+                .increment_failed_login_count(&self.context.db, record.user.id)
+                .await?;
             return Err(Error::InvalidCredentials);
         }
 
-        let record = maybe_user.ok_or(Error::InvalidCredentials)?;
         self.users
             .reset_failed_login_count(&self.context.db, record.user.id)
             .await?;
+
+        if crypto::needs_rehash(password_hash)? {
+            self.update_password_hash(record.user.id, &command.password).await;
+        }
         self.issue_session(record.user).await
     }
 
@@ -267,6 +271,35 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             refresh_token,
             old_jti: Some(claims.jti),
         })
+    }
+
+    async fn update_password_hash(
+        &self,
+        user_id: common::UserId,
+        password: &str,
+    ) {
+        match crypto::hash_password(password) {
+            Ok(new_hash) => {
+                if let Err(err) = self
+                    .users
+                    .update_password_hash(&self.context.db, user_id, &new_hash)
+                    .await
+                {
+                    error!(
+                        user_id = user_id.0,
+                        error = %err,
+                        "password_rehash_update_failed"
+                    );
+                }
+            },
+            Err(err) => {
+                error!(
+                    user_id = user_id.0,
+                    error = %err,
+                    "password_rehash_failed"
+                );
+            },
+        }
     }
 }
 

@@ -10,16 +10,20 @@ pub fn get_hash_as_hex(token: &str) -> String {
 use argon2::password_hash as ar2;
 use std::sync;
 
+const PARAMS: argon2::Params = match argon2::Params::new(19_456, 2, 1, None) {
+    Ok(p) => p,
+    Err(_) => panic!("Invalid Argon2 parameters"),
+};
+
+fn argon2() -> argon2::Argon2<'static> {
+    argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, PARAMS)
+}
+
 /// Hash a password using Argon2
-pub fn hash_password(password: &str) -> Result<String, argon2::password_hash::Error> {
+pub fn hash_password(password: &str) -> Result<String, ar2::Error> {
     use ar2::PasswordHasher;
-    const ARGON2_MEM_COST: u32 = 19456;
-    const ARGON2_TIME_COST: u32 = 2;
-    const ARGON2_PARALLELISM: u32 = 1;
     let salt = ar2::SaltString::generate(ar2::rand_core::OsRng);
-    let params = argon2::Params::new(ARGON2_MEM_COST, ARGON2_TIME_COST, ARGON2_PARALLELISM, None)?;
-    let hasher = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
-    let hash = hasher.hash_password(password.as_bytes(), &salt)?;
+    let hash = argon2().hash_password(password.as_bytes(), &salt)?;
     Ok(hash.to_string())
 }
 
@@ -29,13 +33,26 @@ pub fn verify_password(
     hash: &str,
 ) -> Result<bool, ar2::Error> {
     use ar2::PasswordVerifier;
-    use argon2::Argon2;
     let parsed_hash = ar2::PasswordHash::new(hash)?;
-    match Argon2::default().verify_password(password.as_bytes(), &parsed_hash) {
+    match argon2().verify_password(password.as_bytes(), &parsed_hash) {
         Ok(()) => Ok(true),
         Err(ar2::Error::Password) => Ok(false),
         Err(e) => Err(e),
     }
+}
+
+/// Check if a password hash needs to be re-hashed due to outdated parameters
+pub fn needs_rehash(hash: &str) -> Result<bool, ar2::Error> {
+    let parsed_hash = ar2::PasswordHash::new(hash)?;
+    let params = argon2::Params::try_from(&parsed_hash)?;
+
+    let is_different = parsed_hash.algorithm != argon2::Algorithm::Argon2id.ident()
+        || parsed_hash.version != Some(argon2::Version::V0x13.into())
+        || params.m_cost() != PARAMS.m_cost()
+        || params.t_cost() != PARAMS.t_cost()
+        || params.p_cost() != PARAMS.p_cost();
+
+    Ok(is_different)
 }
 
 static DUMMY_HASH: sync::LazyLock<Result<String, ar2::Error>> =

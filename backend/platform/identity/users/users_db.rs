@@ -337,6 +337,30 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
+    async fn update_password_hash(
+        &self,
+        db: &db::Context,
+        user_id: common::UserId,
+        password_hash: &str,
+    ) -> Result<(), db::Error> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE users
+            SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            "#,
+            password_hash,
+            user_id.0
+        )
+        .execute(db)
+        .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(db::Error::RowNotFound);
+        }
+        Ok(())
+    }
+
     async fn increment_failed_login_count(
         &self,
         db: &db::Context,

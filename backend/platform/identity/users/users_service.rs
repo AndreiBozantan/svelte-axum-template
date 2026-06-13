@@ -163,6 +163,13 @@ pub trait TRepository: Send + Sync {
         command: UpdateAdminCredentialsCommand,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
+    fn update_password_hash(
+        &self,
+        db: &db::Context,
+        user_id: common::UserId,
+        password_hash: &str,
+    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
+
     fn increment_failed_login_count(
         &self,
         db: &db::Context,
