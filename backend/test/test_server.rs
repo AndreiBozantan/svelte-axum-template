@@ -22,8 +22,8 @@ pub async fn login_testuser_and_get_tokens(server: &TestServer) -> TestResult<(V
         .await;
     response.assert_status(StatusCode::OK);
     let body: Value = response.json();
-    let refresh_token = response.cookie("refresh_token").value().to_string();
-    let access_token = response.cookie("access_token").value().to_string();
+    let refresh_token = response.cookie("__Secure-refresh_token").value().to_string();
+    let access_token = response.cookie("__Host-access_token").value().to_string();
     assert!(!access_token.is_empty());
     assert!(!refresh_token.is_empty());
     Ok((body, access_token, refresh_token))

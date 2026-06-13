@@ -104,11 +104,11 @@ async fn refresh_token_success() -> TestResult {
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let refresh_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     refresh_response.assert_status(StatusCode::OK);
     let refresh_body: Value = refresh_response.json();
-    assert!(!refresh_response.cookie("access_token").value().is_empty());
+    assert!(!refresh_response.cookie("__Host-access_token").value().is_empty());
     assert_eq!(refresh_body["user"]["email"], TEST_USER_EMAIL);
     Ok(())
 }
@@ -121,17 +121,17 @@ async fn refresh_token_reuse_detection() -> TestResult {
     // first refresh: rotates refresh_token_1 to refresh_token_2
     let refresh_response_1 = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_1.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_1.clone()))
         .await;
     refresh_response_1.assert_status(StatusCode::OK);
-    let refresh_token_2 = refresh_response_1.cookie("refresh_token").value().to_string();
+    let refresh_token_2 = refresh_response_1.cookie("__Secure-refresh_token").value().to_string();
     assert!(!refresh_token_2.is_empty());
     assert_ne!(refresh_token_1, refresh_token_2);
 
     // reuse refresh_token_1: should fail with UNAUTHORIZED
     let reuse_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_1.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_1.clone()))
         .await;
     reuse_response.assert_status(StatusCode::UNAUTHORIZED);
 
@@ -139,7 +139,7 @@ async fn refresh_token_reuse_detection() -> TestResult {
     // try refreshing with the new refresh_token_2: should now also fail with UNAUTHORIZED.
     let subsequent_refresh_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token_2))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_2))
         .await;
     subsequent_refresh_response.assert_status(StatusCode::UNAUTHORIZED);
 
@@ -152,13 +152,13 @@ async fn revoke_token_success() -> TestResult {
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let refresh_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     refresh_response.assert_status(StatusCode::OK);
 
     let refresh_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     refresh_response.assert_status(StatusCode::UNAUTHORIZED);
     Ok(())
@@ -170,13 +170,13 @@ async fn logout_success() -> TestResult {
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let logout_response = server
         .post("/api/auth/logout")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     logout_response.assert_status(StatusCode::NO_CONTENT);
 
     let refresh_response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", refresh_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     refresh_response.assert_status(StatusCode::UNAUTHORIZED);
     Ok(())
@@ -195,11 +195,11 @@ async fn access_token_expiry() -> TestResult {
             "password": TEST_PASSWORD
         }))
         .await;
-    let valid_access_token = login_response.cookie("access_token").value().to_string();
+    let valid_access_token = login_response.cookie("__Host-access_token").value().to_string();
 
     let response_valid = server
         .get("/api/users/me")
-        .add_cookie(cookie::Cookie::new("access_token", valid_access_token.clone()))
+        .add_cookie(cookie::Cookie::new("__Host-access_token", valid_access_token.clone()))
         .await;
     response_valid.assert_status(StatusCode::OK);
 
@@ -226,7 +226,7 @@ async fn access_token_expiry() -> TestResult {
 
     let response_expired = server
         .get("/api/users/me")
-        .add_cookie(cookie::Cookie::new("access_token", expired_token))
+        .add_cookie(cookie::Cookie::new("__Host-access_token", expired_token))
         .await;
     response_expired.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response_expired.json();
@@ -358,7 +358,7 @@ async fn refresh_token_not_in_db() -> TestResult {
 
     let response = server
         .post("/api/auth/refresh")
-        .add_cookie(cookie::Cookie::new("refresh_token", token))
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", token))
         .await;
     response.assert_status(StatusCode::UNAUTHORIZED);
     let body: Value = response.json();

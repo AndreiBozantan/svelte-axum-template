@@ -25,7 +25,7 @@ async fn decode_access_token_from_req_cookie_success() -> TestResult {
     let mut req = Request::new(Body::empty());
     req.headers_mut().insert(
         http::header::COOKIE,
-        HeaderValue::from_str(&format!("access_token={}", token.value))?,
+        HeaderValue::from_str(&format!("__Host-access_token={}", token.value))?,
     );
     let claims = cookies::decode_access_token_from_cookie(&context, req.headers())?;
     assert_eq!(claims.sub, "123");
