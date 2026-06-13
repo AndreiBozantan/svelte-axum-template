@@ -17,7 +17,7 @@ abbr -a ga "git add"
 abbr -a gca "git commit -a"
 abbr -a gp "git push"
 abbr -a gl "git log --oneline -n 10"
-abbr -a gpc "git-cleanup-branches"
+abbr -a gcb "git-cleanup-branches"
 
 abbr -a cb "cargo build"
 abbr -a cr "cargo run"
@@ -26,6 +26,7 @@ abbr -a cc "cargo check --all-targets && cargo clippy --all-targets"
 abbr -a cf "cargo fmt"
 abbr -a cx "cargo xtask"
 abbr -a cxd "cargo xtask dev"
+abbr -a cxs "cargo -q xtask status"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."
