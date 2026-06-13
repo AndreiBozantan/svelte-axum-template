@@ -1,41 +1,86 @@
 # syntax=docker/dockerfile:1
 
-# BUILD stage with Rust and Node.js for building the frontend and backend
-FROM svelaxum-dev AS builder
+# --- Stage 1: Frontend Builder ---
+FROM node:24-bookworm-slim@sha256:03eae3ef7e88a9de535496fb488d67e02b9d96a063a8967bae657744ecd513f2 AS frontend-builder
 WORKDIR /build
-COPY --chown=vscode:vscode . .
 
-# build the frontend
-# use a cache mount to the standard npm cache directory location
-RUN --mount=type=cache,target=/home/vscode/.npm,uid=1000,gid=1000 \
-    npm ci && cd frontend && npm ci && npm run build
+# Copy only package manifests to cache dependencies
+COPY frontend/package.json frontend/package-lock.json ./frontend/
 
-# build the backend
-# use cache mounts for Cargo registry and target directories
-# SQLX_OFFLINE=true allows compilation without a live database connection by reading the cached query metadata
-RUN --mount=type=cache,target=/home/vscode/.cargo/registry,uid=1000,gid=1000 \
-    --mount=type=cache,target=/home/vscode/.cargo/git,uid=1000,gid=1000 \
-    --mount=type=cache,target=/build/target,uid=1000,gid=1000 \
-    SQLX_OFFLINE=true cargo build --release \
-    && cp target/release/app /build/app
+# Install dependencies (cached unless package.json/package-lock.json changes)
+RUN cd frontend && npm ci
 
-# create a completely empty directory out of reach of the build context
+# Copy the rest of the frontend source
+COPY frontend/ ./frontend/
+
+# Build the frontend (outputs to frontend/dist)
+RUN cd frontend && npm run build
+
+
+# --- Stage 2: Backend Builder (Dependency Cache) ---
+FROM rust:1.95.0-slim-bookworm@sha256:caaf9ca7acd474892186860307d6f28e51fdbc1a4eada459fcff81517cf46a36 AS backend-dependencies
+WORKDIR /build
+
+# Install native dependencies required for compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    sqlite3 \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy cargo configuration files
+COPY Cargo.toml Cargo.lock ./
+COPY backend/Cargo.toml backend/Cargo.toml
+
+# Create a dummy main.rs to build and cache dependencies
+RUN mkdir -p backend && echo "fn main() {}" > backend/main.rs
+
+# Build dependencies only (SQLX_OFFLINE=true is not needed since no macros are in dummy main)
+# We disable sccache during the docker build to avoid sccache overhead/errors in standard environment
+ENV RUSTC_WRAPPER=""
+RUN cargo build --release --bin app
+
+# Create a pristine empty directory for runtime data
 RUN mkdir -p /tmp/empty_data
 
 
-# RUNTIME STAGE (distroless)
+# --- Stage 3: Backend Builder (Final Compilation) ---
+FROM backend-dependencies AS backend-builder
+
+# Copy the frontend build output so rust-embed can compile it
+COPY --from=frontend-builder /build/frontend/dist ./frontend/dist
+
+# Copy the migrations and SQLx offline preparation metadata
+COPY migrations ./migrations
+COPY .sqlx ./.sqlx
+
+# Copy the actual backend source code
+COPY backend ./backend
+
+# Touch the dummy source file to force cargo to rebuild our binary with the real code
+RUN touch backend/main.rs
+
+# Compile the actual application in offline mode
+ENV SQLX_OFFLINE=true
+ENV RUSTC_WRAPPER=""
+RUN cargo build --release --bin app
+
+
+# --- Stage 4: Runtime ---
 FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1417ffc986ec9619bd0e1556b56
 
-# use the built-in nonroot system user
+# Use the built-in nonroot system user
 USER nonroot:nonroot
 
-# copy the compiled binary from the builder stage
-COPY --from=builder /build/app /usr/local/bin/app
+# Copy the compiled binary from the backend-builder stage
+COPY --from=backend-builder /build/target/release/app /usr/local/bin/app
 
-# copy the pristine empty directory and map it to /data with nonroot ownership
-COPY --from=builder --chown=nonroot:nonroot /tmp/empty_data /data
+# Copy the pristine empty directory and map it to /data with nonroot ownership
+COPY --from=backend-builder --chown=nonroot:nonroot /tmp/empty_data /data
 
-# start the application
+# Start the application
 WORKDIR /
 EXPOSE 3000
 VOLUME ["/data"]
