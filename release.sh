@@ -1,4 +1,3 @@
-docker build -f .devcontainer/Dockerfile -t svelaxum-dev .
 docker build -f Dockerfile.prod -t svelaxum:release .
 
 # release with tarball
