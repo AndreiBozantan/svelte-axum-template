@@ -1,5 +1,5 @@
 import type { User } from './types';
- 
+
 export class ApiError extends Error {
     readonly code: string;
     constructor(code: string, message: string) {
@@ -50,8 +50,9 @@ class Api {
             data = await res.json();
         } else {
             const text = await res.text();
-            try { data = JSON.parse(text); }
-            catch {
+            try {
+                data = JSON.parse(text);
+            } catch {
                 if (!res.ok) throw new ApiError('error', text || res.statusText);
                 return text as T;
             }
@@ -66,7 +67,7 @@ class Api {
     private async get<T>(
         path: string,
         params?: Record<string, unknown>,
-        signal?: AbortSignal,
+        signal?: AbortSignal
     ): Promise<T> {
         // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
         const res = await fetch(this.buildUrl(path, params), {
@@ -145,12 +146,12 @@ class Api {
     // ---- users ----
 
     async getUserInfo(signal?: AbortSignal): Promise<{ user: User }> {
-        return this.get('/api/users/me', undefined, signal);  // was /api/auth/user_info
+        return this.get('/api/users/me', undefined, signal); // was /api/auth/user_info
     }
 
     async getUsers(
         { limit = 50, offset = 0 }: PaginationParams = {},
-        signal?: AbortSignal,
+        signal?: AbortSignal
     ): Promise<PaginatedResponse<User>> {
         const raw = await this.get<{
             users: User[];

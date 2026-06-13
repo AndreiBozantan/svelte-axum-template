@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { AppState } from "../AppState.svelte";
-    
+    import { AppState } from '../AppState.svelte';
+
     // Dummy state for new settings
     let darkMode = $state(false);
     let notifications = $state(true);
@@ -19,7 +19,7 @@
             <div class="section-header-block">
                 <h2 class="page-sub-header">appearance</h2>
             </div>
-            
+
             <div class="group-body">
                 <div class="item-row">
                     <div class="setting-info">
@@ -27,7 +27,7 @@
                         <span class="description">Switch between light and dark themes.</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" bind:checked={darkMode}>
+                        <input type="checkbox" bind:checked={darkMode} />
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -44,10 +44,12 @@
                 <div class="item-row">
                     <div class="setting-info">
                         <span class="label">Push Notifications</span>
-                        <span class="description">Receive browser notifications for important updates.</span>
+                        <span class="description"
+                            >Receive browser notifications for important updates.</span
+                        >
                     </div>
                     <label class="switch">
-                        <input type="checkbox" bind:checked={notifications}>
+                        <input type="checkbox" bind:checked={notifications} />
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -58,7 +60,7 @@
 
 <style>
     /* Local overrides for specialized components like switches and segmented buttons */
-    
+
     .setting-info {
         display: flex;
         flex-direction: column;
@@ -125,19 +127,19 @@
         right: 0;
         bottom: 0;
         background-color: #e2e8f0;
-        transition: .4s;
+        transition: 0.4s;
         border-radius: 24px;
     }
 
     .slider:before {
         position: absolute;
-        content: "";
+        content: '';
         height: 18px;
         width: 18px;
         left: 3px;
         bottom: 3px;
         background-color: white;
-        transition: .4s;
+        transition: 0.4s;
         border-radius: 50%;
     }
 

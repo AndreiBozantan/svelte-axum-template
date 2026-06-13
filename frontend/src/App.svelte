@@ -1,8 +1,8 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { AppState } from "./AppState.svelte";
-    import { Pages } from "./AppPages.svelte";
-    import AppSidebar from "./AppSidebar.svelte";
+    import { onMount } from 'svelte';
+    import { AppState } from './AppState.svelte';
+    import { Pages } from './AppPages.svelte';
+    import AppSidebar from './AppSidebar.svelte';
 
     const pageMap = Object.fromEntries(Pages.map((item) => [item.id, item]));
     const getActivePage = () => pageMap[AppState.activePage];
@@ -29,21 +29,20 @@
         });
     });
 
-
     // Auto-redirect logic
     $effect(() => {
         const active = getActivePage();
-        
+
         // If logged out and on a protected page, redirect to login
         if (active && !active.public && !AppState.isLoggedIn) {
             const isAuthPage = ['logout', 'login'].includes(AppState.activePage);
             if (!isAuthPage) {
-                AppState.setIntendedPage(AppState.activePage);  // only store real destinations
+                AppState.setIntendedPage(AppState.activePage); // only store real destinations
             }
             history.pushState(null, '', '/login');
             AppState.setActivePage('login');
         }
-        
+
         // If just logged in and on Login page, go to Welcome
         if (AppState.isLoggedIn && AppState.activePage === 'login') {
             const target = AppState.intendedPage || 'welcome';
@@ -74,7 +73,13 @@
     :global(body) {
         margin: 0;
         padding: 0;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family:
+            'Inter',
+            -apple-system,
+            BlinkMacSystemFont,
+            'Segoe UI',
+            Roboto,
+            sans-serif;
         background-color: #fffaf5;
         color: #1e293b;
     }
