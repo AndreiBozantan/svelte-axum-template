@@ -13,6 +13,10 @@ mkdir -p /home/vscode/.local/share/fish
 
 # Write config.fish
 cat << 'EOF' > /home/vscode/.config/fish/config.fish
+if test -f ~/.config/fish/env.fish
+    source ~/.config/fish/env.fish
+end
+
 # Helpful Development Abbreviations
 abbr -a gs "git status"
 abbr -a gd "git diff"
