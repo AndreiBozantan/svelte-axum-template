@@ -1,0 +1,70 @@
+name: CI Checks
+
+on:
+    workflow_dispatch:
+    # for manual-only mode: comment out push/pull_request:
+    push:
+        branches: [main]
+        paths-ignore:
+            - "*.md"
+            - "docs/**"
+            - "LICENSE"
+    pull_request:
+        branches: [main]
+        paths-ignore:
+            - "*.md"
+            - "docs/**"
+            - "LICENSE"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    backend-checks:
+        name: Backend (Rust)
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        env:
+            SQLX_OFFLINE: true
+            RUSTC_WRAPPER: ""
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install system dependencies
+              run: sudo apt-get update && sudo apt-get install -y lld
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: clippy, rustfmt
+
+            - name: Cache Cargo dependencies
+              uses: Swatinem/rust-cache@v2
+
+            - name: Run all backend checks
+              run: cargo xtask ci-backend
+
+    frontend-checks:
+        name: Frontend (Svelte)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: "npm"
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies
+              run: npm ci
+              working-directory: frontend
+
+            - name: Run all frontend checks
+              run: cargo xtask ci-frontend
