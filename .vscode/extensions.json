@@ -4,6 +4,8 @@
         "rust-lang.rust-analyzer",
         "esbenp.prettier-vscode",
         "ms-vscode-remote.remote-containers",
-        "streetsidesoftware.code-spell-checker"
+        "streetsidesoftware.code-spell-checker",
+        "vadimcn.vscode-lldb",
+        "alexcvzz.vscode-sqlite"
     ]
 }
