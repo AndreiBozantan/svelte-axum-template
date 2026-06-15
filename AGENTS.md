@@ -11,6 +11,7 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - backend/ - unified backend package containing platform and application code
 - data/ - config files and SQLite database
 - migrations/ - SQL migration files embedded via sqlx; main SQL schema is in migrations/01_initial_schema.sql
+- xtask/ - Rust-based automation scripts for: env setup, dev scripts, git-hooks, release, CI
 - .githooks/ - pre-commit and pre-push hook templates (copied via `cargo xtask setup-hooks`)
 
 # BACKEND STRUCTURE
