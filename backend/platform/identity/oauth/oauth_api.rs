@@ -58,7 +58,10 @@ where
     let redirect_url = params.data().get("redirect_url").cloned();
     info!(provider = "google", ?redirect_url, "sso_initiate");
 
-    let (auth_url, state_jwt) = service.begin_google_flow(redirect_url)?;
+    let (auth_url, state_jwt) = service.begin_google_flow(redirect_url).map_err(|err| {
+        warn!(error = %err, provider = "google", "sso_initiate_failed");
+        err
+    })?;
     info!(provider = "google", %auth_url, "sso_redirect");
 
     let mut response = axum::response::Redirect::to(auth_url.as_str()).into_response();
@@ -90,7 +93,11 @@ where
 
     let (user_info, redirect_url) = service
         .complete_google_callback(&params.code, &params.state, &oauth_state_cookie)
-        .await?;
+        .await
+        .map_err(|err| {
+            warn!(error = %err, provider = "google", "sso_callback_failed");
+            err
+        })?;
     if !user_info.verified_email {
         warn!(
             state_hash = %crypto::get_hash_as_hex(&params.state),
@@ -108,14 +115,24 @@ where
         "success"
     );
 
-    let email = common::Email::parse(&user_info.email).ok_or_else(api::Error::sso_failed)?;
+    let email = common::Email::parse(&user_info.email).ok_or_else(|| {
+        warn!(
+            email_hash = %crypto::get_hash_as_hex(&user_info.email),
+            provider = "google",
+            "invalid_email_format"
+        );
+        api::Error::sso_failed()
+    })?;
     let cmd = auth::OAuthLoginCommand {
         email,
         sso_provider: "google".to_string(),
         sso_id: user_info.id,
     };
 
-    let session = service.auth.login_oauth(cmd).await?;
+    let session = service.auth.login_oauth(cmd).await.map_err(|err| {
+        warn!(error = %err, provider = "google", "sso_login_failed");
+        err
+    })?;
     let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
     let response = axum::response::Redirect::to(final_redirect_url).into_response();
     let mut response = cookies::add_auth_cookies(
