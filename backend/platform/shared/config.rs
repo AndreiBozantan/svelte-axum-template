@@ -171,10 +171,10 @@ impl AppSettings {
             builder = builder.add_source(File::from(local_config_path));
         }
 
-        // layer 4: override with environment variables (APP_SERVER_HOST, APP_DATABASE_URL, etc.)
+        // layer 4: override with environment variables (APP__SERVER__HOST, APP__DATABASE__URL, etc.)
         // use partial loaded config to extract the env_vars_prefix
         let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
-        builder = builder.add_source(Environment::with_prefix(&partial_config.server.env_vars_prefix).separator("_"));
+        builder = builder.add_source(Environment::with_prefix(&partial_config.server.env_vars_prefix).separator("__"));
 
         // build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;

@@ -126,7 +126,7 @@ google_client_id = "your-client-id-here"
 google_client_secret = "your-client-secret-here"
 ```
 
-Alternatively, you can use environment variables: `APP_OAUTH_GOOGLE_CLIENT_ID` and `APP_OAUTH_GOOGLE_CLIENT_SECRET`.
+Alternatively, you can use environment variables: `APP__OAUTH__GOOGLE_CLIENT_ID` and `APP__OAUTH__GOOGLE_CLIENT_SECRET`.
 
 ## 3. Using OAuth2 Login
 

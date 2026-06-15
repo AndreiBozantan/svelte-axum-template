@@ -17,7 +17,7 @@ refresh_token_expiry_days = 32
 [oauth]
 # ⚠️ SECURITY WARNING: NEVER commit real OAuth secrets to git!
 # Use one of these secure methods instead:
-# 1. Environment variables (in .env file): APP_OAUTH_GOOGLE_CLIENT_ID, APP_OAUTH_GOOGLE_CLIENT_SECRET
+# 1. Environment variables (in .env file): APP__OAUTH__GOOGLE_CLIENT_ID, APP__OAUTH__GOOGLE_CLIENT_SECRET
 # 2. Create configs.local.toml (git-ignored)
 
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
