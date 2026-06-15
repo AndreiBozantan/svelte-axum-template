@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { AppState } from './AppState.svelte';
+    import { AppState } from '$lib/AppState.svelte';
     import { Pages } from './AppPages.svelte';
     import AppSidebar from './AppSidebar.svelte';
 

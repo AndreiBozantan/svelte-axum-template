@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { PageDefinition } from './AppPages.svelte';
     import { Pages } from './AppPages.svelte';
-    import { AppState } from './AppState.svelte';
+    import { AppState } from '$lib/AppState.svelte';
 
     import { Fa } from 'svelte-fa';
     import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';

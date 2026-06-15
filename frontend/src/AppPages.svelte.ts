@@ -4,7 +4,7 @@ import LogIn from './pages/Login.svelte';
 import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
-import { AppState } from './AppState.svelte';
+import { AppState } from '$lib/AppState.svelte';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
     faSignOutAlt,

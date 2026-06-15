@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { AppState } from '../AppState.svelte';
+    import { AppState } from '$lib/AppState.svelte';
 </script>
 
 <div class="page">

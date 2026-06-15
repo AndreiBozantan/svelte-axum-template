@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { AppState } from '../AppState.svelte';
-    import { api, ApiError } from '../lib/api';
+    import { AppState } from '$lib/AppState.svelte';
+    import { api, ApiError } from '$lib/api';
     import { onMount, tick } from 'svelte';
 
     let email = $state('');
