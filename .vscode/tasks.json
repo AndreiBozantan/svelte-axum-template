@@ -1,14 +1,51 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "npm",
-			"script": "start",
-			"problemMatcher": [
-				"$tsc"
-			],
-			"label": "npm: start",
-			"detail": "npm run dev"
-		}
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "cargo build app",
+            "command": "cargo build --package app",
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Run Dev Environment",
+            "command": "cargo run -p xtask dev",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Initialize Dev Environment",
+            "command": "cargo run -p xtask dev-init",
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Reset Database",
+            "command": "cargo run -p xtask db-reset",
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Run Status Check",
+            "command": "cargo run -p xtask status",
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Build Release",
+            "command": "cargo run -p xtask release",
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "type": "shell",
+            "label": "xtask: Run Pre-commit Checks",
+            "command": "cargo run -p xtask pre-commit",
+            "problemMatcher": ["$rustc"]
+        }
+    ]
 }
