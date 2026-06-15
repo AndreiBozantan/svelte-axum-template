@@ -38,15 +38,17 @@ fn get_cmdline(pid: u32) -> Option<String> {
     if parts.is_empty() { None } else { Some(parts.join(" ")) }
 }
 
-fn find_backend_pids() -> Vec<u32> {
+fn find_dev_pids() -> Vec<u32> {
     let mut pids = Vec::new();
 
     let current_dir = env::current_dir().ok();
     let current_dir_str = current_dir.as_ref().and_then(|p| p.to_str());
 
-    // 1. Check port 3000
+    // 1. Check port 3000 (backend)
     if let Some(pid) = status::get_pid_for_port(3000) {
-        pids.push(pid);
+        if !pids.contains(&pid) {
+            pids.push(pid);
+        }
 
         let mut curr = pid;
         while let Some(ppid) = get_ppid(curr) {
@@ -73,7 +75,37 @@ fn find_backend_pids() -> Vec<u32> {
         }
     }
 
-    // 2. Scan /proc for other backend/watch processes in this workspace
+    // 2. Check port 5173 (frontend)
+    if let Some(pid) = status::get_pid_for_port(5173) {
+        if !pids.contains(&pid) {
+            pids.push(pid);
+        }
+
+        let mut curr = pid;
+        while let Some(ppid) = get_ppid(curr) {
+            if ppid <= 1 {
+                break;
+            }
+            if let Some(comm) = get_comm(ppid) {
+                let comm_lower = comm.to_lowercase();
+                if comm_lower == "fish"
+                    || comm_lower == "bash"
+                    || comm_lower == "zsh"
+                    || comm_lower == "systemd"
+                    || comm_lower == "init"
+                {
+                    break;
+                }
+
+                if (comm_lower == "node" || comm_lower == "npm" || comm_lower == "sh") && !pids.contains(&ppid) {
+                    pids.push(ppid);
+                }
+            }
+            curr = ppid;
+        }
+    }
+
+    // 3. Scan /proc for other backend/frontend/watch processes in this workspace
     if let Ok(entries) = fs::read_dir("/proc") {
         for entry in entries.flatten() {
             let name = entry.file_name();
@@ -101,8 +133,10 @@ fn find_backend_pids() -> Vec<u32> {
                     let is_cargo_watch = comm_lower == "cargo-watch" || cmdline.contains("cargo-watch");
                     let is_cargo_run = comm_lower == "cargo"
                         && (cmdline.contains("run --package app") || cmdline.contains("run -p app"));
+                    let is_node = comm_lower == "node" && (cmdline.contains("vite") || cmdline.contains("npm"));
+                    let is_npm = comm_lower == "npm" && cmdline.contains("run dev");
 
-                    if is_app || is_cargo_watch || is_cargo_run {
+                    if is_app || is_cargo_watch || is_cargo_run || is_node || is_npm {
                         pids.push(pid);
                     }
                 }
@@ -114,14 +148,14 @@ fn find_backend_pids() -> Vec<u32> {
 }
 
 pub fn stop() {
-    println!("Finding running backend servers...");
-    let pids = find_backend_pids();
+    println!("Finding running development servers...");
+    let pids = find_dev_pids();
     if pids.is_empty() {
-        println!("No running backend servers found.");
+        println!("No running backend or frontend servers found.");
         return;
     }
 
-    println!("Stopping backend server processes (PIDs: {:?})...", pids);
+    println!("Stopping server processes (PIDs: {:?})...", pids);
     for pid in &pids {
         let mut kill_cmd = Command::new("kill");
         kill_cmd.arg(pid.to_string());
@@ -150,5 +184,5 @@ pub fn stop() {
         }
     }
 
-    println!("Backend servers stopped.");
+    println!("Development servers stopped.");
 }
