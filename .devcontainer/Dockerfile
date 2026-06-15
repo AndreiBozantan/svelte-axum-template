@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Rust Toolchain (v1.95.0) 
-FROM rust:1.95.0-slim-bookworm@sha256:caaf9ca7acd474892186860307d6f28e51fdbc1a4eada459fcff81517cf46a36 AS rust-env
+# Rust Toolchain (v1.96.0) 
+FROM rust:1.96.0-slim-bookworm@sha256:c8a94a78f67ec8c4d474ec7f71e0720f21eb7e584e158daec0874cafa7c30e4d AS rust-env
 RUN rustup component add rust-analyzer clippy rustfmt
 
 # Node.js (v24 LTS)

@@ -18,7 +18,7 @@ RUN cd frontend && npm run build
 
 
 # --- Stage 2: Backend Builder (Dependency Cache) ---
-FROM rust:1.95.0-slim-bookworm@sha256:caaf9ca7acd474892186860307d6f28e51fdbc1a4eada459fcff81517cf46a36 AS backend-dependencies
+FROM rust:1.96.0-slim-bookworm@sha256:c8a94a78f67ec8c4d474ec7f71e0720f21eb7e584e158daec0874cafa7c30e4d AS backend-dependencies
 WORKDIR /build
 
 # Install native dependencies required for compilation

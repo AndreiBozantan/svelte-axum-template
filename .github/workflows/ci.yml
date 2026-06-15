@@ -38,7 +38,7 @@ jobs:
               run: sudo apt-get update && sudo apt-get install -y lld
 
             - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.95.0
+              uses: dtolnay/rust-toolchain@1.96.0
               with:
                   components: clippy, rustfmt
 
