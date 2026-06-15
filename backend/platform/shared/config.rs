@@ -64,12 +64,12 @@ impl Default for JwtSettings {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct OAuthSettings {
     #[serde(default)]
     pub google_client_id: String,
 
-    #[serde(default)]
+    #[serde(default, serialize_with = "serialize_masked_secret")]
     pub google_client_secret: String,
 
     #[serde(default)]
@@ -79,7 +79,6 @@ pub struct OAuthSettings {
     #[serde(default = "default_session_timeout")]
     pub session_timeout_minutes: u32,
 }
-
 const fn default_session_timeout() -> u32 {
     10 // 10 minutes default
 }
@@ -89,7 +88,7 @@ impl Default for OAuthSettings {
         Self {
             google_client_id: String::new(),
             google_client_secret: String::new(),
-            google_redirect_uri: "http://localhost:3000/api/oauth/google/callback".to_string(),
+            google_redirect_uri: String::new(),
             session_timeout_minutes: default_session_timeout(),
         }
     }
@@ -203,5 +202,37 @@ impl AppSettings {
     #[allow(clippy::unused_self)]
     pub fn get_config_dir_str(&self) -> Result<String, std::io::Error> {
         Self::get_config_dir().map(|p| p.to_string_lossy().into_owned())
+    }
+}
+
+fn serialize_masked_secret<S>(
+    secret: &str,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    if secret.is_empty() {
+        serializer.serialize_str("")
+    } else {
+        serializer.serialize_str("[REDACTED]")
+    }
+}
+
+impl std::fmt::Debug for OAuthSettings {
+    fn fmt(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+    ) -> std::fmt::Result {
+        let google_client_secret = match self.google_client_secret.as_str() {
+            "" => String::new(),
+            _ => "[REDACTED]".to_string(),
+        };
+        f.debug_struct("OAuthSettings")
+            .field("session_timeout_minutes", &self.session_timeout_minutes)
+            .field("google_redirect_uri", &self.google_redirect_uri)
+            .field("google_client_id", &self.google_client_id)
+            .field("google_client_secret", &google_client_secret)
+            .finish()
     }
 }
