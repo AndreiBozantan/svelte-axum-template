@@ -226,6 +226,7 @@ fn dev() {
     let mut backend = Command::new("cargo")
         .args([
             "watch",
+            "--quiet",
             "--ignore",
             "data/db.sqlite",
             "--watch",
@@ -253,12 +254,44 @@ fn dev() {
     // Monitor processes
     loop {
         if let Ok(Some(status)) = backend.try_wait() {
-            println!("Backend server exited with: {}", status);
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Backend server stopped.");
+                    } else {
+                        println!("Backend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Backend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Backend server exited with: {}", status);
+            }
             let _ = frontend.kill();
             break;
         }
         if let Ok(Some(status)) = frontend.try_wait() {
-            println!("Frontend server exited with: {}", status);
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Frontend server stopped.");
+                    } else {
+                        println!("Frontend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Frontend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Frontend server exited with: {}", status);
+            }
             let _ = backend.kill();
             break;
         }

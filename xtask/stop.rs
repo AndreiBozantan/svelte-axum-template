@@ -155,8 +155,28 @@ pub fn stop() {
         return;
     }
 
-    println!("Stopping server processes (PIDs: {:?})...", pids);
-    for pid in &pids {
+    // Filter to only send SIGTERM to root-most processes to allow clean, warning-free signal propagation
+    let mut root_pids = Vec::new();
+    for &pid in &pids {
+        let mut has_ancestor_in_list = false;
+        let mut curr = pid;
+        while let Some(ppid) = get_ppid(curr) {
+            if ppid <= 1 {
+                break;
+            }
+            if pids.contains(&ppid) {
+                has_ancestor_in_list = true;
+                break;
+            }
+            curr = ppid;
+        }
+        if !has_ancestor_in_list {
+            root_pids.push(pid);
+        }
+    }
+
+    println!("Stopping server processes (PIDs: {:?})...", root_pids);
+    for pid in &root_pids {
         let mut kill_cmd = Command::new("kill");
         kill_cmd.arg(pid.to_string());
         kill_cmd.stderr(Stdio::null());
