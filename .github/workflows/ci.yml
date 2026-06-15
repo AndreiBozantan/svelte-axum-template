@@ -30,9 +30,14 @@ jobs:
         timeout-minutes: 15
         env:
             SQLX_OFFLINE: true
-            RUSTC_WRAPPER: ""
+            RUSTC_WRAPPER: "" # bypasses sccache
         steps:
             - uses: actions/checkout@v4
+
+            - name: Create placeholder frontend dist directory
+              run: |
+                  mkdir -p frontend/dist
+                  echo "<html><body>test</body></html>" > frontend/dist/index.html
 
             - name: Install system dependencies
               run: sudo apt-get update && sudo apt-get install -y lld
@@ -68,3 +73,6 @@ jobs:
 
             - name: Run all frontend checks
               run: cargo xtask ci-frontend
+              env:
+                  RUSTC_WRAPPER: "" # bypasses sccache for compiling xtask
+                  RUSTFLAGS: "-C linker=cc" # override repository-level config, to compile the xtask with the cc linker - avoids installing lld
