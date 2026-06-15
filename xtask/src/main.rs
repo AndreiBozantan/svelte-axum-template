@@ -51,6 +51,12 @@ fn main() {
         "pre-push" => {
             pre_push().expect("failed to run pre-push checks");
         },
+        "ci-backend" => {
+            ci_backend().expect("failed to run CI backend checks");
+        },
+        "ci-frontend" => {
+            ci_frontend().expect("failed to run CI frontend checks");
+        },
         "dev" => dev(),
         "docker-build" => {
             docker_build().expect("failed to build docker image");
@@ -73,24 +79,26 @@ fn print_help() {
         r#"Svelaxum Xtask Runner
 
 Available commands:
-  clean         - Deletes build files, target, .sqlx, and node_modules
-  status        - Displays project development status (branch, DB, services, tests, clippy, size)
-  release       - Builds the frontend and backend in release mode
-  lint-security - Runs semgrep security scan
-  db-init       - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries
-  db-create     - Creates the SQLite database
-  db-migrate    - Runs database migrations
+  clean            - Deletes build files, target, .sqlx, and node_modules
+  status           - Displays project development status (branch, DB, services, tests, clippy, size)
+  release          - Builds the frontend and backend in release mode
+  lint-security    - Runs semgrep security scan
+  db-init          - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries
+  db-create        - Creates the SQLite database
+  db-migrate       - Runs database migrations
   db-prepare       - Prepares SQLx offline metadata (.sqlx/)
   db-prepare-check - Checks if SQLx offline metadata (.sqlx/) is up to date
   db-drop          - Drops the SQLite database
-  db-reset      - Drops database and re-initializes it
-  dev-init      - Installs frontend packages, initializes DB, and seeds admin user
-  setup-hooks   - Sets up workspace git hooks
-  dev           - Runs backend watch and frontend dev server concurrently
-  docker-build  - Builds the production Docker image (svelaxum:release)
-  docker-run    - Runs the production Docker container locally
-  docker-down   - Stops and removes the production Docker container
-  docker-debug  - Runs a debug container mounting the data volume"#
+  db-reset         - Drops database and re-initializes it
+  dev-init         - Installs frontend packages, initializes DB, and seeds admin user
+  setup-hooks      - Sets up workspace git hooks
+  ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
+  ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
+  dev              - Runs backend watch and frontend dev server concurrently
+  docker-build     - Builds the production Docker image (svelaxum:release)
+  docker-run       - Runs the production Docker container locally
+  docker-down      - Stops and removes the production Docker container
+  docker-debug     - Runs a debug container mounting the data volume"#
     );
 }
 
@@ -512,6 +520,105 @@ fn get_pushed_files() -> std::io::Result<Vec<String>> {
         .collect())
 }
 
+fn check_backend_fmt() -> std::io::Result<()> {
+    println!("Checking Rust formatting (cargo fmt)...");
+    let status = run_command("cargo", &["fmt", "--all", "--check"], None)?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_backend_lint() -> std::io::Result<()> {
+    println!("Running Rust lints (cargo clippy)...");
+    let status = run_command(
+        "cargo",
+        &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+        None,
+    )?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_backend_sqlx() -> std::io::Result<()> {
+    println!("Verifying SQLx offline query metadata...");
+    let status = run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_backend_test() -> std::io::Result<()> {
+    println!("Running Rust tests (cargo test)...");
+    let status = run_command("cargo", &["test", "--workspace"], None)?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_frontend_fmt() -> std::io::Result<()> {
+    println!("Checking frontend formatting (Prettier)...");
+    let status = run_command("npm", &["run", "format:check"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_frontend_diagnostics() -> std::io::Result<()> {
+    println!("Checking frontend types (svelte-check)...");
+    let status = run_command("npm", &["run", "check"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_frontend_test() -> std::io::Result<()> {
+    println!("Running frontend tests (npm run test)...");
+    let status = run_command("npm", &["run", "test"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn check_frontend_build() -> std::io::Result<()> {
+    println!("Building frontend (npm run build)...");
+    let status = run_command("npm", &["run", "build"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
+fn ci_backend() -> std::io::Result<()> {
+    println!("Running all backend CI checks...");
+    check_backend_fmt()?;
+    check_backend_lint()?;
+    // Note: check_backend_sqlx() is intentionally skipped in CI.
+    // It requires a live database and sqlx-cli, neither available on the runner.
+    // Stale/missing .sqlx/ files are already caught by clippy (SQLX_OFFLINE=true
+    // makes the proc macros validate queries against the cached .sqlx/ files).
+    check_backend_test()?;
+    println!("All backend CI checks passed!");
+    Ok(())
+}
+
+fn ci_frontend() -> std::io::Result<()> {
+    println!("Running all frontend CI checks...");
+    check_frontend_fmt()?;
+    check_frontend_diagnostics()?;
+    check_frontend_build()?;
+    check_frontend_test()?;
+    println!("All frontend CI checks passed!");
+    Ok(())
+}
+
 fn pre_commit() -> std::io::Result<()> {
     println!("Running intelligent pre-commit checks...");
     let files = get_staged_files()?;
@@ -540,43 +647,16 @@ fn pre_commit() -> std::io::Result<()> {
     }
 
     if has_backend {
-        println!("Checking Rust formatting (cargo fmt)...");
-        let status = run_command("cargo", &["fmt", "--check"], None)?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
-
-        println!("Running Rust lints (cargo clippy)...");
-        let status = run_command(
-            "cargo",
-            &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
-            None,
-        )?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
-
-        println!("Verifying SQLx offline query metadata...");
-        let status = run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        check_backend_fmt()?;
+        check_backend_lint()?;
+        check_backend_sqlx()?;
     } else {
         println!("No backend changes detected. Skipping Rust lints and formatting.");
     }
 
     if has_frontend {
-        println!("Checking frontend formatting (Prettier)...");
-        let status = run_command("npm", &["run", "format:check"], Some("frontend"))?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
-
-        println!("Checking frontend types (svelte-check)...");
-        let status = run_command("npm", &["run", "check"], Some("frontend"))?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        check_frontend_fmt()?;
+        check_frontend_diagnostics()?;
     } else {
         println!("No frontend changes detected. Skipping frontend checks.");
     }
@@ -612,21 +692,13 @@ fn pre_push() -> std::io::Result<()> {
     }
 
     if has_backend {
-        println!("Running Rust tests (cargo test)...");
-        let status = run_command("cargo", &["test", "--workspace"], None)?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        check_backend_test()?;
     } else {
         println!("No backend changes detected. Skipping Rust tests.");
     }
 
     if has_frontend {
-        println!("Running frontend tests (npm run test)...");
-        let status = run_command("npm", &["run", "test"], Some("frontend"))?;
-        if !status.success() {
-            std::process::exit(status.code().unwrap_or(1));
-        }
+        check_frontend_test()?;
     } else {
         println!("No frontend changes detected. Skipping frontend tests.");
     }
