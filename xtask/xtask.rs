@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 mod status;
+mod stop;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -70,6 +71,7 @@ fn main() {
         "docker-debug" => {
             docker_debug().expect("failed to run docker debug container");
         },
+        "stop" => stop::stop(),
         _ => print_help(),
     }
 }
@@ -95,6 +97,7 @@ Available commands:
   ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
   ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
   dev              - Runs backend watch and frontend dev server concurrently
+  stop             - Stops any running backend servers
   docker-build     - Builds the production Docker image (svelaxum:release)
   docker-run       - Runs the production Docker container locally
   docker-down      - Stops and removes the production Docker container
