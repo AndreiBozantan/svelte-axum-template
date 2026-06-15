@@ -5,7 +5,7 @@ edition = "2024"
 
 [[bin]]
 name = "xtask"
-path = "src/main.rs"
+path = "xtask.rs"
 
 [dependencies]
 # No external dependencies are strictly required. Keeping dependencies empty ensures near-instant build/execution time.
