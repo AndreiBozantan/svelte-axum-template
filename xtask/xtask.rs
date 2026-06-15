@@ -289,26 +289,6 @@ fn wait_for_port(port: u16) {
     eprintln!("Timeout waiting for port {}.", port);
 }
 
-fn open_browser(url: &str) {
-    println!("Opening {} in browser...", url);
-    let (cmd, args) = if cfg!(target_os = "macos") {
-        ("open", vec![url])
-    } else if cfg!(target_os = "windows") {
-        ("cmd", vec!["/c", "start", url])
-    } else {
-        if Command::new("xdg-open")
-            .arg(url)
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-        {
-            return;
-        }
-        ("python3", vec!["-m", "webbrowser", url])
-    };
-    let _ = Command::new(cmd).args(args).status();
-}
-
 fn dev() {
     ensure_cargo_watch();
 
@@ -354,9 +334,6 @@ fn dev() {
 
     // Wait for frontend dev server
     wait_for_port(5173);
-
-    // Open browser
-    open_browser("http://localhost:5173");
 
     // Monitor processes
     loop {
