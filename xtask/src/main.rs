@@ -33,6 +33,9 @@ fn main() {
         "db-prepare" => {
             db_prepare().expect("failed to prepare sqlx queries");
         },
+        "db-prepare-check" => {
+            db_prepare_check().expect("failed to check sqlx queries");
+        },
         "db-drop" => {
             db_drop().expect("failed to drop database");
         },
@@ -41,6 +44,12 @@ fn main() {
         "dev-init" => dev_init(),
         "setup-hooks" => {
             setup_hooks().expect("failed to set up git hooks");
+        },
+        "pre-commit" => {
+            pre_commit().expect("failed to run pre-commit checks");
+        },
+        "pre-push" => {
+            pre_push().expect("failed to run pre-push checks");
         },
         "dev" => dev(),
         "docker-build" => {
@@ -71,8 +80,9 @@ Available commands:
   db-init       - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries
   db-create     - Creates the SQLite database
   db-migrate    - Runs database migrations
-  db-prepare    - Prepares SQLx offline metadata (.sqlx/)
-  db-drop       - Drops the SQLite database
+  db-prepare       - Prepares SQLx offline metadata (.sqlx/)
+  db-prepare-check - Checks if SQLx offline metadata (.sqlx/) is up to date
+  db-drop          - Drops the SQLite database
   db-reset      - Drops database and re-initializes it
   dev-init      - Installs frontend packages, initializes DB, and seeds admin user
   setup-hooks   - Sets up workspace git hooks
@@ -192,6 +202,12 @@ fn db_migrate() -> std::io::Result<ExitStatus> {
 fn db_prepare() -> std::io::Result<ExitStatus> {
     println!("Preparing SQLx offline queries metadata...");
     run_command("cargo", &["sqlx", "prepare", "--workspace"], None)
+}
+
+fn db_prepare_check() -> std::io::Result<ExitStatus> {
+    ensure_sqlx_cli();
+    println!("Checking if SQLx offline queries metadata is up to date...");
+    run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)
 }
 
 fn db_drop() -> std::io::Result<ExitStatus> {
@@ -429,25 +445,192 @@ fn setup_hooks() -> std::io::Result<()> {
     let hooks_dir = git_dir.join("hooks");
     fs::create_dir_all(&hooks_dir)?;
 
-    let src = Path::new(".githooks/pre-commit");
-    let dst = hooks_dir.join("pre-commit");
+    let hooks = ["pre-commit", "pre-push"];
 
-    if !src.exists() {
-        println!("Source hook file .githooks/pre-commit does not exist.");
-        return Ok(());
+    for hook in &hooks {
+        let src = Path::new(".githooks").join(hook);
+        let dst = hooks_dir.join(hook);
+
+        if !src.exists() {
+            println!("Source hook file .githooks/{} does not exist. Skipping.", hook);
+            continue;
+        }
+
+        println!("Installing {} hook to .git/hooks/{}...", hook, hook);
+        fs::copy(&src, &dst)?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&dst)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&dst, perms)?;
+        }
     }
 
-    println!("Installing pre-commit hook to .git/hooks/pre-commit...");
-    fs::copy(src, &dst)?;
+    println!("Git hooks installed successfully.");
+    Ok(())
+}
 
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&dst)?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&dst, perms)?;
+fn get_staged_files() -> std::io::Result<Vec<String>> {
+    let output = Command::new("git").args(["diff", "--cached", "--name-only"]).output()?;
+    if !output.status.success() {
+        return Err(std::io::Error::other("failed to run git diff"));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
+}
+
+fn get_pushed_files() -> std::io::Result<Vec<String>> {
+    // Try diffing against upstream @{u}
+    let output = Command::new("git").args(["diff", "--name-only", "@{u}.."]).output();
+
+    let stdout = match output {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
+        _ => {
+            // Fallback: diff against origin/main or main
+            let fallback_output = Command::new("git")
+                .args(["diff", "--name-only", "origin/main.."])
+                .output();
+            match fallback_output {
+                Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
+                _ => {
+                    // If everything else fails, return empty vector to fall back to running all tests
+                    return Ok(Vec::new());
+                },
+            }
+        },
+    };
+    Ok(stdout
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect())
+}
+
+fn pre_commit() -> std::io::Result<()> {
+    println!("Running intelligent pre-commit checks...");
+    let files = get_staged_files()?;
+
+    let mut has_backend = false;
+    let mut has_frontend = false;
+
+    if files.is_empty() {
+        println!("No staged files found. Running all formatting and lint checks as fallback.");
+        has_backend = true;
+        has_frontend = true;
+    } else {
+        for file in &files {
+            if file.starts_with("backend/")
+                || file.starts_with("xtask/")
+                || file == "Cargo.toml"
+                || file == "Cargo.lock"
+                || file == "rustfmt.toml"
+            {
+                has_backend = true;
+            }
+            if file.starts_with("frontend/") {
+                has_frontend = true;
+            }
+        }
     }
 
-    println!("Pre-commit hook installed successfully.");
+    if has_backend {
+        println!("Checking Rust formatting (cargo fmt)...");
+        let status = run_command("cargo", &["fmt", "--check"], None)?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+
+        println!("Running Rust lints (cargo clippy)...");
+        let status = run_command(
+            "cargo",
+            &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+            None,
+        )?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+
+        println!("Verifying SQLx offline query metadata...");
+        let status = run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    } else {
+        println!("No backend changes detected. Skipping Rust lints and formatting.");
+    }
+
+    if has_frontend {
+        println!("Checking frontend formatting (Prettier)...");
+        let status = run_command("npm", &["run", "format:check"], Some("frontend"))?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+
+        println!("Checking frontend types (svelte-check)...");
+        let status = run_command("npm", &["run", "check"], Some("frontend"))?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    } else {
+        println!("No frontend changes detected. Skipping frontend checks.");
+    }
+
+    println!("All pre-commit checks passed!");
+    Ok(())
+}
+
+fn pre_push() -> std::io::Result<()> {
+    println!("Running intelligent pre-push checks...");
+    let files = get_pushed_files()?;
+
+    let mut has_backend = false;
+    let mut has_frontend = false;
+
+    if files.is_empty() {
+        println!("Could not determine diff or first push on new branch. Running all tests as fallback.");
+        has_backend = true;
+        has_frontend = true;
+    } else {
+        for file in &files {
+            if file.starts_with("backend/")
+                || file.starts_with("xtask/")
+                || file == "Cargo.toml"
+                || file == "Cargo.lock"
+            {
+                has_backend = true;
+            }
+            if file.starts_with("frontend/") {
+                has_frontend = true;
+            }
+        }
+    }
+
+    if has_backend {
+        println!("Running Rust tests (cargo test)...");
+        let status = run_command("cargo", &["test", "--workspace"], None)?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    } else {
+        println!("No backend changes detected. Skipping Rust tests.");
+    }
+
+    if has_frontend {
+        println!("Running frontend tests (npm run test)...");
+        let status = run_command("npm", &["run", "test"], Some("frontend"))?;
+        if !status.success() {
+            std::process::exit(status.code().unwrap_or(1));
+        }
+    } else {
+        println!("No frontend changes detected. Skipping frontend tests.");
+    }
+
+    println!("All tests passed!");
     Ok(())
 }

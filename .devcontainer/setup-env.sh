@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+echo "Pre-compiling xtask..."
+cargo build --package xtask
+
 echo "Configuring Fish environment..."
 
 # Create config directory
@@ -39,7 +42,8 @@ set -g fish_color_keyword green --bold
 
 # Cargo xtask completions
 complete -c cargo -n "__fish_seen_subcommand_from xtask" -f
-complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "clean status release lint-security db-init db-create db-migrate db-prepare db-drop db-reset dev-init dev docker-build docker-run docker-debug docker-down help"
+complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "(/workspaces/svelaxum/target/debug/xtask help | string match -r '^\s{2,}[a-z0-9-]+' | string trim)"
+
 
 # Prune local branches tracking remote branches deleted on GitHub (> 1 week old)
 function git-cleanup-branches
