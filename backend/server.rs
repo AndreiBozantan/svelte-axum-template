@@ -75,6 +75,7 @@ async fn start_server() -> Result<(), Error> {
     info!("sql_url: {}", settings.database.url);
     info!("cfg_dir: {}", settings.get_config_dir_str()?);
     info!("address: http://{}", settings.get_server_address());
+    info!("configs: {:#?}", &settings);
 
     let jwt_secret = jwt::get_jwt_secret()?;
     let ctx = common::Context::create(settings, &jwt_secret).await?;
