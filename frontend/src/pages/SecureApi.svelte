@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { AppState } from '../AppState.svelte';
-    import { api } from '../lib/api';
+    import { AppState } from '$lib/AppState.svelte';
+    import { api } from '$lib/api';
 
     let response = $state('');
 

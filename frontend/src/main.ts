@@ -1,8 +1,8 @@
 import './app.css';
 
 import { mount } from 'svelte';
-import { AppState } from './AppState.svelte';
-import { api } from './lib/api';
+import { AppState } from '$lib/AppState.svelte';
+import { api } from '$lib/api';
 
 import App from './App.svelte';
 
