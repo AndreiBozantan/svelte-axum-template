@@ -13,6 +13,10 @@ mkdir -p /home/vscode/.local/share/fish
 
 # Write config.fish
 cat << 'EOF' > /home/vscode/.config/fish/config.fish
+if test -f ~/.config/fish/env.fish
+    source ~/.config/fish/env.fish
+end
+
 # Helpful Development Abbreviations
 abbr -a gs "git status"
 abbr -a gd "git diff"
@@ -27,8 +31,8 @@ abbr -a cr "cargo run"
 abbr -a ct "cargo test --workspace"
 abbr -a cc "cargo check --workspace --all-targets && cargo clippy --workspace --all-targets"          
 abbr -a cf "cargo fmt --workspace"
-abbr -a cx "cargo xtask"
-abbr -a cxd "cargo xtask dev"
+abbr -a cx "cargo -q xtask"
+abbr -a cxd "cargo -q xtask dev"
 abbr -a cxs "cargo -q xtask status"
 
 # Directory navigation shortcuts

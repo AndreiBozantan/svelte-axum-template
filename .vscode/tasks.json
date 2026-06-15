@@ -9,7 +9,7 @@
         },
         {
             "type": "shell",
-            "label": "xtask: Run Dev Environment",
+            "label": "xtask: dev - run dev environment",
             "command": "cargo run -p xtask dev",
             "problemMatcher": [],
             "group": {
@@ -19,31 +19,31 @@
         },
         {
             "type": "shell",
-            "label": "xtask: Initialize Dev Environment",
+            "label": "xtask: initialize dev environment",
             "command": "cargo run -p xtask dev-init",
             "problemMatcher": []
         },
         {
             "type": "shell",
-            "label": "xtask: Reset Database",
+            "label": "xtask: reset database",
             "command": "cargo run -p xtask db-reset",
             "problemMatcher": []
         },
         {
             "type": "shell",
-            "label": "xtask: Run Status Check",
+            "label": "xtask: status - run status check",
             "command": "cargo run -p xtask status",
             "problemMatcher": []
         },
         {
             "type": "shell",
-            "label": "xtask: Build Release",
+            "label": "xtask: release - build release container",
             "command": "cargo run -p xtask release",
             "problemMatcher": ["$rustc"]
         },
         {
             "type": "shell",
-            "label": "xtask: Run Pre-commit Checks",
+            "label": "xtask: commit - run pre-commit checks",
             "command": "cargo run -p xtask pre-commit",
             "problemMatcher": ["$rustc"]
         }

@@ -215,7 +215,7 @@ fn get_db_info() -> String {
     )
 }
 
-fn get_pid_for_port(port: u16) -> Option<u32> {
+pub fn get_pid_for_port(port: u16) -> Option<u32> {
     if let Ok(output) = Command::new("ss").args(["-tlnp"]).output()
         && output.status.success()
     {

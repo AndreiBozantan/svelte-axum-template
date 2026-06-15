@@ -6,7 +6,11 @@ use std::process::{Command, ExitStatus};
 use std::thread;
 use std::time::Duration;
 
+mod checks;
+mod database;
+mod docker;
 mod status;
+mod stop;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -25,51 +29,52 @@ fn main() {
             lint_security().expect("failed to run semgrep");
         },
         "db-create" => {
-            db_create().expect("failed to create database");
+            database::db_create().expect("failed to create database");
         },
         "db-migrate" => {
-            db_migrate().expect("failed to run migrations");
+            database::db_migrate().expect("failed to run migrations");
         },
         "db-prepare" => {
-            db_prepare().expect("failed to prepare sqlx queries");
+            database::db_prepare().expect("failed to prepare sqlx queries");
         },
         "db-prepare-check" => {
-            db_prepare_check().expect("failed to check sqlx queries");
+            database::db_prepare_check().expect("failed to check sqlx queries");
         },
         "db-drop" => {
-            db_drop().expect("failed to drop database");
+            database::db_drop().expect("failed to drop database");
         },
-        "db-init" => db_init(),
-        "db-reset" => db_reset(),
+        "db-init" => database::db_init(),
+        "db-reset" => database::db_reset(),
         "dev-init" => dev_init(),
         "setup-hooks" => {
-            setup_hooks().expect("failed to set up git hooks");
+            checks::setup_hooks().expect("failed to set up git hooks");
         },
         "pre-commit" => {
-            pre_commit().expect("failed to run pre-commit checks");
+            checks::pre_commit().expect("failed to run pre-commit checks");
         },
         "pre-push" => {
-            pre_push().expect("failed to run pre-push checks");
+            checks::pre_push().expect("failed to run pre-push checks");
         },
         "ci-backend" => {
-            ci_backend().expect("failed to run CI backend checks");
+            checks::ci_backend().expect("failed to run CI backend checks");
         },
         "ci-frontend" => {
-            ci_frontend().expect("failed to run CI frontend checks");
+            checks::ci_frontend().expect("failed to run CI frontend checks");
         },
         "dev" => dev(),
         "docker-build" => {
-            docker_build().expect("failed to build docker image");
+            docker::docker_build().expect("failed to build docker image");
         },
         "docker-run" => {
-            docker_run().expect("failed to run docker container");
+            docker::docker_run().expect("failed to run docker container");
         },
         "docker-down" => {
-            docker_down().expect("failed to stop docker container");
+            docker::docker_down().expect("failed to stop docker container");
         },
         "docker-debug" => {
-            docker_debug().expect("failed to run docker debug container");
+            docker::docker_debug().expect("failed to run docker debug container");
         },
+        "stop" => stop::stop(),
         _ => print_help(),
     }
 }
@@ -95,6 +100,7 @@ Available commands:
   ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
   ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
   dev              - Runs backend watch and frontend dev server concurrently
+  stop             - Stops any running backend servers
   docker-build     - Builds the production Docker image (svelaxum:release)
   docker-run       - Runs the production Docker container locally
   docker-down      - Stops and removes the production Docker container
@@ -102,7 +108,7 @@ Available commands:
     );
 }
 
-fn run_command(
+pub(crate) fn run_command(
     cmd: &str,
     args: &[&str],
     dir: Option<&str>,
@@ -144,104 +150,12 @@ fn clean() {
     println!("Clean completed.");
 }
 
-fn ensure_sqlx_cli() {
-    let sqlx_installed = Command::new("cargo")
-        .args(["sqlx", "--version"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-
-    if !sqlx_installed {
-        println!("sqlx-cli is not installed. Installing it via cargo-binstall...");
-        let status = Command::new("cargo")
-            .args(["binstall", "sqlx-cli", "--no-confirm"])
-            .status();
-        if status.is_err() || !status.unwrap().success() {
-            eprintln!("cargo-binstall failed. Falling back to cargo install sqlx-cli...");
-            let status2 = Command::new("cargo")
-                .args(["install", "sqlx-cli", "--no-default-features", "--features", "sqlite"])
-                .status();
-            if status2.is_err() || !status2.unwrap().success() {
-                eprintln!("Error: failed to install sqlx-cli. Please install it manually.");
-                std::process::exit(1);
-            }
-        }
-    }
-}
-
-fn ensure_cargo_watch() {
-    let watch_installed = Command::new("cargo")
-        .args(["watch", "--version"])
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-
-    if !watch_installed {
-        println!("cargo-watch is not installed. Installing it via cargo-binstall...");
-        let status = Command::new("cargo")
-            .args(["binstall", "cargo-watch", "--no-confirm"])
-            .status();
-        if status.is_err() || !status.unwrap().success() {
-            eprintln!("cargo-binstall failed. Falling back to cargo install cargo-watch...");
-            let status2 = Command::new("cargo").args(["install", "cargo-watch"]).status();
-            if status2.is_err() || !status2.unwrap().success() {
-                eprintln!("Error: failed to install cargo-watch. Please install it manually.");
-                std::process::exit(1);
-            }
-        }
-    }
-}
-
-fn db_create() -> std::io::Result<ExitStatus> {
-    fs::create_dir_all("data")?;
-    println!("Creating database...");
-    run_command("cargo", &["sqlx", "database", "create"], None)
-}
-
-fn db_migrate() -> std::io::Result<ExitStatus> {
-    println!("Running migrations...");
-    run_command("cargo", &["sqlx", "migrate", "run", "--source", "migrations"], None)
-}
-
-fn db_prepare() -> std::io::Result<ExitStatus> {
-    println!("Preparing SQLx offline queries metadata...");
-    run_command("cargo", &["sqlx", "prepare", "--workspace"], None)
-}
-
-fn db_prepare_check() -> std::io::Result<ExitStatus> {
-    ensure_sqlx_cli();
-    println!("Checking if SQLx offline queries metadata is up to date...");
-    run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)
-}
-
-fn db_drop() -> std::io::Result<ExitStatus> {
-    println!("Dropping database...");
-    run_command("cargo", &["sqlx", "database", "drop", "-y"], None)
-}
-
-fn db_init() {
-    ensure_sqlx_cli();
-    db_create().expect("failed to create database");
-    db_migrate().expect("failed to run migrations");
-    db_prepare().expect("failed to prepare offline queries");
-    println!("Database initialized successfully.");
-}
-
-fn db_reset() {
-    let _ = db_drop();
-    db_init();
-}
-
 fn dev_init() {
     println!("Initializing development environment...");
-    ensure_cargo_watch();
+    database::ensure_cargo_watch();
 
     // Set up git hooks
-    setup_hooks().expect("failed to set up git hooks");
+    checks::setup_hooks().expect("failed to set up git hooks");
 
     // Install frontend dependencies
     println!("Installing frontend dependencies...");
@@ -260,7 +174,7 @@ fn dev_init() {
     }
 
     // Initialize database
-    db_init();
+    database::db_init();
 
     // Seed admin user
     println!("Seeding default admin user...");
@@ -289,33 +203,13 @@ fn wait_for_port(port: u16) {
     eprintln!("Timeout waiting for port {}.", port);
 }
 
-fn open_browser(url: &str) {
-    println!("Opening {} in browser...", url);
-    let (cmd, args) = if cfg!(target_os = "macos") {
-        ("open", vec![url])
-    } else if cfg!(target_os = "windows") {
-        ("cmd", vec!["/c", "start", url])
-    } else {
-        if Command::new("xdg-open")
-            .arg(url)
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false)
-        {
-            return;
-        }
-        ("python3", vec!["-m", "webbrowser", url])
-    };
-    let _ = Command::new(cmd).args(args).status();
-}
-
 fn dev() {
-    ensure_cargo_watch();
+    database::ensure_cargo_watch();
 
     // Check if database exists, if not initialize it
     if !Path::new("data/db.sqlite").exists() {
         println!("Database not found. Initializing...");
-        db_init();
+        database::db_init();
     }
 
     // Check if frontend node_modules exists, if not install dependencies
@@ -332,6 +226,7 @@ fn dev() {
     let mut backend = Command::new("cargo")
         .args([
             "watch",
+            "--quiet",
             "--ignore",
             "data/db.sqlite",
             "--watch",
@@ -349,61 +244,59 @@ fn dev() {
     let mut frontend = Command::new("npm")
         .args(["run", "dev"])
         .current_dir("frontend")
+        .stdin(std::process::Stdio::null())
         .spawn()
         .expect("failed to start frontend dev server");
 
     // Wait for frontend dev server
     wait_for_port(5173);
 
-    // Open browser
-    open_browser("http://localhost:5173");
-
     // Monitor processes
     loop {
         if let Ok(Some(status)) = backend.try_wait() {
-            println!("Backend server exited with: {}", status);
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Backend server stopped.");
+                    } else {
+                        println!("Backend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Backend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Backend server exited with: {}", status);
+            }
             let _ = frontend.kill();
             break;
         }
         if let Ok(Some(status)) = frontend.try_wait() {
-            println!("Frontend server exited with: {}", status);
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Frontend server stopped.");
+                    } else {
+                        println!("Frontend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Frontend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Frontend server exited with: {}", status);
+            }
             let _ = backend.kill();
             break;
         }
         thread::sleep(Duration::from_millis(500));
     }
-}
-
-fn docker_build() -> std::io::Result<ExitStatus> {
-    println!("Building production docker image via docker compose...");
-    run_command("docker", &["compose", "build"], None)
-}
-
-fn docker_run() -> std::io::Result<ExitStatus> {
-    println!("Running release container via docker compose...");
-    run_command("docker", &["compose", "up", "-d"], None)
-}
-
-fn docker_down() -> std::io::Result<ExitStatus> {
-    println!("Stopping and removing release container via docker compose...");
-    run_command("docker", &["compose", "down"], None)
-}
-
-fn docker_debug() -> std::io::Result<ExitStatus> {
-    println!("Starting debug container with data volume mounted...");
-    run_command(
-        "docker",
-        &[
-            "run",
-            "--rm",
-            "-it",
-            "--mount",
-            "type=volume,src=svelaxum-data,dst=/data",
-            "debian:bookworm-slim",
-            "bash",
-        ],
-        None,
-    )
 }
 
 fn release() {
@@ -426,7 +319,7 @@ fn release() {
     }
 
     // 3. Initialize database and offline query cache
-    db_init();
+    database::db_init();
 
     // 4. Build backend in release mode
     println!("Building backend in release mode...");
@@ -441,268 +334,4 @@ fn release() {
 fn lint_security() -> std::io::Result<ExitStatus> {
     println!("Running Semgrep security scan...");
     run_command("semgrep", &["--config", "r/all"], None)
-}
-
-fn setup_hooks() -> std::io::Result<()> {
-    let git_dir = Path::new(".git");
-    if !git_dir.exists() {
-        println!("Not a git repository (no .git folder found). Skipping hooks setup.");
-        return Ok(());
-    }
-
-    let hooks_dir = git_dir.join("hooks");
-    fs::create_dir_all(&hooks_dir)?;
-
-    let hooks = ["pre-commit", "pre-push"];
-
-    for hook in &hooks {
-        let src = Path::new(".githooks").join(hook);
-        let dst = hooks_dir.join(hook);
-
-        if !src.exists() {
-            println!("Source hook file .githooks/{} does not exist. Skipping.", hook);
-            continue;
-        }
-
-        println!("Installing {} hook to .git/hooks/{}...", hook, hook);
-        fs::copy(&src, &dst)?;
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(&dst)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&dst, perms)?;
-        }
-    }
-
-    println!("Git hooks installed successfully.");
-    Ok(())
-}
-
-fn get_staged_files() -> std::io::Result<Vec<String>> {
-    let output = Command::new("git").args(["diff", "--cached", "--name-only"]).output()?;
-    if !output.status.success() {
-        return Err(std::io::Error::other("failed to run git diff"));
-    }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    Ok(stdout
-        .lines()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect())
-}
-
-fn get_pushed_files() -> std::io::Result<Vec<String>> {
-    // Try diffing against upstream @{u}
-    let output = Command::new("git").args(["diff", "--name-only", "@{u}.."]).output();
-
-    let stdout = match output {
-        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
-        _ => {
-            // Fallback: diff against origin/main or main
-            let fallback_output = Command::new("git")
-                .args(["diff", "--name-only", "origin/main.."])
-                .output();
-            match fallback_output {
-                Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).into_owned(),
-                _ => {
-                    // If everything else fails, return empty vector to fall back to running all tests
-                    return Ok(Vec::new());
-                },
-            }
-        },
-    };
-    Ok(stdout
-        .lines()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect())
-}
-
-fn check_backend_fmt() -> std::io::Result<()> {
-    println!("Checking Rust formatting (cargo fmt)...");
-    let status = run_command("cargo", &["fmt", "--all", "--check"], None)?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_backend_lint() -> std::io::Result<()> {
-    println!("Running Rust lints (cargo clippy)...");
-    let status = run_command(
-        "cargo",
-        &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
-        None,
-    )?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_backend_sqlx() -> std::io::Result<()> {
-    println!("Verifying SQLx offline query metadata...");
-    let status = run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_backend_test() -> std::io::Result<()> {
-    println!("Running Rust tests (cargo test)...");
-    let status = run_command("cargo", &["test", "--workspace"], None)?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_frontend_fmt() -> std::io::Result<()> {
-    println!("Checking frontend formatting (Prettier)...");
-    let status = run_command("npm", &["run", "format:check"], Some("frontend"))?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_frontend_diagnostics() -> std::io::Result<()> {
-    println!("Checking frontend types (svelte-check)...");
-    let status = run_command("npm", &["run", "check"], Some("frontend"))?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_frontend_test() -> std::io::Result<()> {
-    println!("Running frontend tests (npm run test)...");
-    let status = run_command("npm", &["run", "test"], Some("frontend"))?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn check_frontend_build() -> std::io::Result<()> {
-    println!("Building frontend (npm run build)...");
-    let status = run_command("npm", &["run", "build"], Some("frontend"))?;
-    if !status.success() {
-        std::process::exit(status.code().unwrap_or(1));
-    }
-    Ok(())
-}
-
-fn ci_backend() -> std::io::Result<()> {
-    println!("Running all backend CI checks...");
-    check_backend_fmt()?;
-    check_backend_lint()?;
-    // Note: check_backend_sqlx() is intentionally skipped in CI.
-    // It requires a live database and sqlx-cli, neither available on the runner.
-    // Stale/missing .sqlx/ files are already caught by clippy (SQLX_OFFLINE=true
-    // makes the proc macros validate queries against the cached .sqlx/ files).
-    check_backend_test()?;
-    println!("All backend CI checks passed!");
-    Ok(())
-}
-
-fn ci_frontend() -> std::io::Result<()> {
-    println!("Running all frontend CI checks...");
-    check_frontend_fmt()?;
-    check_frontend_diagnostics()?;
-    check_frontend_build()?;
-    check_frontend_test()?;
-    println!("All frontend CI checks passed!");
-    Ok(())
-}
-
-fn pre_commit() -> std::io::Result<()> {
-    println!("Running intelligent pre-commit checks...");
-    let files = get_staged_files()?;
-
-    let mut has_backend = false;
-    let mut has_frontend = false;
-
-    if files.is_empty() {
-        println!("No staged files found. Running all formatting and lint checks as fallback.");
-        has_backend = true;
-        has_frontend = true;
-    } else {
-        for file in &files {
-            if file.starts_with("backend/")
-                || file.starts_with("xtask/")
-                || file == "Cargo.toml"
-                || file == "Cargo.lock"
-                || file == "rustfmt.toml"
-            {
-                has_backend = true;
-            }
-            if file.starts_with("frontend/") {
-                has_frontend = true;
-            }
-        }
-    }
-
-    if has_backend {
-        check_backend_fmt()?;
-        check_backend_lint()?;
-        check_backend_sqlx()?;
-    } else {
-        println!("No backend changes detected. Skipping Rust lints and formatting.");
-    }
-
-    if has_frontend {
-        check_frontend_fmt()?;
-        check_frontend_diagnostics()?;
-    } else {
-        println!("No frontend changes detected. Skipping frontend checks.");
-    }
-
-    println!("All pre-commit checks passed!");
-    Ok(())
-}
-
-fn pre_push() -> std::io::Result<()> {
-    println!("Running intelligent pre-push checks...");
-    let files = get_pushed_files()?;
-
-    let mut has_backend = false;
-    let mut has_frontend = false;
-
-    if files.is_empty() {
-        println!("Could not determine diff or first push on new branch. Running all tests as fallback.");
-        has_backend = true;
-        has_frontend = true;
-    } else {
-        for file in &files {
-            if file.starts_with("backend/")
-                || file.starts_with("xtask/")
-                || file == "Cargo.toml"
-                || file == "Cargo.lock"
-            {
-                has_backend = true;
-            }
-            if file.starts_with("frontend/") {
-                has_frontend = true;
-            }
-        }
-    }
-
-    if has_backend {
-        check_backend_test()?;
-    } else {
-        println!("No backend changes detected. Skipping Rust tests.");
-    }
-
-    if has_frontend {
-        check_frontend_test()?;
-    } else {
-        println!("No frontend changes detected. Skipping frontend tests.");
-    }
-
-    println!("All tests passed!");
-    Ok(())
 }
