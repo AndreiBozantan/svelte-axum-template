@@ -243,6 +243,7 @@ fn dev() {
     let mut frontend = Command::new("npm")
         .args(["run", "dev"])
         .current_dir("frontend")
+        .stdin(std::process::Stdio::null())
         .spawn()
         .expect("failed to start frontend dev server");
 
