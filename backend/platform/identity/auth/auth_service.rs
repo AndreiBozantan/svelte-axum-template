@@ -149,17 +149,18 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
 
         if !crypto::verify_password(&command.password, password_hash)? {
             self.users
-                .increment_failed_login_count(&self.context.db, record.user.id)
+                .increment_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
                 .await?;
             return Err(Error::InvalidCredentials);
         }
 
         self.users
-            .reset_failed_login_count(&self.context.db, record.user.id)
+            .reset_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
             .await?;
 
         if crypto::needs_rehash(password_hash)? {
-            self.update_password_hash(record.user.id, &command.password).await;
+            self.update_password_hash(record.user.tenant_id, record.user.id, &command.password)
+                .await;
         }
         self.issue_session(record.user).await
     }
@@ -175,7 +176,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             sso_id: command.sso_id,
         };
         let user = self.users.link_sso_user(&self.context.db, cmd).await?;
-        self.users.reset_failed_login_count(&self.context.db, user.id).await?;
+        self.users
+            .reset_failed_login_count(&self.context.db, user.tenant_id, user.id)
+            .await?;
         self.issue_session(user).await
     }
 
@@ -211,7 +214,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         refresh_token_value: &str,
     ) -> Result<(), Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
-        self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
+        self.tokens
+            .revoke_by_jti(&self.context.db, claims.tenant_id(), &claims.jti)
+            .await?;
         Ok(())
     }
 
@@ -220,21 +225,24 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         refresh_token_value: &str,
     ) -> Result<AuthResult, Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
+        let tenant_id = claims.tenant_id();
         let stored_token = self
             .tokens
-            .find_by_jti(&self.context.db, common::TenantId(claims.tenant_id), &claims.jti)
+            .find_by_jti(&self.context.db, tenant_id, &claims.jti)
             .await?;
+
+        let token_user_id = claims.user_id()?;
+        if stored_token.user_id != token_user_id {
+            return Err(Error::InvalidToken);
+        }
 
         // re-using a revoked refresh token suggests token theft or session hijacking
         // as a security precaution, all active refresh tokens for this user are invalidated
+        let user_id = stored_token.user_id;
         if stored_token.revoked_at.is_some() {
             let _ = self
                 .tokens
-                .revoke_all_for_user(
-                    &self.context.db,
-                    common::TenantId(claims.tenant_id),
-                    stored_token.user_id,
-                )
+                .revoke_all_for_user(&self.context.db, tenant_id, user_id)
                 .await;
             return Err(Error::InvalidToken);
         }
@@ -244,9 +252,12 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidToken);
         }
 
-        self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
+        // revoke the existing refresh token
+        self.tokens
+            .revoke_by_jti(&self.context.db, tenant_id, &claims.jti)
+            .await?;
 
-        let user = self.users.find_by_id(&self.context.db, stored_token.user_id).await?;
+        let user = self.users.find_by_id(&self.context.db, tenant_id, user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
         let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);
@@ -275,6 +286,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
 
     async fn update_password_hash(
         &self,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
         password: &str,
     ) {
@@ -282,7 +294,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             Ok(new_hash) => {
                 if let Err(err) = self
                     .users
-                    .update_password_hash(&self.context.db, user_id, &new_hash)
+                    .update_password_hash(&self.context.db, tenant_id, user_id, &new_hash)
                     .await
                 {
                     error!(

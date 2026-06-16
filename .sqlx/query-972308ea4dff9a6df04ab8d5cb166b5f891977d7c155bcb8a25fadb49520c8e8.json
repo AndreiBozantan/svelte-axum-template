@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                id as \"id!\",\n                tenant_id as \"tenant_id!\",\n                created_at as \"created_at!\",\n                updated_at as \"updated_at!\",\n                status as \"status: Status\",\n                email as \"email!\",\n                first_name,\n                middle_name,\n                last_name,\n                password_hash,\n                sso_provider,\n                sso_id,\n                failed_login_count as \"failed_login_count!\",\n                last_failed_login\n            FROM users\n            WHERE id = ?\n            ",
+  "query": "\n            SELECT\n                id as \"id!\",\n                tenant_id as \"tenant_id!\",\n                created_at as \"created_at!\",\n                updated_at as \"updated_at!\",\n                status as \"status: Status\",\n                email as \"email!\",\n                first_name,\n                middle_name,\n                last_name,\n                password_hash,\n                sso_provider,\n                sso_id,\n                failed_login_count as \"failed_login_count!\",\n                last_failed_login\n            FROM users\n            WHERE id = ?\n            AND tenant_id = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -75,7 +75,7 @@
       }
     ],
     "parameters": {
-      "Right": 1
+      "Right": 2
     },
     "nullable": [
       false,
@@ -94,5 +94,5 @@
       true
     ]
   },
-  "hash": "2abba8d0393f5e77ca0b50b6bcb954a3769fefa4ab2e4587831b8d89c1175e17"
+  "hash": "972308ea4dff9a6df04ab8d5cb166b5f891977d7c155bcb8a25fadb49520c8e8"
 }

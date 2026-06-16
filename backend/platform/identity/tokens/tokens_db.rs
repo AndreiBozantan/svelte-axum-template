@@ -55,18 +55,24 @@ impl tokens::TRepository for Repository {
     async fn revoke_by_jti(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         jti: &str,
     ) -> Result<(), db::Error> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
             UPDATE refresh_tokens
             SET revoked_at = CURRENT_TIMESTAMP
-            WHERE jti = ?
+            WHERE jti = ? AND tenant_id = ?
             "#,
-            jti
+            jti,
+            tenant_id.0
         )
         .execute(db)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(db::Error::RowNotFound);
+        }
         Ok(())
     }
 

@@ -34,6 +34,7 @@ abbr -a cf "cargo fmt --workspace"
 abbr -a cx "cargo -q xtask"
 abbr -a cxd "cargo -q xtask dev"
 abbr -a cxs "cargo -q xtask status"
+abbr -a cxdbpr "cargo -q xtask db-prepare"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."

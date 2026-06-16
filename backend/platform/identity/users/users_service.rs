@@ -129,6 +129,7 @@ pub trait TRepository: Send + Sync {
     fn find_by_id(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         id: common::UserId,
     ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
 
@@ -166,6 +167,7 @@ pub trait TRepository: Send + Sync {
     fn update_password_hash(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
         password_hash: &str,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
@@ -173,12 +175,14 @@ pub trait TRepository: Send + Sync {
     fn increment_failed_login_count(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn reset_failed_login_count(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 }

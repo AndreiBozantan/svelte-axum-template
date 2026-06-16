@@ -133,6 +133,7 @@ impl users::TRepository for Repository {
     async fn find_by_id(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         id: common::UserId,
     ) -> Result<users::User, db::Error> {
         let row = sqlx::query_as!(
@@ -155,8 +156,10 @@ impl users::TRepository for Repository {
                 last_failed_login
             FROM users
             WHERE id = ?
+            AND tenant_id = ?
             "#,
-            id.0
+            id.0,
+            tenant_id.0,
         )
         .fetch_one(db)
         .await?;
@@ -340,6 +343,7 @@ impl users::TRepository for Repository {
     async fn update_password_hash(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
         password_hash: &str,
     ) -> Result<(), db::Error> {
@@ -347,10 +351,11 @@ impl users::TRepository for Repository {
             r#"
             UPDATE users
             SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = ? AND tenant_id = ?
             "#,
             password_hash,
-            user_id.0
+            user_id.0,
+            tenant_id.0,
         )
         .execute(db)
         .await?;
@@ -364,10 +369,11 @@ impl users::TRepository for Repository {
     async fn increment_failed_login_count(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> Result<(), db::Error> {
         let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
             UPDATE users SET
                 failed_login_count = CASE
@@ -375,32 +381,43 @@ impl users::TRepository for Repository {
                     ELSE 1
                 END,
                 last_failed_login = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = ? AND tenant_id = ?
             "#,
             window_length,
-            user_id.0
+            user_id.0,
+            tenant_id.0,
         )
         .execute(db)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(db::Error::RowNotFound);
+        }
         Ok(())
     }
 
     async fn reset_failed_login_count(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> Result<(), db::Error> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"
             UPDATE users SET
                 failed_login_count = 0,
                 last_failed_login = NULL
-            WHERE id = ?
+            WHERE id = ? AND tenant_id = ?
             "#,
-            user_id.0
+            user_id.0,
+            tenant_id.0,
         )
         .execute(db)
         .await?;
+
+        if result.rows_affected() == 0 {
+            return Err(db::Error::RowNotFound);
+        }
         Ok(())
     }
 }
