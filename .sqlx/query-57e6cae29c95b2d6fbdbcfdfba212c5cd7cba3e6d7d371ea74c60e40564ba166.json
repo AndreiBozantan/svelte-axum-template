@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE refresh_tokens\n            SET revoked_at = CURRENT_TIMESTAMP\n            WHERE jti = ? AND tenant_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "57e6cae29c95b2d6fbdbcfdfba212c5cd7cba3e6d7d371ea74c60e40564ba166"
+}

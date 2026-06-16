@@ -29,6 +29,7 @@ pub trait TRepository: Send + Sync {
     fn revoke_by_jti(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         jti: &str,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 

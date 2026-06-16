@@ -214,7 +214,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         refresh_token_value: &str,
     ) -> Result<(), Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
-        self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
+        self.tokens
+            .revoke_by_jti(&self.context.db, claims.tenant_id(), &claims.jti)
+            .await?;
         Ok(())
     }
 
@@ -251,7 +253,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         }
 
         // revoke the existing refresh token
-        self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
+        self.tokens
+            .revoke_by_jti(&self.context.db, tenant_id, &claims.jti)
+            .await?;
 
         let user = self.users.find_by_id(&self.context.db, tenant_id, user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
