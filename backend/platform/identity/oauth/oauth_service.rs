@@ -123,7 +123,7 @@ pub struct GoogleCallbackRequest {
 pub struct OAuthStateClaims {
     pub csrf_token_hash: String,
     pub pkce_verifier: String,
-    pub redirect_url: Option<String>,
+    pub redirect_url: String,
     pub iat: i64,
     pub exp: i64,
 }
@@ -221,12 +221,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         &self,
         redirect_url: Option<String>,
     ) -> Result<(Url, String), Error> {
-        let redirect_url = if let Some(url) = redirect_url
-            && validate_redirect_path(&url).is_ok()
-        {
-            Some(url)
-        } else {
-            Some("/".to_string())
+        let redirect_url = match redirect_url {
+            Some(url) if validate_redirect_path(&url).is_ok() => url,
+            _ => "/".to_string(),
         };
 
         let client = create_google_client(&self.context.settings.oauth)?;
@@ -260,7 +257,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         code: &str,
         state: &str,
         oauth_state_cookie: &str,
-    ) -> Result<(GoogleUserInfo, Option<String>), Error> {
+    ) -> Result<(GoogleUserInfo, String), Error> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
         validation.validate_exp = true;
         validation.leeway = 5;
