@@ -226,6 +226,11 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             .find_by_jti(&self.context.db, tenant_id, &claims.jti)
             .await?;
 
+        let token_user_id = claims.user_id()?;
+        if stored_token.user_id != token_user_id {
+            return Err(Error::InvalidToken);
+        }
+
         // re-using a revoked refresh token suggests token theft or session hijacking
         // as a security precaution, all active refresh tokens for this user are invalidated
         let user_id = stored_token.user_id;
