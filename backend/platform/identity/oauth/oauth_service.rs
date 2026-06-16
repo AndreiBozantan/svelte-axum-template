@@ -324,6 +324,8 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidUserInfo);
         }
 
+        validate_redirect_path(&token_data.claims.redirect_url)?;
+
         Ok((user_info, token_data.claims.redirect_url))
     }
 }

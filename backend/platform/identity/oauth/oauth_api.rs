@@ -133,6 +133,12 @@ where
         warn!(error = %err, provider = "google", "sso_login_failed");
         err
     })?;
+
+    oauth::validate_redirect_path(&redirect_url).map_err(|err| {
+        warn!(error = %err, "invalid_final_redirect_url");
+        api::Error::sso_failed()
+    })?;
+
     let response = axum::response::Redirect::to(&redirect_url).into_response();
     let mut response = cookies::add_auth_cookies(
         &service.context.settings.jwt,
