@@ -133,8 +133,7 @@ where
         warn!(error = %err, provider = "google", "sso_login_failed");
         err
     })?;
-    let final_redirect_url = redirect_url.as_deref().unwrap_or("/");
-    let response = axum::response::Redirect::to(final_redirect_url).into_response();
+    let response = axum::response::Redirect::to(&redirect_url).into_response();
     let mut response = cookies::add_auth_cookies(
         &service.context.settings.jwt,
         response,

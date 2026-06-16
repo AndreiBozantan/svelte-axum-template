@@ -94,10 +94,36 @@ pub struct GoogleCallbackRequest {
     pub state: String,
 }
 
+/// Claims stored within the `oauth_state` cookie.
+///
+/// NOTE: These claims are signed with HS256 to ensure integrity and prevent tampering,
+/// but they are not encrypted (no JWE). This is a deliberate, standard choice, not an
+/// oversight:
+///
+/// 1. The JWT lives in an `HttpOnly; Secure; SameSite=Lax` cookie scoped to the OAuth
+///    callback path. It is never placed in a URL, so it's never exposed via Referer
+///    headers, browser history, or server access logs of other routes. `HttpOnly` also
+///    blocks JS/XSS access to its contents.
+/// 2. The PKCE verifier and CSRF hash are only meant to be confidential from parties
+///    outside this single login flow (e.g., other websites, network attackers without
+///    the cookie). The user's own browser is already inside that trust boundary — it's
+///    the party performing the login — so it seeing its own verifier is not a privilege
+///    escalation.
+/// 3. If the cookie itself is exfiltrated (e.g. XSS bypass, compromised proxy, log
+///    misconfiguration), the attacker can already replay/use the full authenticated
+///    value. Encrypting individual fields wouldn't prevent that — it only hides field
+///    contents, not usability of the token — so JWE adds no meaningful defense here.
+/// 4. Short `exp` (bound to `session_timeout_minutes`) and Google's single-use
+///    authorization codes bound the replay window independent of encryption.
+///
+/// Signature verification (HS256) is therefore sufficient to bind these claims to the
+/// browser that initiated the flow; this matches standard practice in OAuth state-cookie
+/// implementations (e.g. oauth2-proxy, Auth.js).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthStateClaims {
     pub csrf_token_hash: String,
-    pub redirect_url: Option<String>,
+    pub pkce_verifier: String,
+    pub redirect_url: String,
     pub iat: i64,
     pub exp: i64,
 }
@@ -195,17 +221,16 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         &self,
         redirect_url: Option<String>,
     ) -> Result<(Url, String), Error> {
-        let redirect_url = if let Some(url) = redirect_url
-            && validate_redirect_path(&url).is_ok()
-        {
-            Some(url)
-        } else {
-            Some("/".to_string())
+        let redirect_url = match redirect_url {
+            Some(url) if validate_redirect_path(&url).is_ok() => url,
+            _ => "/".to_string(),
         };
 
         let client = create_google_client(&self.context.settings.oauth)?;
+        let (pkce_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
         let (auth_url, csrf_token) = client
             .authorize_url(oauth2::CsrfToken::new_random)
+            .set_pkce_challenge(pkce_challenge)
             .add_scope(oauth2::Scope::new("openid".to_string()))
             .add_scope(oauth2::Scope::new("email".to_string()))
             .add_scope(oauth2::Scope::new("profile".to_string()))
@@ -215,6 +240,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
         let claims = OAuthStateClaims {
             csrf_token_hash: crypto::get_hash_as_hex(csrf_token.secret()),
+            pkce_verifier: pkce_verifier.secret().clone(),
             iat: now,
             exp: now + (timeout_minutes * 60),
             redirect_url,
@@ -231,7 +257,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         code: &str,
         state: &str,
         oauth_state_cookie: &str,
-    ) -> Result<(GoogleUserInfo, Option<String>), Error> {
+    ) -> Result<(GoogleUserInfo, String), Error> {
         let mut validation = jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS256);
         validation.validate_exp = true;
         validation.leeway = 5;
@@ -253,8 +279,11 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let client = create_google_client(&self.context.settings.oauth)?;
         let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
 
+        let pkce_verifier = oauth2::PkceCodeVerifier::new(token_data.claims.pkce_verifier);
+
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .set_pkce_verifier(pkce_verifier)
             .request_async(&oauth_client)
             .await?;
 
