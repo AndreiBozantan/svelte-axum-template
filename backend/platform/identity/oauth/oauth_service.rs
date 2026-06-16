@@ -1,6 +1,7 @@
 use chrono::Utc;
 use jsonwebtoken;
 use oauth2;
+use percent_encoding;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::error;
@@ -268,10 +269,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let incoming_hash = crypto::get_hash_as_hex(state);
         if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
             info!(
-                expected_hash = %crypto::get_hash_as_hex(&token_data.claims.csrf_token_hash),
-                actual_hash = %crypto::get_hash_as_hex(&incoming_hash),
-                "csrf_token_mismatch",
-
+                expected_hash = %token_data.claims.csrf_token_hash,
+                actual_hash = %incoming_hash,
+                "csrf_token_mismatch"
             );
             return Err(Error::CsrfMismatch);
         }
@@ -323,15 +323,38 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidUserInfo);
         }
 
+        validate_redirect_path(&token_data.claims.redirect_url)?;
+
         Ok((user_info, token_data.claims.redirect_url))
     }
 }
 
-fn validate_redirect_path(path: &str) -> Result<(), Error> {
-    if path.len() > 512 {
+pub fn validate_redirect_path(path: &str) -> Result<(), Error> {
+    if path.len() > 256 {
         return Err(Error::InvalidRedirectUrl);
     }
-    if !path.starts_with('/') || path.starts_with("//") || path.contains("://") {
+    // Must start with exactly one slash, not two
+    if !path.starts_with('/') || path.starts_with("//") {
+        return Err(Error::InvalidRedirectUrl);
+    }
+    // Reject protocol-relative and absolute URLs after percent-decoding
+    let decoded = percent_encoding::percent_decode_str(path)
+        .decode_utf8()
+        .map_err(|_| Error::InvalidRedirectUrl)?;
+
+    // Enforce idempotent decoding to prevent double percent-encoding bypasses
+    let double_decoded = percent_encoding::percent_decode_str(&decoded)
+        .decode_utf8()
+        .map_err(|_| Error::InvalidRedirectUrl)?;
+    if decoded != double_decoded {
+        return Err(Error::InvalidRedirectUrl);
+    }
+
+    if decoded.chars().any(char::is_control)
+        || decoded.contains("://")
+        || decoded.contains('\\')
+        || decoded.starts_with("//")
+    {
         return Err(Error::InvalidRedirectUrl);
     }
     Ok(())
