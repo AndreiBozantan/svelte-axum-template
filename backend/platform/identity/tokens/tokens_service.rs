@@ -33,6 +33,13 @@ pub trait TRepository: Send + Sync {
         jti: &str,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
+    fn try_revoke_active_by_jti(
+        &self,
+        db: &db::Context,
+        tenant_id: common::TenantId,
+        jti: &str,
+    ) -> impl std::future::Future<Output = Result<Option<RefreshToken>, db::Error>> + Send;
+
     fn find_by_jti(
         &self,
         db: &db::Context,

@@ -115,7 +115,20 @@ async fn refresh_token_success() -> TestResult {
 
 #[tokio::test]
 async fn refresh_token_reuse_detection() -> TestResult {
-    let server = create_test_server().await?;
+    let (ctx, server) = create_test_context_and_server().await?;
+
+    // register the test user
+    let register_resp = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    register_resp.assert_status(StatusCode::CREATED);
+
     let (_body, _access_token, refresh_token_1) = login_testuser_and_get_tokens(&server).await?;
 
     // first refresh: rotates refresh_token_1 to refresh_token_2
@@ -127,6 +140,15 @@ async fn refresh_token_reuse_detection() -> TestResult {
     let refresh_token_2 = refresh_response_1.cookie("__Secure-refresh_token").value().to_string();
     assert!(!refresh_token_2.is_empty());
     assert_ne!(refresh_token_1, refresh_token_2);
+
+    // decode refresh_token_1 to get JTI
+    let claims = jwt::decode_token(&ctx.jwt, &refresh_token_1, jwt::TokenType::Refresh)?;
+
+    // manually set revoked_at to 15 seconds ago to simulate being outside the grace period
+    sqlx::query("UPDATE refresh_tokens SET revoked_at = datetime('now', '-15 seconds') WHERE jti = ?")
+        .bind(&claims.jti)
+        .execute(&ctx.db)
+        .await?;
 
     // reuse refresh_token_1: should fail with UNAUTHORIZED
     let reuse_response = server
@@ -146,15 +168,130 @@ async fn refresh_token_reuse_detection() -> TestResult {
     Ok(())
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn refresh_token_concurrent_reuse_within_grace_period() -> TestResult {
+    let server = create_test_server().await?;
+    let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
+
+    let server_arc = std::sync::Arc::new(server);
+    let token_arc = std::sync::Arc::new(refresh_token);
+
+    let count = 15;
+    let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(count));
+    let mut handles = Vec::new();
+    for _ in 0..count {
+        let server_clone = server_arc.clone();
+        let token_clone = token_arc.clone();
+        let barrier_clone = barrier.clone();
+        handles.push(tokio::spawn(async move {
+            barrier_clone.wait().await;
+            server_clone
+                .post("/api/auth/refresh")
+                .add_cookie(cookie::Cookie::new("__Secure-refresh_token", (*token_clone).clone()))
+                .await
+        }));
+    }
+
+    let mut ok_count = 0;
+    for handle in handles {
+        let res = handle.await?;
+        if res.status_code() == StatusCode::OK {
+            ok_count += 1;
+        }
+    }
+
+    // With a 10-second grace period, all concurrent requests within the window should succeed.
+    assert_eq!(
+        ok_count, count,
+        "Expected all {count} concurrent refresh requests within the grace period to succeed, but only {ok_count} succeeded."
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn refresh_token_reuse_outside_grace_period() -> TestResult {
+    let (ctx, server) = create_test_context_and_server().await?;
+
+    // Register the test user
+    let register_resp = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    register_resp.assert_status(StatusCode::CREATED);
+
+    let (_body, _access_token, refresh_token_1) = login_testuser_and_get_tokens(&server).await?;
+
+    // 1. Perform a legitimate refresh to rotate refresh_token_1 to refresh_token_2
+    let refresh_response_1 = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_1.clone()))
+        .await;
+    refresh_response_1.assert_status(StatusCode::OK);
+    let refresh_token_2 = refresh_response_1.cookie("__Secure-refresh_token").value().to_string();
+
+    // 2. Decode refresh_token_1 to get its JTI so we can find it in the DB
+    let claims = jwt::decode_token(&ctx.jwt, &refresh_token_1, jwt::TokenType::Refresh)?;
+
+    // 3. Manually update the revoked_at field of refresh_token_1 in DB to be 15 seconds ago (outside 10s grace period)
+    sqlx::query("UPDATE refresh_tokens SET revoked_at = datetime('now', '-15 seconds') WHERE jti = ?")
+        .bind(&claims.jti)
+        .execute(&ctx.db)
+        .await?;
+
+    // 4. Try to reuse refresh_token_1 (outside grace period) - should fail with UNAUTHORIZED
+    let reuse_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_1.clone()))
+        .await;
+    reuse_response.assert_status(StatusCode::UNAUTHORIZED);
+
+    // 5. Because it was outside the grace period, breach detection should have revoked the new token_2 as well
+    let subsequent_refresh_response = server
+        .post("/api/auth/refresh")
+        .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token_2))
+        .await;
+    subsequent_refresh_response.assert_status(StatusCode::UNAUTHORIZED);
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn revoke_token_success() -> TestResult {
-    let server = create_test_server().await?;
+    let (ctx, server) = create_test_context_and_server().await?;
+
+    // Register the test user
+    let register_resp = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": TEST_USER_EMAIL,
+            "password": TEST_PASSWORD,
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    register_resp.assert_status(StatusCode::CREATED);
+
     let (_body, _access_token, refresh_token) = login_testuser_and_get_tokens(&server).await?;
     let refresh_response = server
         .post("/api/auth/refresh")
         .add_cookie(cookie::Cookie::new("__Secure-refresh_token", refresh_token.clone()))
         .await;
     refresh_response.assert_status(StatusCode::OK);
+
+    // Decode refresh_token to get JTI
+    let claims = jwt::decode_token(&ctx.jwt, &refresh_token, jwt::TokenType::Refresh)?;
+
+    // Manually set revoked_at to 15 seconds ago to simulate being outside the grace period
+    sqlx::query("UPDATE refresh_tokens SET revoked_at = datetime('now', '-15 seconds') WHERE jti = ?")
+        .bind(&claims.jti)
+        .execute(&ctx.db)
+        .await?;
 
     let refresh_response = server
         .post("/api/auth/refresh")
