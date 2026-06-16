@@ -1,6 +1,7 @@
 use chrono::Utc;
 use jsonwebtoken;
 use oauth2;
+use percent_encoding;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::error;
@@ -327,11 +328,32 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     }
 }
 
-fn validate_redirect_path(path: &str) -> Result<(), Error> {
-    if path.len() > 512 {
+pub fn validate_redirect_path(path: &str) -> Result<(), Error> {
+    if path.len() > 256 {
         return Err(Error::InvalidRedirectUrl);
     }
-    if !path.starts_with('/') || path.starts_with("//") || path.contains("://") {
+    // Must start with exactly one slash, not two
+    if !path.starts_with('/') || path.starts_with("//") {
+        return Err(Error::InvalidRedirectUrl);
+    }
+    // Reject protocol-relative and absolute URLs after percent-decoding
+    let decoded = percent_encoding::percent_decode_str(path)
+        .decode_utf8()
+        .map_err(|_| Error::InvalidRedirectUrl)?;
+
+    // Enforce idempotent decoding to prevent double percent-encoding bypasses
+    let double_decoded = percent_encoding::percent_decode_str(&decoded)
+        .decode_utf8()
+        .map_err(|_| Error::InvalidRedirectUrl)?;
+    if decoded != double_decoded {
+        return Err(Error::InvalidRedirectUrl);
+    }
+
+    if decoded.chars().any(char::is_control)
+        || decoded.contains("://")
+        || decoded.contains('\\')
+        || decoded.starts_with("//")
+    {
         return Err(Error::InvalidRedirectUrl);
     }
     Ok(())

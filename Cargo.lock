@@ -120,6 +120,7 @@ dependencies = [
  "jsonwebtoken",
  "mime_guess",
  "oauth2",
+ "percent-encoding",
  "rand 0.10.1",
  "reqwest 0.13.2",
  "rpassword",
