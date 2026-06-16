@@ -94,6 +94,31 @@ pub struct GoogleCallbackRequest {
     pub state: String,
 }
 
+/// Claims stored within the `oauth_state` cookie.
+///
+/// NOTE: These claims are signed with HS256 to ensure integrity and prevent tampering,
+/// but they are not encrypted (no JWE). This is a deliberate, standard choice, not an
+/// oversight:
+///
+/// 1. The JWT lives in an `HttpOnly; Secure; SameSite=Lax` cookie scoped to the OAuth
+///    callback path. It is never placed in a URL, so it's never exposed via Referer
+///    headers, browser history, or server access logs of other routes. `HttpOnly` also
+///    blocks JS/XSS access to its contents.
+/// 2. The PKCE verifier and CSRF hash are only meant to be confidential from parties
+///    outside this single login flow (e.g., other websites, network attackers without
+///    the cookie). The user's own browser is already inside that trust boundary — it's
+///    the party performing the login — so it seeing its own verifier is not a privilege
+///    escalation.
+/// 3. If the cookie itself is exfiltrated (e.g. XSS bypass, compromised proxy, log
+///    misconfiguration), the attacker can already replay/use the full authenticated
+///    value. Encrypting individual fields wouldn't prevent that — it only hides field
+///    contents, not usability of the token — so JWE adds no meaningful defense here.
+/// 4. Short `exp` (bound to `session_timeout_minutes`) and Google's single-use
+///    authorization codes bound the replay window independent of encryption.
+///
+/// Signature verification (HS256) is therefore sufficient to bind these claims to the
+/// browser that initiated the flow; this matches standard practice in OAuth state-cookie
+/// implementations (e.g. oauth2-proxy, Auth.js).
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthStateClaims {
     pub csrf_token_hash: String,
