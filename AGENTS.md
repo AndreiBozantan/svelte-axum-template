@@ -2,6 +2,8 @@
 
 Rust + Svelte fullstack template. Backend: Axum + SQLite + sqlx. Frontend: Svelte 5 (runes) + Vite.
 
+Treat this project as a production-quality codebase - code design and implementation must meet production-grade standards.
+
 Dev Env: VS Code devcontainer is the preferred development environment (pre-configured with Fish shell, toolchains, git hooks, and command autocompletion).
 
 # REPO STRUCTURE

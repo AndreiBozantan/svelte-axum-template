@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 
 use chrono::DateTime;
 use chrono::NaiveDateTime;
@@ -166,26 +167,46 @@ pub fn decode_token(
 
 /// Loads or creates a JWT secret
 pub fn get_jwt_secret() -> Result<String, Error> {
-    // check persisted secret file
     let secret_file_path = config::AppSettings::get_config_dir()?.join(".jwt.secret");
-    if let Ok(file_secret) = fs::read_to_string(&secret_file_path) {
+    get_jwt_secret_with_file_path(&secret_file_path)
+}
+
+pub fn get_jwt_secret_with_file_path(secret_file_path: &std::path::Path) -> Result<String, Error> {
+    // check persisted secret file
+    if let Ok(file_secret) = fs::read_to_string(secret_file_path) {
         let trimmed_secret = file_secret.trim();
         if !trimmed_secret.is_empty() && trimmed_secret.len() >= 32 {
             return Ok(trimmed_secret.to_string());
         }
     }
 
-    // write the secret to file with restricted permissions
+    // write the secret to file atomically and with restricted permissions
     let new_secret = generate_secure_secret()?;
-    fs::write(&secret_file_path, &new_secret)?;
+    let parent_dir = secret_file_path
+        .parent()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "No parent directory"))?;
+    let temp_file_path = parent_dir.join(format!(".jwt.secret.tmp.{}", Uuid::new_v4()));
 
-    // set file permissions to be readable only by owner (Unix-like systems)
+    // open/create the temp file with restricted permissions (0o600)
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&secret_file_path)?.permissions();
-        perms.set_mode(0o600); // rw-------
-        fs::set_permissions(&secret_file_path, perms)?;
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600); // owner read/write only
+    }
+
+    let write_and_rename = || -> Result<(), std::io::Error> {
+        let mut temp_file = options.open(&temp_file_path)?;
+        temp_file.write_all(new_secret.as_bytes())?;
+        temp_file.sync_all()?;
+        fs::rename(&temp_file_path, secret_file_path)?;
+        Ok(())
+    };
+
+    if let Err(err) = write_and_rename() {
+        let _ = fs::remove_file(&temp_file_path);
+        return Err(err.into());
     }
 
     Ok(new_secret)
