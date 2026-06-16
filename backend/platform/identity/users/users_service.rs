@@ -129,6 +129,7 @@ pub trait TRepository: Send + Sync {
     fn find_by_id(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         id: common::UserId,
     ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
 

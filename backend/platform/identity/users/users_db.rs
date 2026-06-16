@@ -133,6 +133,7 @@ impl users::TRepository for Repository {
     async fn find_by_id(
         &self,
         db: &db::Context,
+        tenant_id: common::TenantId,
         id: common::UserId,
     ) -> Result<users::User, db::Error> {
         let row = sqlx::query_as!(
@@ -155,8 +156,10 @@ impl users::TRepository for Repository {
                 last_failed_login
             FROM users
             WHERE id = ?
+            AND tenant_id = ?
             "#,
-            id.0
+            id.0,
+            tenant_id.0,
         )
         .fetch_one(db)
         .await?;

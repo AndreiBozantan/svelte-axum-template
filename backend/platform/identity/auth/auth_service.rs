@@ -220,21 +220,19 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         refresh_token_value: &str,
     ) -> Result<AuthResult, Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
+        let tenant_id = claims.tenant_id();
         let stored_token = self
             .tokens
-            .find_by_jti(&self.context.db, common::TenantId(claims.tenant_id), &claims.jti)
+            .find_by_jti(&self.context.db, tenant_id, &claims.jti)
             .await?;
 
         // re-using a revoked refresh token suggests token theft or session hijacking
         // as a security precaution, all active refresh tokens for this user are invalidated
+        let user_id = stored_token.user_id;
         if stored_token.revoked_at.is_some() {
             let _ = self
                 .tokens
-                .revoke_all_for_user(
-                    &self.context.db,
-                    common::TenantId(claims.tenant_id),
-                    stored_token.user_id,
-                )
+                .revoke_all_for_user(&self.context.db, tenant_id, user_id)
                 .await;
             return Err(Error::InvalidToken);
         }
@@ -244,9 +242,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidToken);
         }
 
+        // revoke the existing refresh token
         self.tokens.revoke_by_jti(&self.context.db, &claims.jti).await?;
 
-        let user = self.users.find_by_id(&self.context.db, stored_token.user_id).await?;
+        let user = self.users.find_by_id(&self.context.db, tenant_id, user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
         let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);

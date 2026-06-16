@@ -10,6 +10,7 @@ use serde::Serialize;
 use thiserror::Error;
 use uuid::Uuid;
 
+use crate::platform::common;
 use crate::platform::config;
 
 #[rustfmt::skip]
@@ -74,8 +75,14 @@ pub struct TokenClaims {
 }
 
 impl TokenClaims {
-    pub fn user_id(&self) -> Result<i64, Error> {
-        self.sub.parse::<i64>().map_err(|_| Error::InvalidToken)
+    pub fn user_id(&self) -> Result<common::UserId, Error> {
+        Ok(common::UserId(
+            self.sub.parse::<i64>().map_err(|_| Error::InvalidToken)?,
+        ))
+    }
+
+    pub const fn tenant_id(&self) -> common::TenantId {
+        common::TenantId(self.tenant_id)
     }
 }
 

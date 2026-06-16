@@ -87,10 +87,11 @@ async fn user_info<UR>(
 where
     UR: users::TRepository + Clone + 'static,
 {
+    let tenant_id = claims.tenant_id();
     let user_id = claims.user_id()?;
     let user = service
         .users
-        .find_by_id(&service.context.db, common::UserId(user_id))
+        .find_by_id(&service.context.db, tenant_id, user_id)
         .await?;
     Ok(axum::Json(UserInfoResponse { user: user.into() }))
 }
