@@ -226,24 +226,20 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     ) -> Result<AuthResult, Error> {
         let claims = jwt::decode_token(&self.context.jwt, refresh_token_value, jwt::TokenType::Refresh)?;
         let tenant_id = claims.tenant_id();
-        let stored_token = self
-            .tokens
-            .find_by_jti(&self.context.db, tenant_id, &claims.jti)
-            .await?;
-
         let token_user_id = claims.user_id()?;
-        if stored_token.user_id != token_user_id {
-            return Err(Error::InvalidToken);
-        }
+        let revoke_result = self
+            .tokens
+            .try_revoke_active_by_jti(&self.context.db, tenant_id, &claims.jti)
+            .await?;
+        let stored_token = match revoke_result {
+            Some(token) => token,
+            None => {
+                self.handle_revoked_token_refresh(tenant_id, &claims.jti, token_user_id)
+                    .await?
+            },
+        };
 
-        // re-using a revoked refresh token suggests token theft or session hijacking
-        // as a security precaution, all active refresh tokens for this user are invalidated
-        let user_id = stored_token.user_id;
-        if stored_token.revoked_at.is_some() {
-            let _ = self
-                .tokens
-                .revoke_all_for_user(&self.context.db, tenant_id, user_id)
-                .await;
+        if stored_token.user_id != token_user_id {
             return Err(Error::InvalidToken);
         }
 
@@ -252,29 +248,23 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             return Err(Error::InvalidToken);
         }
 
-        // revoke the existing refresh token
-        self.tokens
-            .revoke_by_jti(&self.context.db, tenant_id, &claims.jti)
+        let user = self
+            .users
+            .find_by_id(&self.context.db, tenant_id, stored_token.user_id)
             .await?;
-
-        let user = self.users.find_by_id(&self.context.db, tenant_id, user_id).await?;
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
         let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);
         let refresh_token_expires_at = jwt::get_token_expiration_as_naive_utc(refresh_token.claims.exp)?;
 
-        self.tokens
-            .create(
-                &self.context.db,
-                tokens::CreateRefreshTokenCommand {
-                    jti: refresh_token.claims.jti.clone(),
-                    tenant_id: user.tenant_id,
-                    user_id: user.id,
-                    token_hash: refresh_token_hash.clone(),
-                    expires_at: refresh_token_expires_at,
-                },
-            )
-            .await?;
+        let cmd = tokens::CreateRefreshTokenCommand {
+            jti: refresh_token.claims.jti.clone(),
+            tenant_id: user.tenant_id,
+            user_id: user.id,
+            token_hash: refresh_token_hash.clone(),
+            expires_at: refresh_token_expires_at,
+        };
+        self.tokens.create(&self.context.db, cmd).await?;
 
         Ok(AuthResult {
             user,
@@ -282,6 +272,31 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             refresh_token,
             old_jti: Some(claims.jti),
         })
+    }
+
+    async fn handle_revoked_token_refresh(
+        &self,
+        tenant_id: common::TenantId,
+        jti: &str,
+        token_user_id: common::UserId,
+    ) -> Result<tokens::RefreshToken, Error> {
+        let token = self.tokens.find_by_jti(&self.context.db, tenant_id, jti).await?;
+        if token.user_id != token_user_id {
+            return Err(Error::InvalidToken);
+        }
+        if let Some(revoked_at) = token.revoked_at {
+            let now = chrono::Utc::now().naive_utc();
+            let elapsed = now - revoked_at;
+            if elapsed > chrono::Duration::seconds(constants::auth::REFRESH_TOKEN_GRACE_PERIOD_SECONDS) {
+                // beyond the grace period: trigger breach detection!
+                let _ = self
+                    .tokens
+                    .revoke_all_for_user(&self.context.db, tenant_id, token.user_id)
+                    .await;
+                return Err(Error::InvalidToken);
+            }
+        }
+        Ok(token)
     }
 
     async fn update_password_hash(

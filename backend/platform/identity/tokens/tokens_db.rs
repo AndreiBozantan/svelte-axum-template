@@ -58,12 +58,16 @@ impl tokens::TRepository for Repository {
         tenant_id: common::TenantId,
         jti: &str,
     ) -> Result<(), db::Error> {
+        let epoch = chrono::DateTime::from_timestamp(0, 0)
+            .map(|dt| dt.naive_utc())
+            .ok_or_else(|| db::Error::DatabaseOperationFailed(sqlx::Error::Protocol("invalid epoch".into())))?;
         let result = sqlx::query!(
             r#"
             UPDATE refresh_tokens
-            SET revoked_at = CURRENT_TIMESTAMP
+            SET revoked_at = ?
             WHERE jti = ? AND tenant_id = ?
             "#,
+            epoch,
             jti,
             tenant_id.0
         )
@@ -74,6 +78,35 @@ impl tokens::TRepository for Repository {
             return Err(db::Error::RowNotFound);
         }
         Ok(())
+    }
+
+    async fn try_revoke_active_by_jti(
+        &self,
+        db: &db::Context,
+        tenant_id: common::TenantId,
+        jti: &str,
+    ) -> Result<Option<tokens::RefreshToken>, db::Error> {
+        let row = sqlx::query_as!(
+            Row,
+            r#"
+            UPDATE refresh_tokens
+            SET revoked_at = CURRENT_TIMESTAMP
+            WHERE tenant_id = ? AND jti = ? AND revoked_at IS NULL
+            RETURNING
+                id as "id!",
+                jti as "jti!",
+                user_id as "user_id!",
+                token_hash as "token_hash!",
+                issued_at as "issued_at!",
+                expires_at as "expires_at!",
+                revoked_at
+            "#,
+            tenant_id.0,
+            jti
+        )
+        .fetch_optional(db)
+        .await?;
+        Ok(row.map(Into::into))
     }
 
     async fn find_by_jti(
@@ -110,14 +143,16 @@ impl tokens::TRepository for Repository {
         tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> Result<(), db::Error> {
-        let now = chrono::Utc::now().naive_utc();
+        let epoch = chrono::DateTime::from_timestamp(0, 0)
+            .map(|dt| dt.naive_utc())
+            .ok_or_else(|| db::Error::DatabaseOperationFailed(sqlx::Error::Protocol("invalid epoch".into())))?;
         sqlx::query!(
             r#"
             UPDATE refresh_tokens
             SET revoked_at = ?
             WHERE tenant_id = ? AND user_id = ? AND revoked_at IS NULL
             "#,
-            now,
+            epoch,
             tenant_id.0,
             user_id.0,
         )

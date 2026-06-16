@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE refresh_tokens\n            SET revoked_at = CURRENT_TIMESTAMP\n            WHERE tenant_id = ? AND jti = ? AND revoked_at IS NULL\n            RETURNING\n                id as \"id!\",\n                jti as \"jti!\",\n                user_id as \"user_id!\",\n                token_hash as \"token_hash!\",\n                issued_at as \"issued_at!\",\n                expires_at as \"expires_at!\",\n                revoked_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "jti!",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "user_id!",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "token_hash!",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "issued_at!",
+        "ordinal": 4,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "expires_at!",
+        "ordinal": 5,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "revoked_at",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "7538fdbb353efda53e1ca29a4fe449785aa4d2f679ec7ebdb8481532602562c9"
+}
