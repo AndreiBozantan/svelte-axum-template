@@ -10,6 +10,7 @@
         "cxdbpr",
         "distroless",
         "fuser",
+        "pkce",
         "rfind",
         "rustup",
         "semgrep",

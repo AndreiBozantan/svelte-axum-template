@@ -97,6 +97,7 @@ pub struct GoogleCallbackRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthStateClaims {
     pub csrf_token_hash: String,
+    pub pkce_verifier: String,
     pub redirect_url: Option<String>,
     pub iat: i64,
     pub exp: i64,
@@ -204,8 +205,10 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         };
 
         let client = create_google_client(&self.context.settings.oauth)?;
+        let (pkce_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
         let (auth_url, csrf_token) = client
             .authorize_url(oauth2::CsrfToken::new_random)
+            .set_pkce_challenge(pkce_challenge)
             .add_scope(oauth2::Scope::new("openid".to_string()))
             .add_scope(oauth2::Scope::new("email".to_string()))
             .add_scope(oauth2::Scope::new("profile".to_string()))
@@ -215,6 +218,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
         let claims = OAuthStateClaims {
             csrf_token_hash: crypto::get_hash_as_hex(csrf_token.secret()),
+            pkce_verifier: pkce_verifier.secret().clone(),
             iat: now,
             exp: now + (timeout_minutes * 60),
             redirect_url,
@@ -253,8 +257,11 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let client = create_google_client(&self.context.settings.oauth)?;
         let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
 
+        let pkce_verifier = oauth2::PkceCodeVerifier::new(token_data.claims.pkce_verifier);
+
         let token_result = client
             .exchange_code(oauth2::AuthorizationCode::new(code.to_string()))
+            .set_pkce_verifier(pkce_verifier)
             .request_async(&oauth_client)
             .await?;
 
