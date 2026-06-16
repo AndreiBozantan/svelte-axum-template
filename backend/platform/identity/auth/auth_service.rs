@@ -149,17 +149,18 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
 
         if !crypto::verify_password(&command.password, password_hash)? {
             self.users
-                .increment_failed_login_count(&self.context.db, record.user.id)
+                .increment_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
                 .await?;
             return Err(Error::InvalidCredentials);
         }
 
         self.users
-            .reset_failed_login_count(&self.context.db, record.user.id)
+            .reset_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
             .await?;
 
         if crypto::needs_rehash(password_hash)? {
-            self.update_password_hash(record.user.id, &command.password).await;
+            self.update_password_hash(record.user.tenant_id, record.user.id, &command.password)
+                .await;
         }
         self.issue_session(record.user).await
     }
@@ -175,7 +176,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             sso_id: command.sso_id,
         };
         let user = self.users.link_sso_user(&self.context.db, cmd).await?;
-        self.users.reset_failed_login_count(&self.context.db, user.id).await?;
+        self.users
+            .reset_failed_login_count(&self.context.db, user.tenant_id, user.id)
+            .await?;
         self.issue_session(user).await
     }
 
@@ -279,6 +282,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
 
     async fn update_password_hash(
         &self,
+        tenant_id: common::TenantId,
         user_id: common::UserId,
         password: &str,
     ) {
@@ -286,7 +290,7 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
             Ok(new_hash) => {
                 if let Err(err) = self
                     .users
-                    .update_password_hash(&self.context.db, user_id, &new_hash)
+                    .update_password_hash(&self.context.db, tenant_id, user_id, &new_hash)
                     .await
                 {
                     error!(

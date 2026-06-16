@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE users\n            SET password_hash = ?, updated_at = CURRENT_TIMESTAMP\n            WHERE id = ? AND tenant_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "7c05b7ff6a48d6c358f99b9335495a9c41b83a89d2b729173c48d2149d6c5f77"
+}

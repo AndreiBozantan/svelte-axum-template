@@ -404,7 +404,7 @@ async fn login_rehashes_outdated_password_hash_api() -> TestResult {
         .ok_or("user record not found")?;
 
     users::db::Repository
-        .update_password_hash(&ctx.db, user_record.user.id, &outdated_hash)
+        .update_password_hash(&ctx.db, user_record.user.tenant_id, user_record.user.id, &outdated_hash)
         .await?;
 
     // 4. log in over HTTP (this triggers the upgrade logic inside the service layer)
