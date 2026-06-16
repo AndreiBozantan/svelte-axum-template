@@ -269,10 +269,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         let incoming_hash = crypto::get_hash_as_hex(state);
         if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
             info!(
-                expected_hash = %crypto::get_hash_as_hex(&token_data.claims.csrf_token_hash),
-                actual_hash = %crypto::get_hash_as_hex(&incoming_hash),
-                "csrf_token_mismatch",
-
+                expected_hash = %token_data.claims.csrf_token_hash,
+                actual_hash = %incoming_hash,
+                "csrf_token_mismatch"
             );
             return Err(Error::CsrfMismatch);
         }
