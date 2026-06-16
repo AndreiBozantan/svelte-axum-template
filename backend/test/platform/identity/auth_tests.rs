@@ -431,3 +431,79 @@ async fn login_rehashes_outdated_password_hash_api() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn refresh_token_tenant_isolation() -> TestResult {
+    use crate::platform::common;
+    use crate::platform::identity::tokens;
+    use crate::platform::identity::tokens::TRepository as _;
+    use crate::platform::identity::users;
+    use crate::platform::identity::users::TRepository;
+
+    let (ctx, _server) = create_test_context_and_server().await?;
+
+    // 1. Insert Tenant 2 into the database
+    sqlx::query(
+        "INSERT INTO tenants (id, created_at, updated_at, status, name) \
+         VALUES (2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Tenant 2')",
+    )
+    .execute(&ctx.db)
+    .await?;
+
+    // 2. Create User 2 belonging to Tenant 2
+    let email = common::Email::parse("tenant2@example.com").ok_or("invalid email")?;
+    let user2 = users::db::Repository
+        .create_user(
+            &ctx.db,
+            users::CreateUserCommand {
+                tenant_id: common::TenantId(2),
+                status: users::UserStatus::Active,
+                email,
+                first_name: Some("Tenant2".to_string()),
+                middle_name: None,
+                last_name: Some("User".to_string()),
+                password_hash: None,
+                sso_provider: None,
+                sso_id: None,
+            },
+        )
+        .await?;
+
+    // 3. Verify that the database foreign key constraint prevents inserting a mismatched token
+    let mismatched_token_cmd = tokens::CreateRefreshTokenCommand {
+        jti: uuid::Uuid::new_v4().to_string(),
+        tenant_id: common::TenantId(0), // default tenant
+        user_id: user2.id,              // user belonging to Tenant 2
+        token_hash: "dummy_hash".to_string(),
+        expires_at: chrono::Utc::now().naive_utc(),
+    };
+
+    let insert_result = tokens::db::Repository.create(&ctx.db, mismatched_token_cmd).await;
+
+    // The insert MUST fail due to foreign key constraint violation
+    assert!(insert_result.is_err());
+    let err_msg = match insert_result {
+        Err(err) => err.to_string(),
+        Ok(()) => return Err("expected insert to fail but it succeeded".into()),
+    };
+    assert!(err_msg.contains("FOREIGN KEY constraint failed"));
+
+    // 4. Verify that users::db::Repository::find_by_id scopes by tenant_id correctly
+    // If we look up user2.id under Tenant 0 (default tenant), it must fail with RowNotFound
+    let user_lookup_result = users::db::Repository
+        .find_by_id(&ctx.db, common::TenantId(0), user2.id)
+        .await;
+
+    assert!(matches!(
+        user_lookup_result,
+        Err(crate::platform::db::Error::RowNotFound)
+    ));
+
+    // Looking up user2.id under its correct Tenant 2 must succeed
+    let user_lookup_success = users::db::Repository
+        .find_by_id(&ctx.db, common::TenantId(2), user2.id)
+        .await?;
+    assert_eq!(user_lookup_success.id, user2.id);
+
+    Ok(())
+}
