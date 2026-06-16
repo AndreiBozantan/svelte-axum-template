@@ -280,3 +280,45 @@ fn generate_token_with_custom_exp(
     let token = jsonwebtoken::encode(&header, &claims, &ctx.encoding_key)?;
     Ok(token)
 }
+
+#[test]
+fn test_get_jwt_secret_internal_atomic_and_permissions() -> TestResult {
+    use std::fs;
+    use uuid::Uuid;
+
+    let config_dir = config::AppSettings::get_config_dir()?;
+    let temp_secret_path = config_dir.join(format!(".jwt.secret.test.{}", Uuid::new_v4()));
+
+    // ensure no file exists yet
+    let _ = fs::remove_file(&temp_secret_path);
+
+    // generate new secret
+    let secret1 = jwt::get_jwt_secret_with_file_path(&temp_secret_path)?;
+    assert!(!secret1.is_empty());
+    assert!(secret1.len() >= 32);
+
+    // verify file actually exists
+    assert!(temp_secret_path.exists());
+
+    // read again - should return the same secret
+    let secret2 = jwt::get_jwt_secret_with_file_path(&temp_secret_path)?;
+    assert_eq!(secret1, secret2);
+
+    // verify file permissions (Unix only)
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let metadata = fs::metadata(&temp_secret_path)?;
+        let mode = metadata.permissions().mode();
+        // check only the lowest 9 bits (owner/group/others permissions)
+        let file_permissions = mode & 0o777;
+        assert_eq!(
+            file_permissions, 0o600,
+            "Permissions should be exactly 0o600 (owner read/write only)"
+        );
+    }
+
+    // clean up
+    fs::remove_file(&temp_secret_path)?;
+    Ok(())
+}
