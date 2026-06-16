@@ -105,6 +105,7 @@ mod test {
         mod identity {
             mod auth_tests;
             mod users_tests;
+            mod validate_redirect_path_tests;
         }
 
         mod shared {
