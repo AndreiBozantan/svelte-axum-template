@@ -2,7 +2,6 @@ use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
 use crate::platform::common;
-use crate::platform::constants;
 use crate::platform::db;
 use crate::platform::identity::users;
 
@@ -366,24 +365,21 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn increment_failed_login_count(
+    async fn update_failed_login_count(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
+        count: i64,
     ) -> Result<(), db::Error> {
-        let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
         let result = sqlx::query!(
             r#"
             UPDATE users SET
-                failed_login_count = CASE
-                    WHEN last_failed_login > datetime('now', ?) THEN failed_login_count + 1
-                    ELSE 1
-                END,
+                failed_login_count = ?,
                 last_failed_login = CURRENT_TIMESTAMP
             WHERE id = ? AND tenant_id = ?
             "#,
-            window_length,
+            count,
             user_id.0,
             tenant_id.0,
         )

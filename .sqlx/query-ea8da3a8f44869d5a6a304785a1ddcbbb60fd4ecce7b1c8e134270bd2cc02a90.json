@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE users SET\n                failed_login_count = ?,\n                last_failed_login = CURRENT_TIMESTAMP\n            WHERE id = ? AND tenant_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "ea8da3a8f44869d5a6a304785a1ddcbbb60fd4ecce7b1c8e134270bd2cc02a90"
+}

@@ -148,8 +148,9 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
         })?;
 
         if !crypto::verify_password(&command.password, password_hash)? {
+            let new_count = record.failed_login_count + 1;
             self.users
-                .increment_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
+                .update_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id, new_count)
                 .await?;
             return Err(Error::InvalidCredentials);
         }
@@ -330,13 +331,24 @@ impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
     }
 }
 
+pub fn lockout_duration_minutes(failed_login_count: i64) -> i64 {
+    let failed_login_count = u32::try_from(failed_login_count).unwrap_or(0);
+    if failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
+        return 0;
+    }
+    let excess = failed_login_count - constants::auth::FAILED_LOGIN_MAX_ATTEMPTS;
+    let excess = core::cmp::min(excess, 10); // max lockout 1024 minutes - 17 hours
+    2i64.pow(excess) // 1, 2, 4, 8, 16, ...
+}
+
 fn is_temporarily_locked(record: &users::UserAuthRecord) -> bool {
-    if record.failed_login_count < constants::auth::FAILED_LOGIN_MAX_ATTEMPTS {
+    let duration = lockout_duration_minutes(record.failed_login_count);
+    if duration == 0 {
         return false;
     }
-    record.last_failed_login.is_some_and(|last| {
-        chrono::Utc::now().naive_utc() - last < chrono::Duration::minutes(constants::auth::FAILED_LOGIN_WINDOW_MINUTES)
-    })
+    record
+        .last_failed_login
+        .is_some_and(|last| chrono::Utc::now().naive_utc() - last < chrono::Duration::minutes(duration))
 }
 
 fn generate_refresh_token(
