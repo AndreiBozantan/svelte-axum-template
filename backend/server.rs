@@ -10,6 +10,7 @@ use crate::router;
 
 use crate::platform::common;
 use crate::platform::config;
+use crate::platform::identity::tokens;
 use crate::platform::jwt;
 use crate::platform::migrations;
 
@@ -88,12 +89,49 @@ async fn start_server() -> Result<(), Error> {
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
         crate::platform::identity::oauth::check_oauth_config(&ctx.settings.oauth);
+
+        start_background_cleanup_tasks(&ctx);
+
         axum::serve(listener, router)
             .with_graceful_shutdown(shutdown_signal())
             .await?;
     }
 
     Ok(())
+}
+
+fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
+    // 1. Expired refresh tokens cleanup task
+    let db = ctx.db.clone();
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            ticker.tick().await;
+            perform_refresh_tokens_cleanup(&db).await;
+        }
+    });
+}
+
+async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
+    use tokens::TRepository as _;
+
+    let now = chrono::Utc::now().naive_utc();
+
+    match tokens::db::Repository.delete_expired(db, now).await {
+        Ok(count) => {
+            if count > 0 {
+                info!(deleted_count = count, "expired_refresh_tokens_cleaned_up");
+            }
+        },
+        Err(error) => {
+            error!(
+                error = %error,
+                "expired_refresh_tokens_cleanup_failed"
+            );
+        },
+    }
 }
 
 async fn shutdown_signal() {

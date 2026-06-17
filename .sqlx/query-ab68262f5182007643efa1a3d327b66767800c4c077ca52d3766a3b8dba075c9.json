@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            DELETE FROM refresh_tokens\n            WHERE expires_at < ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ab68262f5182007643efa1a3d327b66767800c4c077ca52d3766a3b8dba075c9"
+}
