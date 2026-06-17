@@ -160,4 +160,21 @@ impl tokens::TRepository for Repository {
         .await?;
         Ok(())
     }
+
+    async fn delete_expired(
+        &self,
+        db: &db::Context,
+        now: NaiveDateTime,
+    ) -> Result<u64, db::Error> {
+        let result = sqlx::query!(
+            r#"
+            DELETE FROM refresh_tokens
+            WHERE expires_at < ?
+            "#,
+            now
+        )
+        .execute(db)
+        .await?;
+        Ok(result.rows_affected())
+    }
 }
