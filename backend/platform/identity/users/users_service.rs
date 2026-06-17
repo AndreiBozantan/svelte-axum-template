@@ -177,6 +177,7 @@ pub trait TRepository: Send + Sync {
         db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
+        streak_window_minutes: i64,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn reset_failed_login_count(

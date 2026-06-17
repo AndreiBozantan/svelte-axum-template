@@ -2,7 +2,6 @@ use chrono::NaiveDateTime;
 use sqlx::FromRow;
 
 use crate::platform::common;
-use crate::platform::constants;
 use crate::platform::db;
 use crate::platform::identity::users;
 
@@ -371,8 +370,9 @@ impl users::TRepository for Repository {
         db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
+        streak_window_minutes: i64,
     ) -> Result<(), db::Error> {
-        let window_length = format!("-{} minutes", constants::auth::FAILED_LOGIN_WINDOW_MINUTES);
+        let window_length = format!("-{streak_window_minutes} minutes");
         let result = sqlx::query!(
             r#"
             UPDATE users SET
