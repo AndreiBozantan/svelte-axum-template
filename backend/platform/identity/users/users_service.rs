@@ -172,12 +172,12 @@ pub trait TRepository: Send + Sync {
         password_hash: &str,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
-    fn increment_failed_login_count(
+    fn update_failed_login_count(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
         user_id: common::UserId,
-        streak_window_minutes: i64,
+        count: i64,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 
     fn reset_failed_login_count(
