@@ -644,3 +644,139 @@ async fn refresh_token_tenant_isolation() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
+async fn refresh_token_cleanup_task_deletes_expired() -> TestResult {
+    use crate::platform::common;
+    use crate::platform::identity::tokens;
+    use crate::platform::identity::tokens::TRepository as _;
+    use crate::platform::identity::users;
+    use crate::platform::identity::users::TRepository;
+
+    let (ctx, _server) = create_test_context_and_server().await?;
+
+    // create a user for testing
+    let email = common::Email::parse("cleanup_test@example.com").ok_or("invalid email")?;
+    let user = users::db::Repository
+        .create_user(
+            &ctx.db,
+            users::CreateUserCommand {
+                tenant_id: common::TenantId(0),
+                status: users::UserStatus::Active,
+                email,
+                first_name: Some("Cleanup".to_string()),
+                middle_name: None,
+                last_name: Some("User".to_string()),
+                password_hash: None,
+                sso_provider: None,
+                sso_id: None,
+            },
+        )
+        .await?;
+
+    // insert three tokens:
+    // 1. One active (non-expired, non-revoked)
+    // 2. One expired
+    // 3. One revoked and expired
+    // 4. One revoked but not expired
+
+    let now = chrono::Utc::now().naive_utc();
+
+    let active_jti = uuid::Uuid::new_v4().to_string();
+    tokens::db::Repository
+        .create(
+            &ctx.db,
+            tokens::CreateRefreshTokenCommand {
+                jti: active_jti.clone(),
+                tenant_id: common::TenantId(0),
+                user_id: user.id,
+                token_hash: "hash_active".to_string(),
+                expires_at: now + chrono::Duration::hours(2),
+            },
+        )
+        .await?;
+
+    let expired_jti = uuid::Uuid::new_v4().to_string();
+    tokens::db::Repository
+        .create(
+            &ctx.db,
+            tokens::CreateRefreshTokenCommand {
+                jti: expired_jti.clone(),
+                tenant_id: common::TenantId(0),
+                user_id: user.id,
+                token_hash: "hash_expired".to_string(),
+                expires_at: now - chrono::Duration::hours(2),
+            },
+        )
+        .await?;
+
+    let revoked_expired_jti = uuid::Uuid::new_v4().to_string();
+    tokens::db::Repository
+        .create(
+            &ctx.db,
+            tokens::CreateRefreshTokenCommand {
+                jti: revoked_expired_jti.clone(),
+                tenant_id: common::TenantId(0),
+                user_id: user.id,
+                token_hash: "hash_rev_exp".to_string(),
+                expires_at: now - chrono::Duration::hours(1),
+            },
+        )
+        .await?;
+    tokens::db::Repository
+        .revoke_by_jti(&ctx.db, common::TenantId(0), &revoked_expired_jti)
+        .await?;
+
+    let revoked_active_jti = uuid::Uuid::new_v4().to_string();
+    tokens::db::Repository
+        .create(
+            &ctx.db,
+            tokens::CreateRefreshTokenCommand {
+                jti: revoked_active_jti.clone(),
+                tenant_id: common::TenantId(0),
+                user_id: user.id,
+                token_hash: "hash_rev_act".to_string(),
+                expires_at: now + chrono::Duration::hours(1),
+            },
+        )
+        .await?;
+    tokens::db::Repository
+        .revoke_by_jti(&ctx.db, common::TenantId(0), &revoked_active_jti)
+        .await?;
+
+    // perform cleanup with current time
+    let deleted_count = tokens::db::Repository.delete_expired(&ctx.db, now).await?;
+
+    // we expect 2 tokens to have been deleted: the expired one and the revoked-and-expired one
+    assert_eq!(deleted_count, 2);
+
+    // verify active token still exists
+    let active_token = tokens::db::Repository
+        .find_by_jti(&ctx.db, common::TenantId(0), &active_jti)
+        .await;
+    assert!(active_token.is_ok());
+
+    // verify revoked but active token still exists
+    let revoked_active_token = tokens::db::Repository
+        .find_by_jti(&ctx.db, common::TenantId(0), &revoked_active_jti)
+        .await;
+    assert!(revoked_active_token.is_ok());
+
+    // verify expired token is gone
+    let expired_token = tokens::db::Repository
+        .find_by_jti(&ctx.db, common::TenantId(0), &expired_jti)
+        .await;
+    assert!(matches!(expired_token, Err(crate::platform::db::Error::RowNotFound)));
+
+    // verify revoked and expired token is gone
+    let revoked_expired_token = tokens::db::Repository
+        .find_by_jti(&ctx.db, common::TenantId(0), &revoked_expired_jti)
+        .await;
+    assert!(matches!(
+        revoked_expired_token,
+        Err(crate::platform::db::Error::RowNotFound)
+    ));
+
+    Ok(())
+}
