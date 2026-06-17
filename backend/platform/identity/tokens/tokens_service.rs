@@ -53,4 +53,10 @@ pub trait TRepository: Send + Sync {
         tenant_id: common::TenantId,
         user_id: common::UserId,
     ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
+
+    fn delete_expired(
+        &self,
+        db: &db::Context,
+        now: NaiveDateTime,
+    ) -> impl std::future::Future<Output = Result<u64, db::Error>> + Send;
 }
