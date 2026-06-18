@@ -76,3 +76,12 @@ fn needs_rehash_checks_correctly() -> TestResult {
     assert!(crypto::needs_rehash(&hash_outdated)?);
     Ok(())
 }
+
+#[test]
+fn test_constant_time_eq() {
+    assert!(crypto::constant_time_eq("", ""));
+    assert!(crypto::constant_time_eq("hello", "hello"));
+    assert!(!crypto::constant_time_eq("hello", "world"));
+    assert!(!crypto::constant_time_eq("hello", "hello0"));
+    assert!(!crypto::constant_time_eq("hello0", "hello"));
+}

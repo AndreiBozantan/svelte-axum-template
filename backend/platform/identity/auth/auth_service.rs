@@ -245,7 +245,7 @@ impl Service {
         }
 
         let token_hash = crypto::get_hash_as_hex(refresh_token_value);
-        if stored_token.token_hash != token_hash {
+        if !crypto::constant_time_eq(&stored_token.token_hash, &token_hash) {
             return Err(Error::InvalidToken);
         }
 

@@ -64,3 +64,15 @@ pub fn dummy_hash() -> Result<&'static str, ar2::Error> {
         .map(std::string::String::as_str)
         .map_err(ar2::Error::clone)
 }
+
+/// Compare two strings in constant time to prevent timing attacks
+#[must_use]
+pub fn constant_time_eq(
+    a: &str,
+    b: &str,
+) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+}
