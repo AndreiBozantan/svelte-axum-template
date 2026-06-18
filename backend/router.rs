@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
@@ -15,6 +13,7 @@ use tracing::info;
 use crate::platform::api;
 use crate::platform::assets;
 use crate::platform::cookies;
+use crate::platform::rate_limiter;
 
 use crate::platform::common::ArcContext;
 
@@ -29,12 +28,14 @@ pub fn create(context: ArcContext) -> Router {
         .merge(public_router(&context))
         .fallback(|| async { api::Error::not_found() });
 
-    Router::new()
+    let global_settings = context.settings.rate_limiter.global.clone();
+
+    let raw_router = Router::new()
         .nest("/api", api)
         .fallback(assets::static_handler)
         .layer(
             tower_http::trace::TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-                let client_ip = extract_client_ip(request);
+                let client_ip = rate_limiter::extract_client_ip(request);
                 let user_agent = extract_user_agent(request);
                 tracing::info_span!(
                     "request",
@@ -47,7 +48,9 @@ pub fn create(context: ArcContext) -> Router {
             }),
         )
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
-        .with_state(context)
+        .with_state(context);
+
+    rate_limiter::add_global_rate_limiting(raw_router, &global_settings)
 }
 
 fn public_router(context: &ArcContext) -> axum::Router<ArcContext> {
@@ -161,29 +164,6 @@ impl tower_http::catch_panic::ResponseForPanic for CustomPanicHandler {
 
         api::Error::internal().into_response()
     }
-}
-
-fn extract_client_ip(req: &Request<Body>) -> String {
-    // check common proxy headers
-    if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
-        && let Ok(value) = forwarded_for.to_str()
-        && let Some(ip) = value.split(',').next()
-    {
-        return ip.trim().to_string();
-    }
-
-    if let Some(real_ip) = req.headers().get("x-real-ip")
-        && let Ok(value) = real_ip.to_str()
-    {
-        return value.to_string();
-    }
-
-    // fallback to Axum's SocketAddr ConnectInfo
-    if let Some(axum::extract::ConnectInfo(addr)) = req.extensions().get::<axum::extract::ConnectInfo<SocketAddr>>() {
-        return addr.ip().to_string();
-    }
-
-    "unknown".to_string()
 }
 
 fn extract_user_agent(req: &Request<Body>) -> Option<String> {

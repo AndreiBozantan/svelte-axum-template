@@ -101,7 +101,7 @@ async fn start_server() -> Result<(), Error> {
 }
 
 fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
-    // 1. Expired refresh tokens cleanup task
+    // expired refresh tokens cleanup task
     let db = ctx.db.clone();
     tokio::spawn(async move {
         let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
@@ -110,6 +110,22 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
         loop {
             ticker.tick().await;
             perform_refresh_tokens_cleanup(&db).await;
+        }
+    });
+
+    // expired rate limiter keys cleanup task
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
+        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            ticker.tick().await;
+            if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
+                config.limiter().retain_recent();
+            }
+            if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
+                config.limiter().retain_recent();
+            }
         }
     });
 }
