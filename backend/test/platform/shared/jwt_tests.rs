@@ -125,7 +125,7 @@ fn refresh_token_expiry() -> TestResult {
 #[test]
 fn future_token_valid() -> TestResult {
     use chrono::Utc;
-    use jsonwebtoken as jsonwt;
+    use jsonwebtoken;
     use uuid::Uuid;
 
     let ctx = test_context();
@@ -136,7 +136,7 @@ fn future_token_valid() -> TestResult {
     let now = Utc::now().timestamp();
     let future_expiry = now + 86400; // 24 hours from now
 
-    let header = jsonwt::Header::new(jsonwt::Algorithm::HS256);
+    let header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS256);
     let future_claims = jwt::TokenClaims {
         sub: user_id.to_string(),
         tenant_id: 0,
@@ -147,7 +147,7 @@ fn future_token_valid() -> TestResult {
         token_type: jwt::TokenType::Access,
     };
 
-    let future_token = jsonwt::encode(&header, &future_claims, &ctx.encoding_key)?;
+    let future_token = jsonwebtoken::encode(&header, &future_claims, &ctx.encoding_key)?;
 
     // test that future token is accepted
     let claims = jwt::decode_token(&ctx, &future_token, jwt::TokenType::Access)?;
