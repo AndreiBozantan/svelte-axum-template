@@ -20,10 +20,20 @@ where
     UR: users::TRepository + Clone + 'static,
     TR: tokens::TRepository + Clone + 'static,
 {
+    use crate::platform::rate_limiter;
     use axum::routing::post;
-    axum::Router::new()
+
+    let base_router = axum::Router::new()
         .route("/auth/register", post(register::<UR, TR>))
-        .route("/auth/login", post(login::<UR, TR>))
+        .route("/auth/login", post(login::<UR, TR>));
+
+    // strict brute-force protection for unauthenticated, CPU-heavy routes (e.g. argon2 hashing on login).
+    let rate_limited_router =
+        rate_limiter::add_login_rate_limiting(base_router, &service.context.settings.rate_limiter.login);
+
+    // logout and refresh are protected by the global rate limiter; they use cheap token validation
+    // and would block legitimate background client refreshes if subjected to strict login limits.
+    rate_limited_router
         .route("/auth/logout", post(logout::<UR, TR>))
         .route("/auth/refresh", post(refresh::<UR, TR>))
         .with_state(service)

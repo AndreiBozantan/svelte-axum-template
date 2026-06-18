@@ -99,6 +99,16 @@ impl Error {
     }
 
     #[must_use]
+    pub fn too_many_requests() -> Self {
+        Self::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            "too_many_requests",
+            "Too many requests. Please try again later.",
+            None,
+        )
+    }
+
+    #[must_use]
     pub fn validation_failed(
         field: &str,
         message: &str,

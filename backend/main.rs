@@ -86,6 +86,7 @@ mod platform {
         pub mod db;
         pub mod jwt;
         pub mod migrations;
+        pub mod rate_limiter;
     }
 
     pub use shared::*;
@@ -112,6 +113,7 @@ mod test {
             mod auth_tests;
             mod crypto_tests;
             mod jwt_tests;
+            mod rate_limiter_tests;
         }
     }
 }
