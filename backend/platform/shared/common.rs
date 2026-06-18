@@ -110,6 +110,16 @@ impl Context {
                 max_connections: 5,
                 store_temp_tables_in_memory: true,
             },
+            rate_limiter: config::AppRateLimiterSettings {
+                global: config::RateLimitSettings {
+                    enabled: false,
+                    ..Default::default()
+                },
+                login: config::RateLimitSettings {
+                    enabled: false,
+                    ..Default::default()
+                },
+            },
             ..Default::default()
         };
 

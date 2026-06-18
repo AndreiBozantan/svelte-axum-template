@@ -24,7 +24,7 @@ pub struct AppSettings {
     pub oauth: OAuthSettings,
 
     #[serde(default)]
-    pub rate_limiter: RateLimiterSettings,
+    pub rate_limiter: AppRateLimiterSettings,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -241,24 +241,24 @@ impl std::fmt::Debug for OAuthSettings {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RateLimiterSettings {
+pub struct AppRateLimiterSettings {
     #[serde(default)]
-    pub global: RateLimitConfig,
+    pub global: RateLimitSettings,
 
     #[serde(default)]
-    pub login: RateLimitConfig,
+    pub login: RateLimitSettings,
 }
 
-impl Default for RateLimiterSettings {
+impl Default for AppRateLimiterSettings {
     fn default() -> Self {
         Self {
-            global: RateLimitConfig {
+            global: RateLimitSettings {
                 enabled: true,
                 rate: 10,
                 period_in_seconds: 1,
                 burst_size: 50,
             },
-            login: RateLimitConfig {
+            login: RateLimitSettings {
                 enabled: true,
                 rate: 10,
                 period_in_seconds: 60,
@@ -269,7 +269,7 @@ impl Default for RateLimiterSettings {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RateLimitConfig {
+pub struct RateLimitSettings {
     #[serde(default)]
     pub enabled: bool,
 
@@ -283,7 +283,7 @@ pub struct RateLimitConfig {
     pub burst_size: u32,
 }
 
-impl Default for RateLimitConfig {
+impl Default for RateLimitSettings {
     fn default() -> Self {
         Self {
             enabled: true,

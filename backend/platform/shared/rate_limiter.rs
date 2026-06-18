@@ -28,27 +28,27 @@ pub static LOGIN_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor, 
 
 pub fn add_global_rate_limiting<S>(
     router: axum::Router<S>,
-    settings: &crate::platform::config::RateLimitConfig,
+    settings: &crate::platform::config::RateLimitSettings,
 ) -> axum::Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    add_rate_limiting_internal(router, settings, &GLOBAL_LIMITER_CONFIG)
+    add_rate_limiting(router, settings, &GLOBAL_LIMITER_CONFIG)
 }
 
 pub fn add_login_rate_limiting<S>(
     router: axum::Router<S>,
-    settings: &crate::platform::config::RateLimitConfig,
+    settings: &crate::platform::config::RateLimitSettings,
 ) -> axum::Router<S>
 where
     S: Clone + Send + Sync + 'static,
 {
-    add_rate_limiting_internal(router, settings, &LOGIN_LIMITER_CONFIG)
+    add_rate_limiting(router, settings, &LOGIN_LIMITER_CONFIG)
 }
 
-fn add_rate_limiting_internal<S>(
+pub fn add_rate_limiting<S>(
     router: axum::Router<S>,
-    settings: &crate::platform::config::RateLimitConfig,
+    settings: &crate::platform::config::RateLimitSettings,
     limiter_config: &'static OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>>,
 ) -> axum::Router<S>
 where
