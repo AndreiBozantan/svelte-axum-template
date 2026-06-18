@@ -179,14 +179,14 @@ pub fn ci_frontend() -> std::io::Result<()> {
 }
 
 pub fn pre_commit() -> std::io::Result<()> {
-    println!("Running intelligent pre-commit checks...");
+    println!("Running pre-commit formatting checks...");
     let files = get_staged_files()?;
 
     let mut has_backend = false;
     let mut has_frontend = false;
 
     if files.is_empty() {
-        println!("No staged files found. Running all formatting and lint checks as fallback.");
+        println!("No staged files found. Running all formatting checks as fallback.");
         has_backend = true;
         has_frontend = true;
     } else {
@@ -207,32 +207,29 @@ pub fn pre_commit() -> std::io::Result<()> {
 
     if has_backend {
         check_backend_fmt()?;
-        check_backend_lint()?;
-        check_backend_sqlx()?;
     } else {
-        println!("No backend changes detected. Skipping Rust lints and formatting.");
+        println!("No backend changes detected. Skipping Rust formatting.");
     }
 
     if has_frontend {
         check_frontend_fmt()?;
-        check_frontend_diagnostics()?;
     } else {
-        println!("No frontend changes detected. Skipping frontend checks.");
+        println!("No frontend changes detected. Skipping frontend formatting.");
     }
 
-    println!("All pre-commit checks passed!");
+    println!("All pre-commit formatting checks passed!");
     Ok(())
 }
 
 pub fn pre_push() -> std::io::Result<()> {
-    println!("Running intelligent pre-push checks...");
+    println!("Running intelligent pre-push checks (lints and tests)...");
     let files = get_pushed_files()?;
 
     let mut has_backend = false;
     let mut has_frontend = false;
 
     if files.is_empty() {
-        println!("Could not determine diff or first push on new branch. Running all tests as fallback.");
+        println!("Could not determine diff or first push on new branch. Running all checks and tests as fallback.");
         has_backend = true;
         has_frontend = true;
     } else {
@@ -251,17 +248,20 @@ pub fn pre_push() -> std::io::Result<()> {
     }
 
     if has_backend {
+        check_backend_lint()?;
+        check_backend_sqlx()?;
         check_backend_test()?;
     } else {
-        println!("No backend changes detected. Skipping Rust tests.");
+        println!("No backend changes detected. Skipping Rust lints and tests.");
     }
 
     if has_frontend {
+        check_frontend_diagnostics()?;
         check_frontend_test()?;
     } else {
-        println!("No frontend changes detected. Skipping frontend tests.");
+        println!("No frontend changes detected. Skipping frontend diagnostics and tests.");
     }
 
-    println!("All tests passed!");
+    println!("All lints, checks, and tests passed!");
     Ok(())
 }
