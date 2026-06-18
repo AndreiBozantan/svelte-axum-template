@@ -508,7 +508,6 @@ async fn login_rehashes_outdated_password_hash_api() -> TestResult {
     use crate::platform::common;
     use crate::platform::crypto;
     use crate::platform::identity::users;
-    use crate::platform::identity::users::TRepository;
     use argon2::password_hash::{PasswordHasher, SaltString};
     use axum::http::StatusCode;
     use serde_json::json;
@@ -573,9 +572,7 @@ async fn login_rehashes_outdated_password_hash_api() -> TestResult {
 async fn refresh_token_tenant_isolation() -> TestResult {
     use crate::platform::common;
     use crate::platform::identity::tokens;
-    use crate::platform::identity::tokens::TRepository as _;
     use crate::platform::identity::users;
-    use crate::platform::identity::users::TRepository;
 
     let (ctx, _server) = create_test_context_and_server().await?;
 
@@ -650,9 +647,7 @@ async fn refresh_token_tenant_isolation() -> TestResult {
 async fn refresh_token_cleanup_task_deletes_expired() -> TestResult {
     use crate::platform::common;
     use crate::platform::identity::tokens;
-    use crate::platform::identity::tokens::TRepository as _;
     use crate::platform::identity::users;
-    use crate::platform::identity::users::TRepository;
 
     let (ctx, _server) = create_test_context_and_server().await?;
 

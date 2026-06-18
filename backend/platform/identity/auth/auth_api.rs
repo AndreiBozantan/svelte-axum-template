@@ -12,20 +12,15 @@ use crate::platform::cookies;
 use crate::platform::crypto;
 
 use crate::platform::identity::auth;
-use crate::platform::identity::tokens;
 use crate::platform::identity::users;
 
-pub fn router<UR, TR>(service: auth::Service<UR, TR>) -> axum::Router<common::ArcContext>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+pub fn router(service: auth::Service) -> axum::Router<common::ArcContext> {
     use crate::platform::rate_limiter;
     use axum::routing::post;
 
     let base_router = axum::Router::new()
-        .route("/auth/register", post(register::<UR, TR>))
-        .route("/auth/login", post(login::<UR, TR>));
+        .route("/auth/register", post(register))
+        .route("/auth/login", post(login));
 
     // strict brute-force protection for unauthenticated, CPU-heavy routes (e.g. argon2 hashing on login).
     let rate_limited_router =
@@ -34,8 +29,8 @@ where
     // logout and refresh are protected by the global rate limiter; they use cheap token validation
     // and would block legitimate background client refreshes if subjected to strict login limits.
     rate_limited_router
-        .route("/auth/logout", post(logout::<UR, TR>))
-        .route("/auth/refresh", post(refresh::<UR, TR>))
+        .route("/auth/logout", post(logout))
+        .route("/auth/refresh", post(refresh))
         .with_state(service)
 }
 
@@ -88,14 +83,10 @@ impl From<users::User> for UserResponse {
     }
 }
 
-async fn register<UR, TR>(
-    State(service): State<auth::Service<UR, TR>>,
+async fn register(
+    State(service): State<auth::Service>,
     request: api::ValidatedJson<RegisterRequest>,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     let request = request.data();
     let email = common::Email::parse(&request.email)
         .ok_or_else(|| api::Error::validation_failed("email", "invalid email format"))?;
@@ -106,14 +97,10 @@ where
     Ok((http::StatusCode::CREATED, axum::Json(body)))
 }
 
-async fn login<UR, TR>(
-    State(service): State<auth::Service<UR, TR>>,
+async fn login(
+    State(service): State<auth::Service>,
     request: api::Json<LoginRequest>,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     let request = request.data();
     let email_hash = crypto::get_hash_as_hex(&request.email);
     info!(%email_hash, "login_attempt");
@@ -140,14 +127,10 @@ where
     )?)
 }
 
-async fn logout<UR, TR>(
-    State(service): State<auth::Service<UR, TR>>,
+async fn logout(
+    State(service): State<auth::Service>,
     headers: http::HeaderMap,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     if let Ok(refresh_token) = cookies::get_refresh_token_from_cookie(&headers) {
         let _ = service.revoke_refresh_token(&refresh_token).await;
     }
@@ -162,14 +145,10 @@ where
     )?)
 }
 
-async fn refresh<UR, TR>(
-    State(service): State<auth::Service<UR, TR>>,
+async fn refresh(
+    State(service): State<auth::Service>,
     headers: http::HeaderMap,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     let refresh_token = cookies::get_refresh_token_from_cookie(&headers)?;
     let session = service.refresh(&refresh_token).await?;
     info!(

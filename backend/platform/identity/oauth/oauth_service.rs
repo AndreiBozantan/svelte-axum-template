@@ -14,8 +14,6 @@ use crate::platform::config;
 use crate::platform::crypto;
 
 use crate::platform::identity::auth;
-use crate::platform::identity::tokens;
-use crate::platform::identity::users;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -201,16 +199,16 @@ fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Cl
 }
 
 #[derive(Clone)]
-pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
+pub struct Service {
     pub context: common::ArcContext,
-    pub auth: auth::Service<UR, TR>,
+    pub auth: auth::Service,
 }
 
-impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
+impl Service {
     #[must_use]
     pub const fn new(
         context: common::ArcContext,
-        auth_service: auth::Service<UR, TR>,
+        auth_service: auth::Service,
     ) -> Self {
         Self {
             context,

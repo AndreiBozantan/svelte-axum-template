@@ -30,8 +30,8 @@ impl From<Row> for tokens::RefreshToken {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl tokens::TRepository for Repository {
-    async fn create(
+impl Repository {
+    pub async fn create(
         &self,
         db: &db::Context,
         command: tokens::CreateRefreshTokenCommand,
@@ -52,7 +52,7 @@ impl tokens::TRepository for Repository {
         Ok(())
     }
 
-    async fn revoke_by_jti(
+    pub async fn revoke_by_jti(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -80,7 +80,7 @@ impl tokens::TRepository for Repository {
         Ok(())
     }
 
-    async fn try_revoke_active_by_jti(
+    pub async fn try_revoke_active_by_jti(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -109,7 +109,7 @@ impl tokens::TRepository for Repository {
         Ok(row.map(Into::into))
     }
 
-    async fn find_by_jti(
+    pub async fn find_by_jti(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -137,7 +137,7 @@ impl tokens::TRepository for Repository {
         Ok(row.into())
     }
 
-    async fn revoke_all_for_user(
+    pub async fn revoke_all_for_user(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -161,7 +161,7 @@ impl tokens::TRepository for Repository {
         Ok(())
     }
 
-    async fn delete_expired(
+    pub async fn delete_expired(
         &self,
         db: &db::Context,
         now: NaiveDateTime,

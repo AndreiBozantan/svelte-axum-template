@@ -131,8 +131,6 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
 }
 
 async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
-    use tokens::TRepository as _;
-
     let now = chrono::Utc::now().naive_utc();
 
     match tokens::db::Repository.delete_expired(db, now).await {

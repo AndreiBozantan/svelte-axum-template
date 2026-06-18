@@ -8,8 +8,6 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 #[tokio::test]
 async fn oauth_login_new_user_success() -> TestResult {
-    use crate::platform::identity::users::TRepository;
-
     let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 
@@ -46,8 +44,6 @@ async fn oauth_login_new_user_success() -> TestResult {
 
 #[tokio::test]
 async fn oauth_user_linking_existing_password_user() -> TestResult {
-    use crate::platform::identity::users::TRepository;
-
     let ctx = common::Context::create_test_context().await?;
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
 

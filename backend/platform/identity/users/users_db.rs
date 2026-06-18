@@ -88,8 +88,8 @@ impl TryFrom<Row> for users::UserAuthRecord {
 #[derive(Debug, Clone, Copy)]
 pub struct Repository;
 
-impl users::TRepository for Repository {
-    async fn create_user(
+impl Repository {
+    pub async fn create_user(
         &self,
         db: &db::Context,
         command: users::CreateUserCommand,
@@ -129,7 +129,7 @@ impl users::TRepository for Repository {
         row.try_into()
     }
 
-    async fn find_by_id(
+    pub async fn find_by_id(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -165,7 +165,8 @@ impl users::TRepository for Repository {
         row.try_into()
     }
 
-    async fn find_sso_info_by_id(
+    #[allow(dead_code)]
+    pub async fn find_sso_info_by_id(
         &self,
         db: &db::Context,
         id: common::UserId,
@@ -186,7 +187,7 @@ impl users::TRepository for Repository {
         })
     }
 
-    async fn find_auth_details_by_email(
+    pub async fn find_auth_details_by_email(
         &self,
         db: &db::Context,
         email: &common::Email,
@@ -220,7 +221,7 @@ impl users::TRepository for Repository {
         row.map(TryInto::try_into).transpose()
     }
 
-    async fn list_by_tenant(
+    pub async fn list_by_tenant(
         &self,
         db: &db::Context,
         query: users::ListUsersQuery,
@@ -273,7 +274,7 @@ impl users::TRepository for Repository {
         })
     }
 
-    async fn link_sso_user(
+    pub async fn link_sso_user(
         &self,
         db: &db::Context,
         command: users::LinkSsoUserCommand,
@@ -314,7 +315,7 @@ impl users::TRepository for Repository {
         row.try_into()
     }
 
-    async fn update_admin_credentials(
+    pub async fn update_admin_credentials(
         &self,
         db: &db::Context,
         command: users::UpdateAdminCredentialsCommand,
@@ -339,7 +340,7 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn update_password_hash(
+    pub async fn update_password_hash(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -365,7 +366,7 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn update_failed_login_count(
+    pub async fn update_failed_login_count(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
@@ -392,7 +393,7 @@ impl users::TRepository for Repository {
         Ok(())
     }
 
-    async fn reset_failed_login_count(
+    pub async fn reset_failed_login_count(
         &self,
         db: &db::Context,
         tenant_id: common::TenantId,
