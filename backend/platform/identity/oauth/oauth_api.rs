@@ -12,18 +12,12 @@ use crate::platform::crypto;
 
 use crate::platform::identity::auth;
 use crate::platform::identity::oauth;
-use crate::platform::identity::tokens;
-use crate::platform::identity::users;
 
-pub fn router<UR, TR>(service: oauth::Service<UR, TR>) -> axum::Router<common::ArcContext>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+pub fn router(service: oauth::Service) -> axum::Router<common::ArcContext> {
     use axum::routing::get;
     axum::Router::new()
-        .route("/oauth/google", get(google_auth_init::<UR, TR>))
-        .route("/oauth/google/callback", get(google_auth_callback::<UR, TR>))
+        .route("/oauth/google", get(google_auth_init))
+        .route("/oauth/google/callback", get(google_auth_callback))
         .with_state(service)
 }
 
@@ -47,14 +41,10 @@ impl From<oauth::Error> for api::Error {
     }
 }
 
-async fn google_auth_init<UR, TR>(
-    State(service): State<oauth::Service<UR, TR>>,
+async fn google_auth_init(
+    State(service): State<oauth::Service>,
     params: api::Query<std::collections::BTreeMap<String, String>>,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     let redirect_url = params.data().get("redirect_url").cloned();
     info!(provider = "google", ?redirect_url, "sso_initiate");
 
@@ -76,15 +66,11 @@ where
     Ok(response)
 }
 
-async fn google_auth_callback<UR, TR>(
-    State(service): State<oauth::Service<UR, TR>>,
+async fn google_auth_callback(
+    State(service): State<oauth::Service>,
     headers: http::HeaderMap,
     params: api::Query<oauth::GoogleCallbackRequest>,
-) -> Result<impl IntoResponse, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-    TR: tokens::TRepository + Clone + 'static,
-{
+) -> Result<impl IntoResponse, api::Error> {
     let params = params.data();
     let oauth_state_cookie = cookies::get_cookie_value_from_headers(&headers, "oauth_state").ok_or_else(|| {
         info!("oauth_state_cookie_missing");

@@ -145,8 +145,6 @@ async fn create_admin(
     email: String,
     ctx: &common::ArcContext,
 ) -> Result<(), Error> {
-    use crate::platform::identity::users::TRepository;
-
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 

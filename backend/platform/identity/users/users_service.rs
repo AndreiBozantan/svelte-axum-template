@@ -104,86 +104,17 @@ impl From<db::Error> for Error {
 }
 
 #[derive(Clone)]
-pub struct Service<UR: TRepository> {
+pub struct Service {
     pub context: common::ArcContext,
-    pub users: UR,
+    pub users: super::db::Repository,
 }
 
-impl<UR: TRepository> Service<UR> {
+impl Service {
     #[must_use]
     pub const fn new(
-        repo: UR,
+        repo: super::db::Repository,
         context: common::ArcContext,
     ) -> Self {
         Self { users: repo, context }
     }
-}
-
-pub trait TRepository: Send + Sync {
-    fn create_user(
-        &self,
-        db: &db::Context,
-        command: CreateUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
-
-    fn find_by_id(
-        &self,
-        db: &db::Context,
-        tenant_id: common::TenantId,
-        id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
-
-    #[allow(dead_code)]
-    fn find_sso_info_by_id(
-        &self,
-        db: &db::Context,
-        id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<UserSsoInfo, db::Error>> + Send;
-
-    fn find_auth_details_by_email(
-        &self,
-        db: &db::Context,
-        email: &common::Email,
-    ) -> impl std::future::Future<Output = Result<Option<UserAuthRecord>, db::Error>> + Send;
-
-    fn list_by_tenant(
-        &self,
-        db: &db::Context,
-        query: ListUsersQuery,
-    ) -> impl std::future::Future<Output = Result<UserList, db::Error>> + Send;
-
-    fn link_sso_user(
-        &self,
-        db: &db::Context,
-        command: LinkSsoUserCommand,
-    ) -> impl std::future::Future<Output = Result<User, db::Error>> + Send;
-
-    fn update_admin_credentials(
-        &self,
-        db: &db::Context,
-        command: UpdateAdminCredentialsCommand,
-    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
-
-    fn update_password_hash(
-        &self,
-        db: &db::Context,
-        tenant_id: common::TenantId,
-        user_id: common::UserId,
-        password_hash: &str,
-    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
-
-    fn update_failed_login_count(
-        &self,
-        db: &db::Context,
-        tenant_id: common::TenantId,
-        user_id: common::UserId,
-        count: i64,
-    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
-
-    fn reset_failed_login_count(
-        &self,
-        db: &db::Context,
-        tenant_id: common::TenantId,
-        user_id: common::UserId,
-    ) -> impl std::future::Future<Output = Result<(), db::Error>> + Send;
 }

@@ -7,14 +7,11 @@ use crate::platform::common;
 use crate::platform::identity::users;
 use crate::platform::jwt;
 
-pub fn router<UR>(service: users::Service<UR>) -> axum::Router<common::ArcContext>
-where
-    UR: users::TRepository + Clone + 'static,
-{
+pub fn router(service: users::Service) -> axum::Router<common::ArcContext> {
     use axum::routing::get;
     axum::Router::new()
-        .route("/users", get(list_users::<UR>))
-        .route("/users/me", get(user_info::<UR>))
+        .route("/users", get(list_users))
+        .route("/users/me", get(user_info))
         .with_state(service)
 }
 
@@ -58,14 +55,11 @@ impl From<users::Error> for api::Error {
     }
 }
 
-async fn list_users<UR>(
-    State(service): State<users::Service<UR>>,
+async fn list_users(
+    State(service): State<users::Service>,
     pagination: api::Pagination,
     claims: jwt::TokenClaims,
-) -> Result<axum::Json<ListUsersResponse>, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-{
+) -> Result<axum::Json<ListUsersResponse>, api::Error> {
     let query = users::ListUsersQuery {
         tenant_id: common::TenantId(claims.tenant_id),
         limit: pagination.limit,
@@ -80,13 +74,10 @@ where
     }))
 }
 
-async fn user_info<UR>(
-    State(service): State<users::Service<UR>>,
+async fn user_info(
+    State(service): State<users::Service>,
     claims: jwt::TokenClaims,
-) -> Result<axum::Json<UserInfoResponse>, api::Error>
-where
-    UR: users::TRepository + Clone + 'static,
-{
+) -> Result<axum::Json<UserInfoResponse>, api::Error> {
     let tenant_id = claims.tenant_id();
     let user_id = claims.user_id()?;
     let user = service

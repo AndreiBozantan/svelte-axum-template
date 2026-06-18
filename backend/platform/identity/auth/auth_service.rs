@@ -82,17 +82,17 @@ impl From<db::Error> for Error {
 }
 
 #[derive(Clone)]
-pub struct Service<UR: users::TRepository, TR: tokens::TRepository> {
+pub struct Service {
     pub context: common::ArcContext,
-    users: UR,
-    tokens: TR,
+    users: users::db::Repository,
+    tokens: tokens::db::Repository,
 }
 
-impl<UR: users::TRepository, TR: tokens::TRepository> Service<UR, TR> {
+impl Service {
     #[must_use]
     pub const fn new(
-        users: UR,
-        tokens: TR,
+        users: users::db::Repository,
+        tokens: tokens::db::Repository,
         context: common::ArcContext,
     ) -> Self {
         Self { context, users, tokens }
