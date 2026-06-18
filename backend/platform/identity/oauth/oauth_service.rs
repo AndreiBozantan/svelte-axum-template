@@ -135,16 +135,6 @@ type GoogleOAuth2Client = oauth2::basic::BasicClient<
     oauth2::EndpointSet,
 >;
 
-fn constant_time_eq(
-    a: &str,
-    b: &str,
-) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
-}
-
 pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Error> {
     if config.google_client_id.is_empty() {
         return Err(Error::InvalidConfig("Google Client ID is not configured".to_string()));
@@ -265,7 +255,7 @@ impl Service {
             jsonwebtoken::decode::<OAuthStateClaims>(oauth_state_cookie, &self.context.jwt.decoding_key, &validation)?;
 
         let incoming_hash = crypto::get_hash_as_hex(state);
-        if !constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
+        if !crypto::constant_time_eq(&token_data.claims.csrf_token_hash, &incoming_hash) {
             info!(
                 expected_hash = %token_data.claims.csrf_token_hash,
                 actual_hash = %incoming_hash,
