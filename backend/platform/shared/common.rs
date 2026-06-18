@@ -91,6 +91,8 @@ impl Context {
             settings,
             http_client,
         };
+        // eagerly initialize the dummy password hash to prevent cold-start timing leaks
+        let _ = crate::platform::crypto::dummy_hash();
         Ok(context.into())
     }
 

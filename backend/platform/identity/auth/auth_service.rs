@@ -138,12 +138,12 @@ impl Service {
 
         let dummy_hash = crypto::dummy_hash()?;
         let record = maybe_user.ok_or_else(|| {
-            let _ = crypto::verify_password(&command.password, dummy_hash);
+            let _ = std::hint::black_box(crypto::verify_password(&command.password, dummy_hash));
             Error::InvalidCredentials
         })?;
 
         let password_hash = record.password_hash.as_deref().ok_or_else(|| {
-            let _ = crypto::verify_password(&command.password, dummy_hash);
+            let _ = std::hint::black_box(crypto::verify_password(&command.password, dummy_hash));
             Error::InvalidCredentials
         })?;
 
