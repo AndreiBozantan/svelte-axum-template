@@ -22,8 +22,6 @@ data/db.sqlite*
 
 # misc
 tmp/
-.aicode/
-.ai_coding.db
 .DS_Store
 .env
 
