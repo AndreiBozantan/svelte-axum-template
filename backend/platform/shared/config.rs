@@ -22,6 +22,9 @@ pub struct AppSettings {
 
     #[serde(default)]
     pub oauth: OAuthSettings,
+
+    #[serde(default)]
+    pub rate_limiter: RateLimiterSettings,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -234,5 +237,59 @@ impl std::fmt::Debug for OAuthSettings {
             .field("google_client_id", &self.google_client_id)
             .field("google_client_secret", &google_client_secret)
             .finish()
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RateLimiterSettings {
+    #[serde(default)]
+    pub global: RateLimitConfig,
+
+    #[serde(default)]
+    pub login: RateLimitConfig,
+}
+
+impl Default for RateLimiterSettings {
+    fn default() -> Self {
+        Self {
+            global: RateLimitConfig {
+                enabled: true,
+                rate: 10,
+                period_in_seconds: 1,
+                burst_size: 50,
+            },
+            login: RateLimitConfig {
+                enabled: true,
+                rate: 10,
+                period_in_seconds: 60,
+                burst_size: 10,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RateLimitConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default)]
+    pub rate: u32,
+
+    #[serde(default)]
+    pub period_in_seconds: u64,
+
+    #[serde(default)]
+    pub burst_size: u32,
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            rate: 1,
+            period_in_seconds: 1,
+            burst_size: 1,
+        }
     }
 }
