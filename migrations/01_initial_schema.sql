@@ -6,6 +6,14 @@ CREATE TABLE IF NOT EXISTS tenants (
     name TEXT NOT NULL,
     description TEXT
 );
+-- auto update trigger for updated_at 
+CREATE TRIGGER IF NOT EXISTS trg_tenants_updated_at
+AFTER UPDATE ON tenants
+FOR EACH ROW
+BEGIN
+    UPDATE tenants SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
 -- create a default tenant, for new users who sign up without specifying a tenant (e.g., via SSO) or 
 -- for system users that don't belong to any specific tenant
 INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)
@@ -32,6 +40,13 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
+-- auto update trigger for updated_at 
+CREATE TRIGGER IF NOT EXISTS trg_users_updated_at
+AFTER UPDATE ON users
+FOR EACH ROW
+BEGIN
+    UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
 -- create a default system user for internal operations, associated with the default tenant
 INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
 VALUES (0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
