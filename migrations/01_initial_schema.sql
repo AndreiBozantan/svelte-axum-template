@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_users_sso_provider_id ON users(sso_provider, sso_id);
 CREATE UNIQUE INDEX users_email_case_insensitive ON users(LOWER(email));
 -- create a default system user for internal operations, associated with the default tenant
 INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
@@ -49,7 +48,6 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     revoked_at DATETIME,        -- When token was revoked (if applicable)
     FOREIGN KEY (tenant_id, user_id) REFERENCES users(tenant_id, id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_jti ON refresh_tokens(jti);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_cleanup
