@@ -13,11 +13,12 @@ FOR EACH ROW
 BEGIN
     UPDATE tenants SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
-
--- create a default tenant, for new users who sign up without specifying a tenant (e.g., via SSO) or 
--- for system users that don't belong to any specific tenant
+-- create the default tenant for self-signup/SSO users
 INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)
-VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Default', 'Default tenant for system users');
+VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Default', 'Default tenant for public users');
+-- create the system tenant for platform administration
+INSERT OR IGNORE INTO tenants (id, created_at, updated_at, status, name, description)
+VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'System', 'System tenant for internal platform operations');
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,9 +48,9 @@ FOR EACH ROW
 BEGIN
     UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
--- create a default system user for internal operations, associated with the default tenant
+-- create a default system user (id=0) for internal operations, associated with the system tenant (tenant_id=1)
 INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
-VALUES (0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
+VALUES (0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
