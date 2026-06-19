@@ -64,7 +64,5 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_tenant_user ON refresh_tokens(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_cleanup
-ON refresh_tokens(expires_at) WHERE revoked_at IS NOT NULL;
 
 
