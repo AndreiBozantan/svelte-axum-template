@@ -18,6 +18,7 @@
         "fuser",
         "jsonwebtoken",
         "libsqlite",
+        "litestream",
         "NOCASE",
         "pipefail",
         "pkce",

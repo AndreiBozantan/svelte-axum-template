@@ -42,13 +42,13 @@ if [[ "$TARGET_FILE" == *"/platform/"* || "$TARGET_FILE" == *"platform/"* || "$T
     fi
     
     # 2. Run cargo clippy
-    CLIPPY_OUT=$(cargo clippy 2>&1) || STATUS=1
+    CLIPPY_OUT=$(cargo clippy --all-features 2>&1) || STATUS=1
     if [ -n "$CLIPPY_OUT" ]; then
         OUTPUT+=$'\n--- cargo clippy ---\n'"$CLIPPY_OUT"
     fi
     
     # 3. Run cargo check
-    CHECK_OUT=$(cargo check 2>&1) || STATUS=1
+    CHECK_OUT=$(cargo check --all-features 2>&1) || STATUS=1
     if [ -n "$CHECK_OUT" ]; then
         OUTPUT+=$'\n--- cargo check ---\n'"$CHECK_OUT"
     fi

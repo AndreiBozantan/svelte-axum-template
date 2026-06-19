@@ -7,6 +7,13 @@ pub type Context = sqlx::SqlitePool;
 
 pub async fn create_context(db_config: &config::DatabaseSettings) -> Result<Context, sqlx::Error> {
     use std::str::FromStr;
+
+    #[cfg(feature = "fly")]
+    {
+        let db_path = db_config.url.strip_prefix("sqlite:").unwrap_or(&db_config.url);
+        crate::platform::fly::litestream::init_litestream(db_path);
+    }
+
     let options = sqlx::sqlite::SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)

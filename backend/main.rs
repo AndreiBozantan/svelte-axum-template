@@ -89,6 +89,13 @@ mod platform {
         pub mod rate_limiter;
     }
 
+    #[cfg(feature = "fly")]
+    pub mod fly {
+        pub mod backup;
+        pub mod litestream;
+        pub mod recovery;
+    }
+
     pub use shared::*;
 }
 
