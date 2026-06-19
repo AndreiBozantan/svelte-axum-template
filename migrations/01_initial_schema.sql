@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     status TEXT NOT NULL CHECK(status IN ('onboarding', 'active', 'suspended', 'archived')),
-    email TEXT NOT NULL,
+    email TEXT NOT NULL COLLATE NOCASE,
     first_name TEXT,
     middle_name TEXT,
     last_name TEXT,
@@ -32,7 +32,6 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users(tenant_id);
-CREATE UNIQUE INDEX users_email_case_insensitive ON users(LOWER(email));
 -- create a default system user for internal operations, associated with the default tenant
 INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
 VALUES (0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
