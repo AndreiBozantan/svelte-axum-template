@@ -6,6 +6,8 @@
     "cSpell.ignorePaths": ["**/Cargo.lock", "**/settings.json"],
     "cSpell.words": [
         "agentic",
+        "AUTOINCREMENT",
+        "batcat",
         "binstall",
         "chrono",
         "clippy",
@@ -15,6 +17,9 @@
         "exfiltrated",
         "fuser",
         "jsonwebtoken",
+        "libsqlite",
+        "NOCASE",
+        "pipefail",
         "pkce",
         "Referer",
         "reqwest",
@@ -33,6 +38,8 @@
         "testuser",
         "thiserror",
         "tlnp",
+        "tlsv",
+        "usermod",
         "xtask"
     ],
     "editor.formatOnSave": true,
