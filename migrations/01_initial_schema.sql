@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS tenants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status TEXT NOT NULL CHECK(status IN ('active', 'suspended', 'archived')),
     name TEXT NOT NULL,
     description TEXT
@@ -14,8 +14,8 @@ VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'Default', 'Default t
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tenant_id INTEGER NOT NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status TEXT NOT NULL CHECK(status IN ('onboarding', 'active', 'suspended', 'archived')),
     email TEXT NOT NULL COLLATE NOCASE,
     first_name TEXT,
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     user_id INTEGER NOT NULL,
     jti TEXT NOT NULL UNIQUE,  -- JWT ID from the refresh token
     token_hash TEXT NOT NULL,  -- Hash of the refresh token for security
-    issued_at DATETIME NOT NULL,
+    issued_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
     revoked_at DATETIME,        -- When token was revoked (if applicable)
     FOREIGN KEY (tenant_id, user_id) REFERENCES users(tenant_id, id) ON DELETE CASCADE
