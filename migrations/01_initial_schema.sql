@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     revoked_at DATETIME,        -- When token was revoked (if applicable)
     FOREIGN KEY (tenant_id, user_id) REFERENCES users(tenant_id, id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_tenant_user ON refresh_tokens(tenant_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_expires_cleanup
 ON refresh_tokens(expires_at) WHERE revoked_at IS NOT NULL;
