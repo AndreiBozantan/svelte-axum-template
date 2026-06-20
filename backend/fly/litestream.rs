@@ -57,3 +57,39 @@ pub fn stop_litestream() {
         let _ = child.wait();
     }
 }
+
+/// Checks if the Litestream replication subprocess is still running.
+///
+/// Returns true if it is running normally, or if Litestream is not enabled/found.
+/// Returns false if the process has exited unexpectedly or if an error occurred.
+pub fn is_litestream_healthy() -> bool {
+    let litestream_path = path::Path::new("/usr/local/bin/litestream");
+    if !litestream_path.exists() {
+        return true;
+    }
+
+    let Ok(mut guard) = LITESTREAM_PROCESS.lock() else {
+        tracing::error!("litestream_process_mutex_poisoned");
+        return false;
+    };
+
+    let Some(child) = guard.as_mut() else {
+        tracing::error!("litestream_replicate_subprocess_not_started");
+        return false;
+    };
+
+    let status = child.try_wait();
+    drop(guard);
+
+    match status {
+        Ok(None) => true,
+        Ok(Some(exit_status)) => {
+            tracing::error!(status = ?exit_status.code(), "litestream_replicate_subprocess_exited_unexpectedly");
+            false
+        },
+        Err(err) => {
+            tracing::error!(error = %err, "failed_to_query_litestream_subprocess_status");
+            false
+        },
+    }
+}

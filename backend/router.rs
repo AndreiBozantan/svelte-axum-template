@@ -121,6 +121,14 @@ async fn health_check(
         api::Error::internal()
     })?;
 
+    #[cfg(feature = "fly")]
+    {
+        if !crate::fly::litestream::is_litestream_healthy() {
+            error!("health_check_failed_litestream_replication_down");
+            return Err(api::Error::internal());
+        }
+    }
+
     let api::Query(query) = query;
     if query.panic {
         healthy_panic();
