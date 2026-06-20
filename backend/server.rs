@@ -79,7 +79,7 @@ async fn start_server() -> Result<(), Error> {
     info!("configs: {:#?}", &settings);
 
     #[cfg(feature = "fly")]
-    init_fly(&settings).await;
+    init_fly(&settings);
 
     let jwt_secret = jwt::get_jwt_secret()?;
     let ctx = common::Context::create(settings, &jwt_secret).await?;
@@ -104,9 +104,11 @@ async fn start_server() -> Result<(), Error> {
 }
 
 #[cfg(feature = "fly")]
-async fn init_fly(settings: &crate::platform::config::AppSettings) {
+fn init_fly(settings: &crate::platform::config::AppSettings) {
+    use crate::fly;
+
     // self-healing volume check — must run before database initialization - no-op when not running on fly.io
-    crate::fly::recovery::check_volume_and_self_heal().await;
+    fly::recovery::check_volume_and_self_heal();
 
     // initialize Litestream replication before database pool connection is established
     let db_path = settings
@@ -114,7 +116,7 @@ async fn init_fly(settings: &crate::platform::config::AppSettings) {
         .url
         .strip_prefix("sqlite:")
         .unwrap_or(&settings.database.url);
-    crate::fly::litestream::init_litestream(db_path);
+    fly::litestream::init_litestream(db_path);
 }
 
 fn start_background_cleanup_tasks(ctx: &common::ArcContext) {

@@ -30,6 +30,17 @@ struct ServiceAccountKey {
     token_uri: String,
 }
 
+async fn get_last_backup_timestamp() -> Option<i64> {
+    let content = tokio::fs::read_to_string("/data/.last_gcs_backup").await.ok()?;
+    content.trim().parse::<i64>().ok()
+}
+
+async fn write_last_backup_timestamp(timestamp: i64) {
+    if let Err(err) = tokio::fs::write("/data/.last_gcs_backup", timestamp.to_string()).await {
+        tracing::error!(error = %err, "failed_to_write_gcs_backup_checkpoint");
+    }
+}
+
 pub fn spawn_gcs_backup_task(pool: sqlx::SqlitePool) {
     let bucket = std::env::var("GCS_BACKUP_BUCKET").ok();
     let key_base64 = std::env::var("GCS_SA_KEY_BASE64").ok();
@@ -42,17 +53,30 @@ pub fn spawn_gcs_backup_task(pool: sqlx::SqlitePool) {
     };
 
     tokio::spawn(async move {
-        // daily interval (24 hours)
-        let mut ticker = tokio::time::interval(time::Duration::from_hours(24));
+        // check every hour to see if a backup is due
+        let mut ticker = tokio::time::interval(time::Duration::from_hours(1));
         ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        // wait a few minutes after startup before running the first backup
+        // wait a few minutes after startup before running the first check
         tokio::time::sleep(time::Duration::from_mins(5)).await;
 
         loop {
             ticker.tick().await;
-            if let Err(err) = run_backup_and_upload(&pool, &bucket, &key_base64).await {
-                tracing::error!(error = %err, "gcs_disaster_recovery_backup_failed");
+
+            let now = chrono::Utc::now().timestamp();
+            let last_backup = get_last_backup_timestamp().await.unwrap_or(0);
+
+            // 24 hours = 86400 seconds
+            if now - last_backup >= 86400 {
+                tracing::info!("starting_scheduled_gcs_backup");
+                match run_backup_and_upload(&pool, &bucket, &key_base64).await {
+                    Ok(()) => {
+                        write_last_backup_timestamp(now).await;
+                    },
+                    Err(err) => {
+                        tracing::error!(error = %err, "gcs_disaster_recovery_backup_failed");
+                    },
+                }
             }
         }
     });
