@@ -22,7 +22,6 @@ pub mod server;
 pub mod fly {
     pub mod backup;
     pub mod litestream;
-    pub mod recovery;
 }
 
 pub mod app {

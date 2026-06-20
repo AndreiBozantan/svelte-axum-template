@@ -3,9 +3,23 @@ use std::process;
 use std::sync;
 use tracing;
 
+const VOLUME_MOUNT: &str = "/data";
 static LITESTREAM_PROCESS: sync::Mutex<Option<process::Child>> = sync::Mutex::new(None);
 
-pub fn init_litestream(db_path: &str) {
+pub fn init(db_path: &str) {
+    let Ok(_) = std::env::var("FLY_APP_NAME") else {
+        tracing::debug!("not_running_on_fly_skipping_volume_check");
+        return;
+    };
+
+    if !is_volume_healthy() {
+        // exit non-zero so Fly's restart policy retries and alerts the operator
+        tracing::error!(mount = VOLUME_MOUNT, "volume_not_mounted_or_unhealthy_aborting_startup");
+        std::process::exit(1);
+    }
+
+    tracing::info!(mount = VOLUME_MOUNT, "volume_mount_healthy");
+
     let litestream_path = path::Path::new("/usr/local/bin/litestream");
     if !litestream_path.exists() {
         tracing::info!("Litestream binary not found at /usr/local/bin/litestream. Skipping replication setup.");
@@ -13,6 +27,7 @@ pub fn init_litestream(db_path: &str) {
     }
 
     // restore database if it does not exist
+    let db_path = db_path.strip_prefix("sqlite:").unwrap_or(db_path);
     let db_file_path = path::Path::new(db_path);
     if !db_file_path.exists() {
         tracing::info!(path = %db_path, "database_file_not_found_attempting_litestream_restore");
@@ -92,4 +107,42 @@ pub fn is_litestream_healthy() -> bool {
             false
         },
     }
+}
+
+/// Determines whether `/data` is a real mounted volume (not just an empty directory
+/// on the container's ephemeral root filesystem) and is writable.
+///
+/// A missing Fly volume mount still leaves `/data` as a writable directory on the root
+/// filesystem, so a simple write test is not sufficient. We compare device IDs of `/data`
+/// and `/` — if they match, `/data` sits on the root filesystem (no volume attached).
+fn is_volume_healthy() -> bool {
+    use std::os::unix::fs::MetadataExt;
+
+    let Ok(volume_meta) = std::fs::metadata(VOLUME_MOUNT) else {
+        return false;
+    };
+
+    let Ok(root_meta) = std::fs::metadata("/") else {
+        return false;
+    };
+
+    // same device ID means /data is on the root filesystem — no volume is mounted
+    if volume_meta.dev() == root_meta.dev() {
+        tracing::warn!(
+            volume_dev = volume_meta.dev(),
+            root_dev = root_meta.dev(),
+            "volume_shares_device_with_root_filesystem"
+        );
+        return false;
+    }
+
+    // confirm the mount is writable
+    let healthcheck_path = format!("{VOLUME_MOUNT}/.healthcheck");
+    if std::fs::write(&healthcheck_path, b"ok").is_err() {
+        tracing::warn!("volume_mount_not_writable");
+        return false;
+    }
+    let _ = std::fs::remove_file(&healthcheck_path);
+
+    true
 }
