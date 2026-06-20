@@ -74,6 +74,7 @@ async fn run_backup_and_upload(
     tracing::info!(path = %tmp_path, "creating_database_snapshot");
 
     // sqlite's VACUUM INTO works on the database connection, creating a consistent snapshot copy
+    // VACUUM INTO does not support bind parameters; tmp_path is safe since is derived from a timestamp
     sqlx::query(&format!("VACUUM INTO '{tmp_path}'")).execute(pool).await?;
 
     // obtain OAuth2 access token from Google Auth Server
