@@ -78,9 +78,8 @@ async fn start_server() -> Result<(), Error> {
     info!("address: http://{}", settings.get_server_address());
     info!("configs: {:#?}", &settings);
 
-    // self-healing volume check — must run before database initialization - no-op when not running on fly.io
     #[cfg(feature = "fly")]
-    crate::platform::fly::recovery::check_volume_and_self_heal().await;
+    init_fly(&settings).await;
 
     let jwt_secret = jwt::get_jwt_secret()?;
     let ctx = common::Context::create(settings, &jwt_secret).await?;
@@ -102,6 +101,20 @@ async fn start_server() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+#[cfg(feature = "fly")]
+async fn init_fly(settings: &crate::platform::config::AppSettings) {
+    // self-healing volume check — must run before database initialization - no-op when not running on fly.io
+    crate::fly::recovery::check_volume_and_self_heal().await;
+
+    // initialize Litestream replication before database pool connection is established
+    let db_path = settings
+        .database
+        .url
+        .strip_prefix("sqlite:")
+        .unwrap_or(&settings.database.url);
+    crate::fly::litestream::init_litestream(db_path);
 }
 
 fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
@@ -135,7 +148,7 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
 
     // GCS backup task for Tier 2 disaster recovery
     #[cfg(feature = "fly")]
-    crate::platform::fly::backup::spawn_gcs_backup_task(ctx.db.clone());
+    crate::fly::backup::spawn_gcs_backup_task(ctx.db.clone());
 }
 
 async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
@@ -161,7 +174,7 @@ async fn shutdown_signal() {
         Ok(()) => {
             info!("graceful shutdown initiated");
             #[cfg(feature = "fly")]
-            crate::platform::fly::litestream::stop_litestream();
+            crate::fly::litestream::stop_litestream();
         },
         Err(error) => error!(%error, "error during shutdown"),
     }

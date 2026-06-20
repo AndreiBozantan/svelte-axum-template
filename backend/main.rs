@@ -18,6 +18,13 @@ pub mod cli;
 pub mod router;
 pub mod server;
 
+#[cfg(feature = "fly")]
+pub mod fly {
+    pub mod backup;
+    pub mod litestream;
+    pub mod recovery;
+}
+
 pub mod app {
     pub mod sample {
         #[path = "sample_api.rs"]
@@ -87,13 +94,6 @@ mod platform {
         pub mod jwt;
         pub mod migrations;
         pub mod rate_limiter;
-    }
-
-    #[cfg(feature = "fly")]
-    pub mod fly {
-        pub mod backup;
-        pub mod litestream;
-        pub mod recovery;
     }
 
     pub use shared::*;
