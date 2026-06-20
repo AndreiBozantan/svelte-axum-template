@@ -28,8 +28,8 @@ abbr -a gcb "git-cleanup-branches"
 
 abbr -a cb "cargo build"
 abbr -a cr "cargo run"
-abbr -a ct "cargo test --workspace"
-abbr -a cc "cargo check --workspace --all-targets && cargo clippy --workspace --all-targets"          
+abbr -a ct "cargo test --workspace --all-features"
+abbr -a cc "cargo check --workspace --all-targets --all-features && cargo clippy --workspace --all-targets --all-features"          
 abbr -a cf "cargo fmt --workspace"
 abbr -a cx "cargo -q xtask"
 abbr -a cxd "cargo -q xtask dev"
@@ -133,34 +133,7 @@ fi
 
 echo "Fish configuration complete."
 
-# Configure Antigravity CLI Hooks
-echo "Configuring Antigravity CLI Hooks..."
-mkdir -p /home/vscode/.gemini/config
-mkdir -p /home/vscode/.gemini/antigravity-cli
-cat << 'EOF' > /home/vscode/.gemini/config/hooks.json
-{
-  "rust-post-edit-validation": {
-    "enabled": true,
-    "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/workspaces/svelaxum/.agents/post_tool_hook.sh",
-            "timeout": 120
-          }
-        ]
-      }
-    ]
-  }
-}
-EOF
-if [ ! -e /home/vscode/.gemini/antigravity-cli/hooks.json ] || [ "$(realpath /home/vscode/.gemini/config/hooks.json)" != "$(realpath /home/vscode/.gemini/antigravity-cli/hooks.json)" ]; then
-  cp /home/vscode/.gemini/config/hooks.json /home/vscode/.gemini/antigravity-cli/hooks.json
-fi
-chmod +x /workspaces/svelaxum/.agents/post_tool_hook.sh
-echo "Antigravity CLI Hooks configured."
+
 
 # Configure Antigravity CLI Permissions (Auto-Approve safe tools)
 echo "Configuring Antigravity CLI Permissions..."
@@ -171,7 +144,13 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
     "allow": [
       "read_file(/workspaces/svelaxum)",
       "write_file(/workspaces/svelaxum)",
-      "command(git)",
+      // Non-destructive and local Git actions
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(git show)",
+      "command(git rev-parse)",
+      // Full developer workflow commands
       "command(cargo)",
       "command(npm)",
       "command(npx)",
@@ -190,10 +169,25 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
       "command(jq)",
       "command(ps)",
       "command(date)"
+    ],
+    "deny": [
+      // Protect the remote repository from push actions
+      "command(git push)"
+    ],
+    "ask": [
+      "command(git checkout)",
+      "command(git add)",
+      "command(git commit)",
+      "command(git branch)",
+      "command(git stash)",
+      "command(git pull)",
+      "command(git fetch)",
+      "command(git merge)",
+      // Prevent accidental loss of local modifications
+      "command(git reset)",
+      "command(git clean)"
     ]
   }
 }
 EOF
-echo "Antigravity CLI Permissions configured."
-
 
