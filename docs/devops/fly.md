@@ -43,50 +43,22 @@ graph TD
 
 ## 2. Initial Infrastructure & Configuration Setup
 
-### A. App Configuration (`fly.toml`)
+### A. App Configurations (`fly.toml` & `fly-staging.toml`)
 
-```toml
-app = "svelaxum"
-primary_region = "fra"
+To manage different scaling and behavior policies for staging and production in parallel, the project uses two configuration files. The staging configuration allows Fly.io to automatically suspend machines when idle to save resources, while production ensures the machine stays running constantly.
 
-[build]
-  dockerfile = "Dockerfile.prod"
+Use the `-c` / `--config` flag to target the desired environment:
 
-[mounts]
-  source = "svelaxum_data"
-  destination = "/data"
-
-[http_service]
-  internal_port = 3000
-  force_https = true
-  auto_stop_machines = "off"
-  auto_start_machines = true
-  min_machines_running = 1
-
-[[http_service.checks]]
-  interval = "30s"
-  timeout = "5s"
-  grace_period = "30s"
-  method = "GET"
-  path = "/api/health"
-
-[[restart]]
-  policy = "on-failure"
-  retries = 10
-  processes = ["app"]
-
-[[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
-  processes = ["app"]
-```
+- **Production**: Default config using [fly.toml](/fly.toml) (`fly deploy`)
+- **Staging**: Config using [fly-staging.toml](/fly-staging.toml) (`fly deploy -c fly-staging.toml`)
 
 #### Detailed Configuration Breakdown
 
 - **`[mounts]`**: Tells Fly to find the volume named `svelaxum_data` in the deployment region and mount it at `/data` before the app starts.
-- **`min_machines_running = 1`**: Keeps at least one Machine running; for a volume-backed app you can only sensibly run one Machine anyway (see Section 1), so this should always be `1`, never `0`.
-- **`auto_start_machines = true`**: Lets the proxy start a stopped Machine on incoming traffic.
-- **`[[http_service.checks]]`**: A platform health check. Fly pings `/api/health` every 30 seconds. If it fails, Fly stops routing to that Machine — **but does not restart, stop, or replace it**. This is the gap the watchdog (Section 5) fills.
+- **`auto_stop_machines = "off"` (Production)** / **`"suspend"` (Staging)**: In production, the single Machine is kept alive. In staging, Fly stops/suspends the Machine when there is no incoming traffic to reduce billing, and automatically resumes it on new requests.
+- **`min_machines_running = 1` (Production)** / **`0` (Staging)**: Production guarantees at least 1 Machine remains running, whereas staging allows the active Machine count to drop to `0` when idle.
+- **`auto_start_machines = true`**: Lets the proxy start a stopped/suspended Machine on incoming traffic.
+- **`[[http_service.checks]]`**: A platform health check. Fly pings `/api/health` every 30 seconds. If it fails, Fly stops routing to that Machine — **but does not restart, stop, or replace it**. This is the gap the watchdog (Section 4) fills.
 - **`[restart] policy = "on-failure"`**: If your app process crashes (non-zero exit), Fly retries starting it on the _same_ Machine/volume, up to 10 times, before giving up. This handles app-level crashes — it does **not** help if the underlying host itself is gone, since the Machine can't restart on hardware that no longer exists.
 
 ### B. Boot Order & Health Checks
@@ -148,15 +120,15 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     fly apps create svelaxum-staging
     ```
 2. **Create the staging volume**:
-   The volume name must match the `source` specified in [fly.toml](/fly.toml) (`svelaxum_data`):
+   Specify the staging config file (`-c fly-staging.toml`) so that it automatically associates with the staging app:
     ```bash
-    fly volume create svelaxum_data --app svelaxum-staging --region fra --size 3
+    fly volume create svelaxum_data --region fra --size 3 -c fly-staging.toml
     ```
 3. **Create the staging Tigris bucket**:
    Never point staging at your production Tigris bucket, as staging database writes would corrupt the production replication stream.
 
     ```bash
-    fly storage create --app svelaxum-staging
+    fly storage create -c fly-staging.toml
     ```
 
     This sets up a separate staging bucket and registers the staging AWS/Tigris secrets automatically on `svelaxum-staging`.
@@ -169,7 +141,6 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     # Note the registry image URI, e.g. registry.fly.io/svelaxum:deployment-01J0Z...
 
     fly machine run \
-      --app svelaxum-staging \
       --region fra \
       --entrypoint "/usr/local/bin/litestream" \
       --volume svelaxum_data:/data \
@@ -178,6 +149,7 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
       -e AWS_SECRET_ACCESS_KEY="<prod_secret_key>" \
       -e AWS_ENDPOINT_URL_S3="https://fly.storage.tigris.dev" \
       -e BUCKET_NAME="<prod-bucket-name>" \
+      -c fly-staging.toml \
       <your-registry-image-uri> \
       restore -o /data/db.sqlite /data/db.sqlite
     ```
@@ -187,9 +159,10 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     - The `-e` flags pass production secrets only to this temporary container's environment (without saving them as secrets on staging).
 
 5. **Deploy and verify staging**:
+   Deploy using the staging configuration file:
     ```bash
-    fly deploy --app svelaxum-staging
-    fly logs --app svelaxum-staging
+    fly deploy -c fly-staging.toml
+    fly logs -c fly-staging.toml
     ```
 
 ---
@@ -431,8 +404,8 @@ cargo clippy --workspace --all-targets --features fly
 ### Step 3: Deploy to Staging First
 
 ```bash
-fly deploy --app svelaxum-staging
-fly logs --app svelaxum-staging
+fly deploy -c fly-staging.toml
+fly logs -c fly-staging.toml
 ```
 
 ### Step 4: Promote to Production
