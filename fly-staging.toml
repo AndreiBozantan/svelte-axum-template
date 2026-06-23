@@ -1,11 +1,11 @@
-app = "svelaxum-staging"
+app = "registrul-staging"
 primary_region = "fra"
 
 [build]
   dockerfile = "Dockerfile.prod"
 
 [mounts]
-  source = "svelaxum_data"
+  source = "registrul_data"
   destination = "/data"
 
 [http_service]

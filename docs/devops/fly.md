@@ -1,6 +1,6 @@
 # Fly.io Deployment, Backups, and Recovery Guide
 
-This guide covers deploying svelaxum to Fly.io with SQLite, setting up a two-tier backup strategy, and building real automated recovery using GCP as an independent watchdog. It explains **why** each step exists and **what Fly.io actually does and doesn't do** — several commonly-repeated claims about Fly's "auto-recovery" features turn out not to apply to volume-backed apps, so this guide is explicit about where the boundary is.
+This guide covers deploying registrul to Fly.io with SQLite, setting up a two-tier backup strategy, and building real automated recovery using GCP as an independent watchdog. It explains **why** each step exists and **what Fly.io actually does and doesn't do** — several commonly-repeated claims about Fly's "auto-recovery" features turn out not to apply to volume-backed apps, so this guide is explicit about where the boundary is.
 
 ---
 
@@ -54,7 +54,7 @@ Use the `-c` / `--config` flag to target the desired environment:
 
 #### Detailed Configuration Breakdown
 
-- **`[mounts]`**: Tells Fly to find the volume named `svelaxum_data` in the deployment region and mount it at `/data` before the app starts.
+- **`[mounts]`**: Tells Fly to find the volume named `registrul_data` in the deployment region and mount it at `/data` before the app starts.
 - **`auto_stop_machines = "off"` (Production)** / **`"suspend"` (Staging)**: In production, the single Machine is kept alive. In staging, Fly stops/suspends the Machine when there is no incoming traffic to reduce billing, and automatically resumes it on new requests.
 - **`min_machines_running = 1` (Production)** / **`0` (Staging)**: Production guarantees at least 1 Machine remains running, whereas staging allows the active Machine count to drop to `0` when idle.
 - **`auto_start_machines = true`**: Lets the proxy start a stopped/suspended Machine on incoming traffic.
@@ -99,7 +99,7 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     ```bash
     fly storage create
     ```
-    Follow the prompt to name the bucket (e.g. `svelaxum-replica`).
+    Follow the prompt to name the bucket (e.g. `registrul-replica`).
 2. **Fly.io Automated Secrets**: This command automatically sets five environment variables on your Fly.io app:
     - `AWS_ACCESS_KEY_ID`
     - `AWS_SECRET_ACCESS_KEY`
@@ -117,12 +117,12 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
 
 1. **Create the staging app**:
     ```bash
-    fly apps create svelaxum-staging
+    fly apps create registrul-staging
     ```
 2. **Create the staging volume**:
    Specify the staging config file (`-c fly-staging.toml`) so that it automatically associates with the staging app:
     ```bash
-    fly volume create svelaxum_data --region fra --size 3 -c fly-staging.toml
+    fly volume create registrul_data --region fra --size 3 -c fly-staging.toml
     ```
 3. **Create the staging Tigris bucket**:
    Never point staging at your production Tigris bucket, as staging database writes would corrupt the production replication stream.
@@ -131,19 +131,19 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     fly storage create -c fly-staging.toml
     ```
 
-    This sets up a separate staging bucket and registers the staging AWS/Tigris secrets automatically on `svelaxum-staging`.
+    This sets up a separate staging bucket and registers the staging AWS/Tigris secrets automatically on `registrul-staging`.
 
 4. **One-time production data restore to staging (optional)**:
    Since the production image is distroless (no shell), you can't SSH in to inspect or copy files directly. To copy production database data to staging, run a temporary Machine overriding the entrypoint to execute Litestream's restore command:
 
     ```bash
-    fly image show --app svelaxum
-    # Note the registry image URI, e.g. registry.fly.io/svelaxum:deployment-01J0Z...
+    fly image show --app registrul
+    # Note the registry image URI, e.g. registry.fly.io/registrul:deployment-01J0Z...
 
     fly machine run \
       --region fra \
       --entrypoint "/usr/local/bin/litestream" \
-      --volume svelaxum_data:/data \
+      --volume registrul_data:/data \
       --rm \
       -e AWS_ACCESS_KEY_ID="<prod_access_key>" \
       -e AWS_SECRET_ACCESS_KEY="<prod_secret_key>" \
@@ -171,11 +171,11 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
 
 1. **Create the production volume**:
     ```bash
-    fly volume create svelaxum_data --region fra --size 3
+    fly volume create registrul_data --region fra --size 3
     ```
 2. **Set up GCS daily backup (Disaster Recovery Tier)**:
    Since daily snapshots to Google Cloud Storage are production-only, perform GCS resource setup now:
-    - Create a GCS bucket (e.g., `svelaxum-disaster-recovery`).
+    - Create a GCS bucket (e.g., `registrul-disaster-recovery`).
     - Create a Google Service Account in your Google Cloud Console with the **Storage Object Creator** permission scoped to just that bucket.
     - Download the Service Account private key in JSON format.
     - Base64-encode it so it can be passed as a single-line secret:
@@ -187,7 +187,7 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
 
     ```bash
     fly secrets set \
-      GCS_BACKUP_BUCKET="svelaxum-disaster-recovery" \
+      GCS_BACKUP_BUCKET="registrul-disaster-recovery" \
       GCS_SA_KEY_BASE64="<your_base64_encoded_json_key>"
     ```
 
@@ -199,7 +199,7 @@ Litestream provides real-time replication to Fly's S3-compatible storage (Tigris
     ```bash
     fly deploy
     ```
-    With no `--app` flag, `fly deploy` reads `app = "svelaxum"` from [fly.toml](/fly.toml) and targets production by default.
+    With no `--app` flag, `fly deploy` reads `app = "registrul"` from [fly.toml](/fly.toml) and targets production by default.
 
 ## 4. Automated Recovery Watchdog (GCP Cloud Scheduler + Cloud Run)
 
@@ -212,10 +212,10 @@ A watchdog that lives inside Fly shares Fly's own failure modes — if there's a
 Don't reuse your personal `fly auth login` token for this — create one limited to managing just this app:
 
 ```bash
-fly tokens create deploy --app svelaxum --name "gcp-watchdog" --expiry 8760h
+fly tokens create deploy --app registrul --name "gcp-watchdog" --expiry 8760h
 ```
 
-This token can manage `svelaxum` and its Machines, but nothing else in your Fly account. Save the output — store it in Google Secret Manager in the next step.
+This token can manage `registrul` and its Machines, but nothing else in your Fly account. Save the output — store it in Google Secret Manager in the next step.
 
 ### Step 2: Store the token in Secret Manager
 
@@ -236,9 +236,9 @@ import urllib.request
 import json
 
 FLY_API = "https://api.machines.dev/v1"
-APP = "svelaxum"
+APP = "registrul"
 REGION = "fra"
-HEALTH_URL = "https://svelaxum.fly.dev/api/health"
+HEALTH_URL = "https://registrul.fly.dev/api/health"
 FLY_TOKEN = os.environ["FLY_API_TOKEN"]
 STATE_BUCKET = os.environ["WATCHDOG_STATE_BUCKET"]  # GCS bucket to persist failure streak
 
@@ -330,7 +330,7 @@ def main():
         new_volume = fly_request(
             f"/apps/{APP}/volumes",
             method="POST",
-            body={"name": "svelaxum_data", "region": REGION, "size_gb": 3},
+            body={"name": "registrul_data", "region": REGION, "size_gb": 3},
         )
         image = primary["config"]["image"] if primary else os.environ["FALLBACK_IMAGE"]
         create_replacement_machine(image, new_volume["id"])
@@ -354,10 +354,10 @@ A few deliberate design choices here, worth understanding rather than just pasti
 ### Step 4: Deploy the Cloud Run job
 
 ```bash
-gcloud run jobs create svelaxum-watchdog \
+gcloud run jobs create registrul-watchdog \
   --source . \
   --region us-central1 \
-  --set-env-vars APP=svelaxum,REGION=fra,WATCHDOG_STATE_BUCKET=svelaxum-watchdog-state \
+  --set-env-vars APP=registrul,REGION=fra,WATCHDOG_STATE_BUCKET=registrul-watchdog-state \
   --set-secrets FLY_API_TOKEN=fly-watchdog-token:latest \
   --max-retries 0 \
   --task-timeout 30s
@@ -366,10 +366,10 @@ gcloud run jobs create svelaxum-watchdog \
 ### Step 5: Schedule it
 
 ```bash
-gcloud scheduler jobs create http svelaxum-watchdog-trigger \
+gcloud scheduler jobs create http registrul-watchdog-trigger \
   --location us-central1 \
   --schedule "* * * * *" \
-  --uri "https://us-central1-run.googleapis.com/apps/<project-id>/jobs/svelaxum-watchdog:run" \
+  --uri "https://us-central1-run.googleapis.com/apps/<project-id>/jobs/registrul-watchdog:run" \
   --oauth-service-account-email <your-run-invoker-sa>@<project-id>.iam.gserviceaccount.com
 ```
 
@@ -438,7 +438,7 @@ fly logs | grep "starting_litestream_replication"
 fly logs | grep "starting_scheduled_gcs_backup"
 ```
 
-It's worth also occasionally checking the GCP side — confirm `gcloud scheduler jobs describe svelaxum-watchdog-trigger` shows recent successful runs, and that `watchdog-streak.json` in your state bucket resets to `0` regularly (a streak that's stuck above 0 without ever triggering recovery means something in the watchdog logic itself needs attention).
+It's worth also occasionally checking the GCP side — confirm `gcloud scheduler jobs describe registrul-watchdog-trigger` shows recent successful runs, and that `watchdog-streak.json` in your state bucket resets to `0` regularly (a streak that's stuck above 0 without ever triggering recovery means something in the watchdog logic itself needs attention).
 
 ---
 
@@ -457,7 +457,7 @@ fly release rollback <release-number>
 fly machine run \
   --region fra \
   --entrypoint "/usr/local/bin/litestream" \
-  --volume svelaxum_data:/data \
+  --volume registrul_data:/data \
   --rm \
   -e AWS_ACCESS_KEY_ID="<prod_access_key>" \
   -e AWS_SECRET_ACCESS_KEY="<prod_secret_key>" \

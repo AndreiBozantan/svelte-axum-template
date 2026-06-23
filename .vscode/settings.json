@@ -25,6 +25,7 @@
         "pipefail",
         "pkce",
         "Referer",
+        "registrul",
         "reqwest",
         "rfind",
         "rngs",
