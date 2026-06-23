@@ -15,6 +15,7 @@
         "distroless",
         "dotenvy",
         "exfiltrated",
+        "Flyctl",
         "fuser",
         "healthcheck",
         "jsonwebtoken",

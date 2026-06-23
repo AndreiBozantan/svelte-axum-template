@@ -35,6 +35,9 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
 COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 \
     /uv /usr/local/bin/uv
 
+# Install Flyctl (Fly.io CLI)
+RUN curl -L https://fly.io/install.sh | FLYCTL_INSTALL=/usr/local sh
+
 # Setup User and Shell
 RUN usermod -s /usr/bin/fish vscode
 USER vscode
