@@ -34,7 +34,7 @@ graph TD
 
     L[GCP Cloud Scheduler, every 1 min] --> M[Cloud Run job: check /api/health]
     M -->|3 consecutive failures| N[Call Fly Machines API: create replacement Machine]
-    N --> O[New Machine boots, runs init_litestream, restores DB]
+    N --> O[New Machine boots, runs litestream::init, restores DB]
 ```
 
 **Important honesty note:** even with the watchdog, this is not zero-downtime, instantaneous failover. There will be a gap between host failure and a new Machine being healthy — realistically low single-digit minutes, dominated by detection time plus Machine boot plus `litestream restore`. If you need sub-second failover with no data loss window, that requires a fundamentally different architecture (a real multi-writer-aware replicated database, or LiteFS with Consul — which Fly itself flags as unsupported beta software not meant for production reliance, and which is incompatible with autostop/autostart). For a solo project on SQLite, what's below is the most automation you can responsibly build without taking on that complexity.
@@ -91,9 +91,14 @@ primary_region = "fra"
 
 ### B. Boot Order & Health Checks
 
-1. **Startup check**: `recovery.rs` runs `check_volume()`. If `/data` is on the ephemeral root device or is read-only, it fails fast and exits with code `1`.
-2. **Litestream restore**: `litestream.rs` runs `init_litestream()`. If the database file is missing from `/data` (e.g. this is a brand-new volume), it runs `litestream restore -if-replica-exists` to rebuild the DB from the Tigris replica.
-3. **Service launch**: Axum starts serving traffic and monitors Litestream's subprocess health via `is_litestream_healthy()`.
+1. **Startup Volume & Litestream Initialization**: At startup (under the `fly` feature flag), [server::run](file:///workspaces/registrul/backend/server.rs#L82) calls [litestream::init](file:///workspaces/registrul/backend/fly/litestream.rs#L9-L66).
+    - **Volume Check**: Internally, `is_volume_healthy()` is run to determine if `/data` sits on the ephemeral root device (by comparing device IDs of `/data` and `/`) or is read-only/unwritable. If unhealthy, it fails fast and exits with code `1`.
+    - **Litestream Restore**: If the database file is missing from `/data` (e.g., this is a brand-new volume), it runs `litestream restore -if-replica-exists` to rebuild the DB from the Tigris replica.
+        - **Fail-Safe Behavior**: If the restore command fails (returns a non-zero exit status due to network error, credential issue, etc.), the application **aborts startup** (`exit(1)`) to prevent starting with an empty database and causing silent data loss or split-brain/replica generation conflicts.
+        - **First Run**: On a clean initial deployment where no replica exists, the `-if-replica-exists` flag causes the restore command to exit gracefully with code `0`. The application continues booting, SQLx creates the new database file, and the background `litestream replicate` process initializes the Tigris replica.
+    - **Replication Process**: Spawns the `litestream replicate` subprocess in the background to replicate database updates.
+2. **Service Launch & Daily Backup Task**: Axum starts serving HTTP traffic. Once the server is running, [server::start_background_cleanup_tasks](file:///workspaces/registrul/backend/server.rs#L106-L138) spawns the Tier 2 daily backup task via [backup::spawn_gcs_backup_task](file:///workspaces/registrul/backend/fly/backup.rs#L44-L83).
+3. **Continuous Health Monitoring**: The `/api/health` endpoint ([router::health_check](file:///workspaces/registrul/backend/router.rs#L115-L140)) performs a standard database check (`SELECT 1`). If the `fly` feature is active, it also queries [litestream::is_litestream_healthy](file:///workspaces/registrul/backend/fly/litestream.rs#L80-L110) to confirm the replication subprocess is running.
 
 This boot sequence is exactly what lets the watchdog in Section 5 work: any _fresh_ Machine that boots against a _fresh, empty_ volume will automatically self-restore from the replica without manual intervention. That part of your design is already correct — what was missing was the trigger to create that fresh Machine in the first place.
 
