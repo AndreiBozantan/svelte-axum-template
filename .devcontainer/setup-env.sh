@@ -144,13 +144,11 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
     "allow": [
       "read_file(/workspaces/svelaxum)",
       "write_file(/workspaces/svelaxum)",
-      // Non-destructive and local Git actions
       "command(git status)",
       "command(git diff)",
       "command(git log)",
       "command(git show)",
       "command(git rev-parse)",
-      // Full developer workflow commands
       "command(cargo)",
       "command(npm)",
       "command(npx)",
@@ -171,7 +169,6 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
       "command(date)"
     ],
     "deny": [
-      // Protect the remote repository from push actions
       "command(git push)"
     ],
     "ask": [
@@ -183,7 +180,6 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
       "command(git pull)",
       "command(git fetch)",
       "command(git merge)",
-      // Prevent accidental loss of local modifications
       "command(git reset)",
       "command(git clean)"
     ]
