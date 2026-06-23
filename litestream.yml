@@ -2,8 +2,8 @@ dbs:
   - path: /data/db.sqlite
     replicas:
       - type: s3
-        endpoint: ${LITESTREAM_ENDPOINT}
-        bucket: ${LITESTREAM_BUCKET}
+        endpoint: ${AWS_ENDPOINT_URL_S3}
+        bucket: ${BUCKET_NAME}
         path: db.sqlite
         access-key-id: ${AWS_ACCESS_KEY_ID}
         secret-access-key: ${AWS_SECRET_ACCESS_KEY}
