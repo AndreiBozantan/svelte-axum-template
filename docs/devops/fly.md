@@ -91,142 +91,144 @@ primary_region = "fra"
 
 ### B. Boot Order & Health Checks
 
-1. **Startup Volume & Litestream Initialization**: At startup (under the `fly` feature flag), [server::run](file:///workspaces/registrul/backend/server.rs#L82) calls [litestream::init](file:///workspaces/registrul/backend/fly/litestream.rs#L9-L66).
+1. **Startup Volume & Litestream Initialization**: At startup (under the `fly` feature flag), [server::run](/backend/server.rs#L82) calls [litestream::init](/backend/fly/litestream.rs#L9-L66).
     - **Volume Check**: Internally, `is_volume_healthy()` is run to determine if `/data` sits on the ephemeral root device (by comparing device IDs of `/data` and `/`) or is read-only/unwritable. If unhealthy, it fails fast and exits with code `1`.
     - **Litestream Restore**: If the database file is missing from `/data` (e.g., this is a brand-new volume), it runs `litestream restore -if-replica-exists` to rebuild the DB from the Tigris replica.
         - **Fail-Safe Behavior**: If the restore command fails (returns a non-zero exit status due to network error, credential issue, etc.), the application **aborts startup** (`exit(1)`) to prevent starting with an empty database and causing silent data loss or split-brain/replica generation conflicts.
         - **First Run**: On a clean initial deployment where no replica exists, the `-if-replica-exists` flag causes the restore command to exit gracefully with code `0`. The application continues booting, SQLx creates the new database file, and the background `litestream replicate` process initializes the Tigris replica.
     - **Replication Process**: Spawns the `litestream replicate` subprocess in the background to replicate database updates.
-2. **Service Launch & Daily Backup Task**: Axum starts serving HTTP traffic. Once the server is running, [server::start_background_cleanup_tasks](file:///workspaces/registrul/backend/server.rs#L106-L138) spawns the Tier 2 daily backup task via [backup::spawn_gcs_backup_task](file:///workspaces/registrul/backend/fly/backup.rs#L44-L83).
-3. **Continuous Health Monitoring**: The `/api/health` endpoint ([router::health_check](file:///workspaces/registrul/backend/router.rs#L115-L140)) performs a standard database check (`SELECT 1`). If the `fly` feature is active, it also queries [litestream::is_litestream_healthy](file:///workspaces/registrul/backend/fly/litestream.rs#L80-L110) to confirm the replication subprocess is running.
+2. **Service Launch & Daily Backup Task**: Axum starts serving HTTP traffic. Once the server is running, [server::start_background_cleanup_tasks](/backend/server.rs#L106-L138) spawns the Tier 2 daily backup task via [backup::spawn_gcs_backup_task](/backend/fly/backup.rs#L44-L83).
+3. **Continuous Health Monitoring**: The `/api/health` endpoint ([router::health_check](/backend/router.rs#L115-L140)) performs a standard database check (`SELECT 1`). If the `fly` feature is active, it also queries [litestream::is_litestream_healthy](/backend/fly/litestream.rs#L80-L110) to confirm the replication subprocess is running.
 
-This boot sequence is exactly what lets the watchdog in Section 5 work: any _fresh_ Machine that boots against a _fresh, empty_ volume will automatically self-restore from the replica without manual intervention. That part of your design is already correct — what was missing was the trigger to create that fresh Machine in the first place.
-
----
-
-## 3. External Backup Setup & Secrets Configuration
-
-### Tier 1: Litestream Setup (Fly.io Tigris Storage)
-
-1. **Create the bucket** (run from your project directory, after `fly launch` has registered the app):
-
-    ```bash
-    fly storage create
-    ```
-
-    Follow the prompt to name the bucket (e.g. `svelaxum-replica`).
-
-2. **What this actually sets.** `fly storage create` automatically sets **five** secrets on your app, not three:
-    - `AWS_ACCESS_KEY_ID`
-    - `AWS_SECRET_ACCESS_KEY`
-    - `AWS_ENDPOINT_URL_S3` (always `https://fly.storage.tigris.dev`)
-    - `AWS_REGION` (always `auto`)
-    - `BUCKET_NAME`
-
-    **Save the access key and secret immediately if shown in plain text in your terminal** — `fly secrets list` only shows hashes afterward, so if you lose them you'll need to rotate the bucket credentials, not just look them up.
-
-3. **Map to the variable names your code expects.** Your `litestream.yml` and `litestream.rs` read `LITESTREAM_ENDPOINT` and `LITESTREAM_BUCKET` — these are not secrets Fly sets for you, so you set them yourself, pointing at the Tigris bucket Fly just created:
-    ```bash
-    fly secrets set \
-      LITESTREAM_ENDPOINT="https://fly.storage.tigris.dev" \
-      LITESTREAM_BUCKET="<your-generated-tigris-bucket-name>"
-    ```
-    Litestream itself reads AWS-style credentials from the standard `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars that `fly storage create` already set — you don't need to duplicate those under a `LITESTREAM_` prefix. Keep one canonical set of names (`LITESTREAM_ENDPOINT` / `LITESTREAM_BUCKET` + the `AWS_*` credential vars) and use it consistently everywhere in this guide, including staging and the watchdog's recovery calls — don't introduce a second naming scheme later (the original draft of this guide accidentally did, mixing in `LITESTREAM_ACCESS_KEY_ID` / `LITESTREAM_REPLICA_BUCKET` style names in later sections; that's been fixed throughout below).
-
-### Tier 2: GCS Daily Backup Setup
-
-1. Create a GCS bucket (e.g. `svelaxum-disaster-recovery`).
-2. Create a Google Service Account with `Storage Object Admin` or `Storage Object Creator` permission, scoped to just that bucket if possible.
-3. Download the Service Account key in JSON format.
-4. Base64-encode it:
-    ```bash
-    cat gcs-sa-key.json | base64 -w 0
-    ```
-
-`backup.rs` uses a checkpoint file (`/data/.last_gcs_backup`) so the daily GCS snapshot only fires once per 24 hours, regardless of container restarts.
+This boot sequence is exactly what lets the watchdog in Section 4 work: any _fresh_ Machine that boots against a _fresh, empty_ volume will automatically self-restore from the replica without manual intervention. That part of your design is already correct — what was missing was the trigger to create that fresh Machine in the first place.
 
 ---
 
-## 4. Step-by-Step Initial Deployment Guide (Staging-First)
+## 3. Step-by-Step Initial Deployment Guide (Staging-First)
+
+This section guides you through the initial setup, including provisioning Tigris S3 replication, deploying your staging environment, setting up Google Cloud Storage (GCS) for production daily backups, and deploying your production environment.
 
 ### Step 1: Login and App Initialization
+
+First, log in to Fly.io and register your application. Run these commands from your project root:
 
 ```bash
 fly auth login
 fly launch --no-deploy
 ```
 
-`fly launch --no-deploy` reads your local `fly.toml`, registers the app name on your Fly account, and sets up the default region — without deploying yet.
+`fly launch --no-deploy` reads your local [fly.toml](/fly.toml), registers the application name on your Fly.io account, and initializes configuration without deploying yet.
 
-### Step 2: Set up the Staging Environment
+### Step 2: Set up Litestream Backup (Tigris)
 
-1. **Create the staging app:**
+Litestream provides real-time replication to Fly's S3-compatible storage (Tigris).
+
+1. **Create the Tigris bucket**:
+    ```bash
+    fly storage create
+    ```
+    Follow the prompt to name the bucket (e.g. `svelaxum-replica`).
+2. **Fly.io Automated Secrets**: This command automatically sets five environment variables on your Fly.io app:
+    - `AWS_ACCESS_KEY_ID`
+    - `AWS_SECRET_ACCESS_KEY`
+    - `AWS_ENDPOINT_URL_S3` (always `https://fly.storage.tigris.dev`)
+    - `AWS_REGION` (always `auto`)
+    - `BUCKET_NAME`
+
+    _Important: Save the access key and secret immediately if printed in your terminal. `fly secrets list` only displays hashes, so you cannot retrieve them later._
+
+3. **Zero-Configuration Mapping**: Because we configured [litestream.yml](/litestream.yml) to read standard environment variables (`AWS_ENDPOINT_URL_S3` and `BUCKET_NAME`), **you do not need to manually map or set any custom litestream environment variables**.
+
+---
+
+### Step 3: Set up the Staging Environment
+
+1. **Create the staging app**:
     ```bash
     fly apps create svelaxum-staging
     ```
-2. **Create the staging volume.** The name must match `source` in `fly.toml` (`svelaxum_data`):
+2. **Create the staging volume**:
+   The volume name must match the `source` specified in [fly.toml](/fly.toml) (`svelaxum_data`):
     ```bash
-    fly volume create svelaxum_data --app svelaxum-staging --region ord --size 3
+    fly volume create svelaxum_data --app svelaxum-staging --region fra --size 3
     ```
-3. **Create a separate staging bucket and point staging at it** — never point staging at your production Tigris bucket, or staging writes will corrupt production's replication stream:
+3. **Create the staging Tigris bucket**:
+   Never point staging at your production Tigris bucket, as staging database writes would corrupt the production replication stream.
+
     ```bash
     fly storage create --app svelaxum-staging
-    # then, using the bucket it creates:
-    fly secrets set --app svelaxum-staging \
-      LITESTREAM_ENDPOINT="https://fly.storage.tigris.dev" \
-      LITESTREAM_BUCKET="<staging-bucket-name>"
     ```
-4. **One-time production data restore to staging (optional, safe copy).** Since `Dockerfile.prod` is distroless (no shell), you can't SSH in to copy files directly. Instead, run a temporary one-off Machine that overrides the entrypoint to run Litestream directly, restoring from the _production_ bucket into the _staging_ volume:
+
+    This sets up a separate staging bucket and registers the staging AWS/Tigris secrets automatically on `svelaxum-staging`.
+
+4. **One-time production data restore to staging (optional)**:
+   Since the production image is distroless (no shell), you can't SSH in to inspect or copy files directly. To copy production database data to staging, run a temporary Machine overriding the entrypoint to execute Litestream's restore command:
 
     ```bash
     fly image show --app svelaxum
-    # note the registry image URI, e.g. registry.fly.io/svelaxum:deployment-01J0Z...
+    # Note the registry image URI, e.g. registry.fly.io/svelaxum:deployment-01J0Z...
 
     fly machine run \
       --app svelaxum-staging \
-      --region ord \
+      --region fra \
       --entrypoint "/usr/local/bin/litestream" \
       --volume svelaxum_data:/data \
       --rm \
       -e AWS_ACCESS_KEY_ID="<prod_access_key>" \
       -e AWS_SECRET_ACCESS_KEY="<prod_secret_key>" \
-      -e LITESTREAM_ENDPOINT="https://fly.storage.tigris.dev" \
-      -e LITESTREAM_BUCKET="<prod-bucket-name>" \
+      -e AWS_ENDPOINT_URL_S3="https://fly.storage.tigris.dev" \
+      -e BUCKET_NAME="<prod-bucket-name>" \
       <your-registry-image-uri> \
-      restore -o /data/svelaxum.db /data/svelaxum.db
+      restore -o /data/db.sqlite /data/db.sqlite
     ```
 
     - `--entrypoint` bypasses your app binary and runs Litestream directly.
     - `--rm` destroys this temporary Machine automatically once the restore finishes.
-    - The `-e` flags are scoped only to this one-off Machine — they don't touch your staging app's persistent secrets.
+    - The `-e` flags pass production secrets only to this temporary container's environment (without saving them as secrets on staging).
 
-5. **Deploy and verify staging:**
+5. **Deploy and verify staging**:
     ```bash
     fly deploy --app svelaxum-staging
     fly logs --app svelaxum-staging
     ```
 
-### Step 3: Set up the Production Environment
-
-```bash
-fly volume create svelaxum_data --region ord --size 3
-fly secrets set \
-  GCS_BACKUP_BUCKET="svelaxum-disaster-recovery" \
-  GCS_SA_KEY_BASE64="<your_base64_encoded_json_key>"
-# LITESTREAM_ENDPOINT / LITESTREAM_BUCKET and the AWS_* credentials were already
-# set in Section 3 when you ran `fly storage create` for the production app.
-fly deploy
-```
-
-With no `--app` flag, `fly deploy` reads `app = "svelaxum"` from `fly.toml` and targets production by default.
-
-### Step 4: Automated Recovery Watchdog (GCP)
-
-This replaces the manual "clone a standby Machine" approach with something that actually triggers automatically. Full setup is in **Section 5** below — come back here once that's running, since it depends on a Fly API token and your app/volume names already existing.
-
 ---
 
-## 5. Automated Recovery Watchdog (GCP Cloud Scheduler + Cloud Run)
+### Step 4: Set up the Production Environment
+
+1. **Create the production volume**:
+    ```bash
+    fly volume create svelaxum_data --region fra --size 3
+    ```
+2. **Set up GCS daily backup (Disaster Recovery Tier)**:
+   Since daily snapshots to Google Cloud Storage are production-only, perform GCS resource setup now:
+    - Create a GCS bucket (e.g., `svelaxum-disaster-recovery`).
+    - Create a Google Service Account in your Google Cloud Console with the **Storage Object Creator** permission scoped to just that bucket.
+    - Download the Service Account private key in JSON format.
+    - Base64-encode it so it can be passed as a single-line secret:
+        ```bash
+        cat gcs-sa-key.json | base64 -w 0
+        ```
+3. **Set production disaster recovery secrets**:
+   Set the GCS backup bucket and base64-encoded credentials as secrets on the production app:
+
+    ```bash
+    fly secrets set \
+      GCS_BACKUP_BUCKET="svelaxum-disaster-recovery" \
+      GCS_SA_KEY_BASE64="<your_base64_encoded_json_key>"
+    ```
+
+    _Note: The application's Tier 2 backup task ([backup.rs](/backend/fly/backup.rs#L85-L105)) decodes `GCS_SA_KEY_BASE64` at runtime to authenticate with GCS and upload daily database snapshots._
+
+    _(Tigris storage secrets were already configured on the production app automatically in Step 2 when you ran `fly storage create`)._
+
+4. **Deploy to production**:
+    ```bash
+    fly deploy
+    ```
+    With no `--app` flag, `fly deploy` reads `app = "svelaxum"` from [fly.toml](/fly.toml) and targets production by default.
+
+## 4. Automated Recovery Watchdog (GCP Cloud Scheduler + Cloud Run)
 
 ### Why GCP and not a second Fly Machine
 
@@ -262,7 +264,7 @@ import json
 
 FLY_API = "https://api.machines.dev/v1"
 APP = "svelaxum"
-REGION = "ord"
+REGION = "fra"
 HEALTH_URL = "https://svelaxum.fly.dev/api/health"
 FLY_TOKEN = os.environ["FLY_API_TOKEN"]
 STATE_BUCKET = os.environ["WATCHDOG_STATE_BUCKET"]  # GCS bucket to persist failure streak
@@ -382,7 +384,7 @@ A few deliberate design choices here, worth understanding rather than just pasti
 gcloud run jobs create svelaxum-watchdog \
   --source . \
   --region us-central1 \
-  --set-env-vars APP=svelaxum,REGION=ord,WATCHDOG_STATE_BUCKET=svelaxum-watchdog-state \
+  --set-env-vars APP=svelaxum,REGION=fra,WATCHDOG_STATE_BUCKET=svelaxum-watchdog-state \
   --set-secrets FLY_API_TOKEN=fly-watchdog-token:latest \
   --max-retries 0 \
   --task-timeout 30s
@@ -408,13 +410,13 @@ This runs the check every minute. Combined with the 3-consecutive-failure thresh
 
 ---
 
-## 6. Safely Performing a New Release
+## 5. Safely Performing a New Release
 
 ### Step 1: Pre-Release Snapshot
 
 ```bash
 fly machine list
-fly machine exec <primary-machine-id> /usr/local/bin/litestream snapshot /data/svelaxum.db
+fly machine exec <primary-machine-id> /usr/local/bin/litestream snapshot /data/db.sqlite
 ```
 
 This forces a transactionally-consistent snapshot to the Tigris replica bucket immediately before you deploy, independent of the continuous replication stream.
@@ -441,7 +443,7 @@ fly deploy
 
 ---
 
-## 7. Operations & Manual Recovery
+## 6. Operations & Manual Recovery
 
 ### Restoring the Database Locally
 
@@ -453,7 +455,7 @@ litestream restore \
   -o /local/path/to/restored.db \
   -replica-endpoint "https://fly.storage.tigris.dev" \
   -replica-bucket "your_bucket_name" \
-  /data/svelaxum.db
+  /data/db.sqlite
 ```
 
 ### Verifying Backup Health
@@ -467,7 +469,7 @@ It's worth also occasionally checking the GCP side — confirm `gcloud scheduler
 
 ---
 
-## 8. Rollbacks & Point-in-Time Recovery (PITR)
+## 7. Rollbacks & Point-in-Time Recovery (PITR)
 
 ### A. Code Rollback
 
@@ -480,16 +482,16 @@ fly release rollback <release-number>
 
 ```bash
 fly machine run \
-  --region ord \
+  --region fra \
   --entrypoint "/usr/local/bin/litestream" \
   --volume svelaxum_data:/data \
   --rm \
   -e AWS_ACCESS_KEY_ID="<prod_access_key>" \
   -e AWS_SECRET_ACCESS_KEY="<prod_secret_key>" \
-  -e LITESTREAM_ENDPOINT="https://fly.storage.tigris.dev" \
-  -e LITESTREAM_BUCKET="<prod-bucket-name>" \
+  -e AWS_ENDPOINT_URL_S3="https://fly.storage.tigris.dev" \
+  -e BUCKET_NAME="<prod-bucket-name>" \
   <your-registry-image-uri> \
-  restore -timestamp "2026-06-20T12:25:00Z" -o /data/svelaxum.db /data/svelaxum.db
+  restore -timestamp "2026-06-20T12:25:00Z" -o /data/db.sqlite /data/db.sqlite
 
 fly machine restart <primary-machine-id>
 ```
@@ -502,6 +504,6 @@ Pick the timestamp from just before the bad deploy. This discards any writes mad
 
 1. **Removed the `fly machine clone --standby-for` "auto-recovery" claim.** Standby Machines are documented by Fly as being for service-less worker processes; they don't get traffic routed to them by Fly Proxy the way the original draft implied, and a volume-backed HTTP app doesn't benefit from this feature the way the doc described. Replaced with a watchdog that actually triggers on detected failure.
 2. **Fixed the Tigris secrets list.** `fly storage create` sets five secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_ENDPOINT_URL_S3`, `AWS_REGION`, `BUCKET_NAME`), not three.
-3. **Fixed an internal inconsistency in env var names.** The original mixed `LITESTREAM_ENDPOINT`/`LITESTREAM_BUCKET` (Section 3) with `LITESTREAM_ACCESS_KEY_ID`/`LITESTREAM_REPLICA_BUCKET`/etc. (Sections 4, 5, 7) — two different naming schemes for what must be the same config. Standardized on `LITESTREAM_ENDPOINT` / `LITESTREAM_BUCKET` plus the standard `AWS_*` credential vars throughout, since that's what your actual `litestream.yml`/`litestream.rs` read.
+3. **Eliminated custom env var mapping.** Changed [litestream.yml](/litestream.yml) to directly consume Fly's native S3/Tigris environment variables (`AWS_ENDPOINT_URL_S3` and `BUCKET_NAME`), completely eliminating the custom `LITESTREAM_ENDPOINT` and `LITESTREAM_BUCKET` secret-mapping steps.
 4. **Added the watchdog as the actual automation layer**, using GCP per your preference, reusing your existing GCS credits and backup infrastructure.
 5. Restart policy in `fly.toml` changed from `always` to `on-failure` — `always` would also restart on a clean exit (e.g. intentional shutdown during a deploy), which fights with `fly deploy`'s own Machine replacement process; `on-failure` only retries on a crash.
