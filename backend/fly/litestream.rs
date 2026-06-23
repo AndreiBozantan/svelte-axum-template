@@ -30,8 +30,11 @@ pub fn init(db_path: &str) {
     let db_path = db_path.strip_prefix("sqlite:").unwrap_or(db_path);
     let db_file_path = path::Path::new(db_path);
     if !db_file_path.exists() {
+        // fail-safe behavior
+        // if the restore command fails (returns a non-zero exit status due to network error, credential issue, etc.),
+        // the application aborts startup `exit(1)` to prevent starting with an empty database and causing silent data loss
+        // or split-brain/replica generation conflicts
         tracing::info!(path = %db_path, "database_file_not_found_attempting_litestream_restore");
-
         let status = match process::Command::new(litestream_path)
             .args(["restore", "-if-replica-exists", db_path])
             .status()
@@ -39,7 +42,7 @@ pub fn init(db_path: &str) {
             Ok(status) => status,
             Err(err) => {
                 tracing::error!(error = %err, "failed_to_execute_litestream_restore");
-                return;
+                std::process::exit(1);
             },
         };
 
@@ -47,6 +50,7 @@ pub fn init(db_path: &str) {
             tracing::info!("litestream_restore_completed_successfully");
         } else {
             tracing::error!(status = ?status.code(), "litestream_restore_failed_with_non_zero_status");
+            std::process::exit(1);
         }
     }
 
