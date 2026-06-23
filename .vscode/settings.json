@@ -1,7 +1,12 @@
 {
     "explorer.fileNesting.enabled": true,
     "explorer.fileNesting.patterns": {
-        "configs.common.toml": "configs.*.toml"
+        "configs.common.toml": "configs.*.toml",
+        "Cargo.toml": "Cargo.toml, Cargo.lock, rustfmt.toml, .editorconfig",
+        ".gitignore": ".dockerignore, .gitignore, .semgrepignore, .gitattributes",
+        "AGENTS.md": "README.md, LICENSE",
+        ".env": ".env.example",
+        "Dockerfile.prod": "docker-compose.yml"
     },
     "cSpell.ignorePaths": ["**/Cargo.lock", "**/settings.json"],
     "cSpell.words": [
