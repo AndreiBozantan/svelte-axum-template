@@ -18,19 +18,20 @@ RUN cd frontend && npm run build
 
 
 # --- Stage 2: Backend Builder (Dependency Cache) ---
-FROM rust:1.96.0-slim-bookworm@sha256:c8a94a78f67ec8c4d474ec7f71e0720f21eb7e584e158daec0874cafa7c30e4d AS backend-dependencies
+FROM rust:1.96.0-alpine3.24@sha256:f87aa870663e2b57ec8c69de82c7eedf7383bee987eef7612c0359635eaadb41 AS backend-dependencies
 WORKDIR /build
 
-# Install native dependencies required for compilation
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    sqlite3 \
-    libsqlite3-dev \
+# Install alpine compilation packages
+RUN apk add --no-cache \
+    build-base \
+    pkgconfig \
+    sqlite-dev \
+    sqlite \
     clang \
-    lld \
-    && rm -rf /var/lib/apt/lists/*
+    lld
+
+# Create a nonroot user and group for the scratch runtime
+RUN addgroup -g 65532 nonroot && adduser -u 65532 -G nonroot -S -s /sbin/nologin nonroot
 
 # Copy cargo configuration files
 COPY Cargo.toml Cargo.lock ./
@@ -41,8 +42,7 @@ COPY xtask/Cargo.toml xtask/Cargo.toml
 RUN mkdir -p backend && echo "fn main() {}" > backend/main.rs
 RUN mkdir -p xtask/src && echo "fn main() {}" > xtask/src/main.rs
 
-# Build dependencies only (SQLX_OFFLINE=true is not needed since no macros are in dummy main)
-# We disable sccache during the docker build to avoid sccache overhead/errors in standard environment
+# Build dependencies only (compiles natively to host's MUSL architecture by default)
 ENV RUSTC_WRAPPER=""
 RUN cargo build --release --bin app
 
@@ -72,13 +72,20 @@ ENV RUSTC_WRAPPER=""
 RUN cargo build --release --bin app
 
 
-# --- Stage 4: Runtime ---
-FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1417ffc986ec9619bd0e1556b56
+# --- Stage 4: Runtime (from scratch) ---
+FROM scratch
 
-# Use the built-in nonroot system user
+# Copy users and groups from builder
+COPY --from=backend-builder /etc/passwd /etc/passwd
+COPY --from=backend-builder /etc/group /etc/group
+
+# Use the nonroot system user
 USER nonroot:nonroot
 
-# Copy the compiled binary from the backend-builder stage
+# Copy SSL certificates from the builder stage (reqwest needs these for TLS validation)
+COPY --from=backend-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+# Copy the compiled static binary from the backend-builder stage
 COPY --from=backend-builder /build/target/release/app /usr/local/bin/app
 
 # Copy the pristine empty directory and map it to /data with nonroot ownership
