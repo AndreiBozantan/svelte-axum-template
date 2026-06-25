@@ -98,6 +98,41 @@ async fn test_static_file_routing() -> TestResult {
     let response_missing_file = server.get("/assets/non-existent-image.png").await;
     response_missing_file.assert_status(StatusCode::NOT_FOUND);
 
+    // request for non-existent file under /static should return 404 NOT FOUND
+    let response_missing_static = server.get("/static/assets/non-existent-image.png").await;
+    response_missing_static.assert_status(StatusCode::NOT_FOUND);
+
+    // request for existing file under root should succeed
+    let response_static_file = server.get("/favicon.ico").await;
+    response_static_file.assert_status(StatusCode::OK);
+
+    // dynamically extract the compiled JS and CSS file paths from index.html and request them
+    let js_path_start_idx = nav_text
+        .find("src=\"/static/")
+        .map(|idx| idx + 5)
+        .ok_or("could not find script source tag in index.html")?;
+    let js_path_end_idx = nav_text[js_path_start_idx..]
+        .find('"')
+        .map(|idx| js_path_start_idx + idx)
+        .ok_or("could not find script close quote in index.html")?;
+    let js_path = &nav_text[js_path_start_idx..js_path_end_idx];
+
+    let css_path_start_idx = nav_text
+        .find("href=\"/static/")
+        .map(|idx| idx + 6)
+        .ok_or("could not find stylesheet href in index.html")?;
+    let css_path_end_idx = nav_text[css_path_start_idx..]
+        .find('"')
+        .map(|idx| css_path_start_idx + idx)
+        .ok_or("could not find stylesheet close quote in index.html")?;
+    let css_path = &nav_text[css_path_start_idx..css_path_end_idx];
+
+    let response_js_file = server.get(js_path).await;
+    response_js_file.assert_status(StatusCode::OK);
+
+    let response_css_file = server.get(css_path).await;
+    response_css_file.assert_status(StatusCode::OK);
+
     Ok(())
 }
 
