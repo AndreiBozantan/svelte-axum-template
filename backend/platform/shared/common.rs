@@ -109,7 +109,8 @@ impl Context {
             },
             database: config::DatabaseSettings {
                 url: "sqlite::memory:".to_string(),
-                max_connections: 5,
+                min_connections: 1,
+                max_connections: 1,
                 store_temp_tables_in_memory: true,
                 write_busy_timeout_seconds: 30,
             },

@@ -15,7 +15,9 @@ pub async fn create_context(db_config: &config::DatabaseSettings) -> Result<Cont
         .busy_timeout(std::time::Duration::from_secs(db_config.write_busy_timeout_seconds))
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
 
-    let mut pool_options = sqlx::sqlite::SqlitePoolOptions::new().max_connections(db_config.max_connections);
+    let mut pool_options = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(db_config.max_connections)
+        .min_connections(db_config.min_connections);
 
     // attach a hook that runs automatically every time a new connection is established
     if db_config.store_temp_tables_in_memory {
