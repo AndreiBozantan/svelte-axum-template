@@ -93,7 +93,7 @@ fn asset_last_modified(asset: &rust_embed::EmbeddedFile) -> Option<String> {
 #[cfg(test)]
 pub fn get_embedded_static_paths() -> Vec<String> {
     Assets::iter()
-        .map(|p| p.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .filter(|p| p.starts_with("static/"))
         .collect()
 }

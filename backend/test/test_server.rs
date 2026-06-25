@@ -60,9 +60,10 @@ pub async fn create_test_context_and_server() -> TestResult<(common::ArcContext,
 async fn test_static_file_caching() -> TestResult {
     let server = create_test_server().await?;
 
-    // Request index.html first time (should be 200 OK)
+    // request index.html first time (should be 200 OK and have no-cache)
     let response = server.get("/").await;
     response.assert_status(StatusCode::OK);
+    response.assert_header(axum::http::header::CACHE_CONTROL, "no-cache");
 
     let etag = response
         .headers()
@@ -73,7 +74,7 @@ async fn test_static_file_caching() -> TestResult {
 
     assert!(!etag.is_empty(), "ETag should not be empty");
 
-    // Request index.html second time with If-None-Match (should be 304 Not Modified)
+    // request index.html second time with If-None-Match (should be 304 Not Modified)
     let response_cached = server
         .get("/")
         .add_header(axum::http::header::IF_NONE_MATCH, &etag)
@@ -81,6 +82,12 @@ async fn test_static_file_caching() -> TestResult {
 
     response_cached.assert_status(StatusCode::NOT_MODIFIED);
     assert!(response_cached.text().is_empty(), "304 response body should be empty");
+
+    // request a static asset (should have immutable long-term caching)
+    let response_asset = server.get("/favicon.ico").await;
+    response_asset.assert_status(StatusCode::OK);
+    response_asset.assert_header(axum::http::header::CACHE_CONTROL, "public, max-age=31536000, immutable");
+
     Ok(())
 }
 
