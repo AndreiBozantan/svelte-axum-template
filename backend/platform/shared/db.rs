@@ -6,19 +6,29 @@ use crate::platform::config;
 pub type Context = sqlx::SqlitePool;
 
 pub async fn create_context(db_config: &config::DatabaseSettings) -> Result<Context, sqlx::Error> {
+    use sqlx::Executor;
     use std::str::FromStr;
+
     let options = sqlx::sqlite::SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
         .busy_timeout(std::time::Duration::from_secs(db_config.write_busy_timeout_seconds))
         .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
-    let pool = sqlx::sqlite::SqlitePoolOptions::new()
-        .max_connections(db_config.max_connections)
-        .connect_with(options)
-        .await?;
+
+    let mut pool_options = sqlx::sqlite::SqlitePoolOptions::new().max_connections(db_config.max_connections);
+
+    // attach a hook that runs automatically every time a new connection is established
     if db_config.store_temp_tables_in_memory {
-        sqlx::query("PRAGMA temp_store = MEMORY").execute(&pool).await?;
+        pool_options = pool_options.after_connect(|conn, _meta| {
+            Box::pin(async move {
+                conn.execute("PRAGMA temp_store = MEMORY").await?;
+                Ok(())
+            })
+        });
     }
+
+    let pool = pool_options.connect_with(options).await?;
+
     Ok(pool)
 }
 
