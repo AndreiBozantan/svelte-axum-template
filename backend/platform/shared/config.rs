@@ -33,18 +33,26 @@ pub struct DatabaseSettings {
     pub url: String,
 
     #[serde(default)]
+    pub min_connections: u32,
+
+    #[serde(default)]
     pub max_connections: u32,
 
     #[serde(default)]
     pub store_temp_tables_in_memory: bool,
+
+    #[serde(default)]
+    pub write_busy_timeout_seconds: u64,
 }
 
 impl Default for DatabaseSettings {
     fn default() -> Self {
         Self {
             url: "sqlite:data/db.sqlite".to_string(),
+            min_connections: 2,
             max_connections: 5,
             store_temp_tables_in_memory: true,
+            write_busy_timeout_seconds: 30,
         }
     }
 }
