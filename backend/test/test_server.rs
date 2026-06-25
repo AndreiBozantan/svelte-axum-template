@@ -60,9 +60,10 @@ pub async fn create_test_context_and_server() -> TestResult<(common::ArcContext,
 async fn test_static_file_caching() -> TestResult {
     let server = create_test_server().await?;
 
-    // Request index.html first time (should be 200 OK)
+    // request index.html first time (should be 200 OK and have no-cache)
     let response = server.get("/").await;
     response.assert_status(StatusCode::OK);
+    response.assert_header(axum::http::header::CACHE_CONTROL, "no-cache");
 
     let etag = response
         .headers()
@@ -73,7 +74,7 @@ async fn test_static_file_caching() -> TestResult {
 
     assert!(!etag.is_empty(), "ETag should not be empty");
 
-    // Request index.html second time with If-None-Match (should be 304 Not Modified)
+    // request index.html second time with If-None-Match (should be 304 Not Modified)
     let response_cached = server
         .get("/")
         .add_header(axum::http::header::IF_NONE_MATCH, &etag)
@@ -81,6 +82,44 @@ async fn test_static_file_caching() -> TestResult {
 
     response_cached.assert_status(StatusCode::NOT_MODIFIED);
     assert!(response_cached.text().is_empty(), "304 response body should be empty");
+
+    // request a static asset (should have immutable long-term caching)
+    let response_asset = server.get("/favicon.ico").await;
+    response_asset.assert_status(StatusCode::OK);
+    response_asset.assert_header(axum::http::header::CACHE_CONTROL, "public, max-age=31536000, immutable");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_static_file_routing() -> TestResult {
+    let server = create_test_server().await?;
+
+    // navigation route (no extension) should fall back to serving index.html (200 OK)
+    let response_nav = server.get("/some/client/route").await;
+    response_nav.assert_status(StatusCode::OK);
+    let nav_text = response_nav.text();
+    assert!(nav_text.contains("</html>"));
+
+    // request for non-existent file with extension (e.g. .png) should return 404 NOT FOUND
+    let response_missing_file = server.get("/assets/non-existent-image.png").await;
+    response_missing_file.assert_status(StatusCode::NOT_FOUND);
+
+    // request for non-existent file under /static should return 404 NOT FOUND
+    let response_missing_static = server.get("/static/assets/non-existent-image.png").await;
+    response_missing_static.assert_status(StatusCode::NOT_FOUND);
+
+    // request for existing file under root should succeed
+    let response_static_file = server.get("/favicon.ico").await;
+    response_static_file.assert_status(StatusCode::OK);
+
+    // request a dynamically discovered file under /static to verify static serving
+    if let Some(static_path) = crate::platform::shared::assets::get_embedded_static_paths().first() {
+        let route = format!("/{static_path}");
+        let response = server.get(&route).await;
+        response.assert_status(StatusCode::OK);
+    }
+
     Ok(())
 }
 

@@ -4,11 +4,15 @@ import { fileURLToPath } from 'url';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+    base: '/',
     plugins: [svelte()],
     resolve: {
         alias: {
             $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
         },
+    },
+    build: {
+        assetsDir: 'static',
     },
     server: {
         port: 5173,

@@ -78,8 +78,15 @@ pub fn add_auth_cookies(
         Duration::days(i64::from(settings.refresh_token_expiry_days)),
     );
 
+    let logged_in_cookie = create_js_cookie(
+        "logged_in",
+        access_token.map(|_| "true"),
+        "/",
+        Duration::minutes(i64::from(settings.access_token_expiry_minutes)),
+    );
+
     let mut jar = CookieJar::new();
-    jar = jar.add(at_cookie).add(rt_cookie);
+    jar = jar.add(at_cookie).add(rt_cookie).add(logged_in_cookie);
 
     let mut response = response;
     let headers = response.headers_mut();
@@ -125,6 +132,26 @@ fn create_token_cookie(
         .http_only(true)
         .secure(true)
         .same_site(SameSite::Strict)
+        .build()
+}
+
+fn create_js_cookie(
+    name: &'static str,
+    value: Option<&str>,
+    path: &'static str,
+    max_age: Duration,
+) -> Cookie<'static> {
+    let (cookie_val, cookie_max_age) = match value {
+        Some(val) if !val.is_empty() => (val.to_string(), max_age),
+        _ => (String::new(), Duration::ZERO),
+    };
+
+    Cookie::build((name, cookie_val))
+        .path(path)
+        .max_age(cookie_max_age)
+        .http_only(false)
+        .secure(true)
+        .same_site(SameSite::Lax)
         .build()
 }
 
