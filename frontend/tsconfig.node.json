@@ -1,8 +1,10 @@
 {
     "compilerOptions": {
         "composite": true,
+        "target": "ESNext",
         "module": "ESNext",
-        "moduleResolution": "Node",
+        "moduleResolution": "bundler",
+        "skipLibCheck": true,
         "allowSyntheticDefaultImports": true,
         "outDir": "./dist"
     },
