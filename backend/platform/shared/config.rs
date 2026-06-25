@@ -37,6 +37,9 @@ pub struct DatabaseSettings {
 
     #[serde(default)]
     pub store_temp_tables_in_memory: bool,
+
+    #[serde(default)]
+    pub write_busy_timeout_seconds: u64,
 }
 
 impl Default for DatabaseSettings {
@@ -45,6 +48,7 @@ impl Default for DatabaseSettings {
             url: "sqlite:data/db.sqlite".to_string(),
             max_connections: 5,
             store_temp_tables_in_memory: true,
+            write_busy_timeout_seconds: 30,
         }
     }
 }

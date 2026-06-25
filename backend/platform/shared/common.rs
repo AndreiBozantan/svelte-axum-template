@@ -111,6 +111,7 @@ impl Context {
                 url: "sqlite::memory:".to_string(),
                 max_connections: 5,
                 store_temp_tables_in_memory: true,
+                write_busy_timeout_seconds: 30,
             },
             rate_limiter: config::AppRateLimiterSettings {
                 global: config::RateLimitSettings {

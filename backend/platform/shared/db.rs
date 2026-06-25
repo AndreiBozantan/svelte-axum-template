@@ -10,7 +10,7 @@ pub async fn create_context(db_config: &config::DatabaseSettings) -> Result<Cont
     let options = sqlx::sqlite::SqliteConnectOptions::from_str(&db_config.url)?
         .create_if_missing(true)
         .foreign_keys(true)
-        .busy_timeout(std::time::Duration::from_secs(30));
+        .busy_timeout(std::time::Duration::from_secs(db_config.write_busy_timeout_seconds));
     let pool = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(db_config.max_connections)
         .connect_with(options)
