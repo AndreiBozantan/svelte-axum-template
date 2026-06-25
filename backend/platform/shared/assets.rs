@@ -89,3 +89,11 @@ fn asset_last_modified(asset: &rust_embed::EmbeddedFile) -> Option<String> {
         .and_then(|ts| Utc.timestamp_opt(ts as i64, 0).single())
         .map(|dt| dt.to_rfc2822())
 }
+
+#[cfg(test)]
+pub fn get_embedded_static_paths() -> Vec<String> {
+    Assets::iter()
+        .map(|p| p.into_owned())
+        .filter(|p| p.starts_with("static/"))
+        .collect()
+}

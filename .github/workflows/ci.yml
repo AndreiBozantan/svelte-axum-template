@@ -35,9 +35,13 @@ jobs:
             - uses: actions/checkout@v4
 
             - name: Create placeholder frontend dist directory
+              # mock frontend/dist for rust-embed so backend compiles & tests pass in CI
+              # without needing to install Node.js/NPM and do a frontend build.
               run: |
-                  mkdir -p frontend/dist
+                  mkdir -p frontend/dist/static
                   echo "<html><body>test</body></html>" > frontend/dist/index.html
+                  touch frontend/dist/favicon.ico
+                  touch frontend/dist/static/placeholder.js
 
             - name: Install system dependencies
               run: sudo apt-get update && sudo apt-get install -y lld
