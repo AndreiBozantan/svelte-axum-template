@@ -8,6 +8,7 @@ env_vars_prefix = "APP" # customizable prefix used for the environment variables
 [database]
 url = "sqlite:data/db.sqlite"
 max_connections = 5
+write_busy_timeout_seconds = 30
 store_temp_tables_in_memory = true
 
 [jwt]
