@@ -1,24 +1,25 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  app:
-    container_name: svelaxum
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-    ports:
-      - "127.0.0.1:8080:3000"
-    restart: unless-stopped
-    read_only: true
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /tmp:size=32m,noexec,nosuid
-    volumes:
-      - svelaxum-data:/data
+    app:
+        container_name: svelaxum
+        image: svelaxum:latest
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - "127.0.0.1:8080:3000"
+        restart: unless-stopped
+        read_only: true
+        cap_drop:
+            - ALL
+        security_opt:
+            - no-new-privileges:true
+        tmpfs:
+            - /tmp:size=32m,noexec,nosuid
+        volumes:
+            - svelaxum-data:/data
 
 volumes:
-  svelaxum-data:
-    name: svelaxum-data
+    svelaxum-data:
+        name: svelaxum-data

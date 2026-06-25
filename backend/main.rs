@@ -9,6 +9,9 @@
 #![allow(clippy::match_same_arms)]
 #![allow(clippy::enum_variant_names)]
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[tokio::main]
 async fn main() {
     server::run().await;
