@@ -21,11 +21,18 @@ pub async fn static_handler(
 ) -> Result<impl IntoResponse, api::Error> {
     let path_str = uri.path().trim_start_matches('/');
     let path_str = if path_str.is_empty() { "index.html" } else { path_str };
-    let asset = Assets::get(path_str);
-    let path_str = if asset.is_none() { "index.html" } else { path_str };
-    let asset = asset
-        .or_else(|| Assets::get(path_str))
-        .ok_or_else(api::Error::not_found)?;
+
+    let (asset, final_path) = match Assets::get(path_str) {
+        Some(asset) => (asset, path_str),
+        None if path_str.split('/').next_back().is_some_and(|s| s.contains('.')) => {
+            return Err(api::Error::not_found());
+        },
+        None => {
+            // fallback to index for paths without extensions, e.g. /settings
+            let index_asset = Assets::get("index.html").ok_or_else(api::Error::not_found)?;
+            (index_asset, "index.html")
+        },
+    };
 
     let etag = hex::encode(asset.metadata.sha256_hash());
 
@@ -38,9 +45,9 @@ pub async fn static_handler(
         return Ok(http::StatusCode::NOT_MODIFIED.into_response());
     }
 
-    let builder = match path_str {
+    let builder = match final_path {
         "index.html" => create_index_response_builder(&asset, &etag),
-        _ => create_asset_response_builder(&asset, path_str, &etag),
+        _ => create_asset_response_builder(&asset, final_path, &etag),
     };
     let body = builder.body(Body::from(asset.data.to_vec()))?;
     Ok(body.into_response())

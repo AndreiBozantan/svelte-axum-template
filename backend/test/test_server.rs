@@ -85,6 +85,23 @@ async fn test_static_file_caching() -> TestResult {
 }
 
 #[tokio::test]
+async fn test_static_file_routing() -> TestResult {
+    let server = create_test_server().await?;
+
+    // navigation route (no extension) should fall back to serving index.html (200 OK)
+    let response_nav = server.get("/some/client/route").await;
+    response_nav.assert_status(StatusCode::OK);
+    let nav_text = response_nav.text();
+    assert!(nav_text.contains("<!doctype html>"));
+
+    // request for non-existent file with extension (e.g. .png) should return 404 NOT FOUND
+    let response_missing_file = server.get("/assets/non-existent-image.png").await;
+    response_missing_file.assert_status(StatusCode::NOT_FOUND);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_panic_handling() -> TestResult {
     let server = create_test_server().await?;
 
