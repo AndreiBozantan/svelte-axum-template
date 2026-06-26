@@ -11,3 +11,12 @@ use utoipa::OpenApi;
     components()
 )]
 pub struct ApiDoc;
+
+pub fn run_export() -> Result<(), String> {
+    if std::env::args().nth(1).as_deref() == Some("export-openapi") {
+        let spec = ApiDoc::openapi().to_pretty_json().map_err(|err| err.to_string())?;
+        println!("{spec}");
+        std::process::exit(0);
+    }
+    Ok(())
+}

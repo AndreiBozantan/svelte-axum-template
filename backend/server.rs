@@ -42,6 +42,9 @@ pub enum Error {
 
     #[error("Context creation error: {0}")]
     ContextCreationFailed(#[from] common::ContextCreationError),
+
+    #[error("OpenAPI error: {0}")]
+    OpenApiGenerationFailed(String),
 }
 
 pub async fn run() {
@@ -64,6 +67,8 @@ pub async fn run() {
 }
 
 async fn start_server() -> Result<(), Error> {
+    crate::openapi::run_export().map_err(Error::OpenApiGenerationFailed)?;
+
     let settings = config::AppSettings::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
