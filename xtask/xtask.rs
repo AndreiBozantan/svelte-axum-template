@@ -232,7 +232,7 @@ fn dev() {
             "--watch",
             "backend",
             "--exec",
-            "run --package app",
+            "run --package app --features swagger",
         ])
         .spawn()
         .expect("failed to start backend watch");

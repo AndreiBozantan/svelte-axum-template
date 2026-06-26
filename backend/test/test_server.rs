@@ -31,8 +31,9 @@ pub async fn login_testuser_and_get_tokens(server: &TestServer) -> TestResult<(V
 
 pub async fn create_test_server() -> TestResult<TestServer> {
     let ctx = common::Context::create_test_context().await?;
-    let router = router::create(ctx.clone());
-    let server = TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let router = router::create(ctx.clone()).split_for_parts().0;
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let server = TestServer::new(service);
 
     // register the test user via the API
     let response = server
@@ -49,10 +50,11 @@ pub async fn create_test_server() -> TestResult<TestServer> {
     Ok(server)
 }
 
-pub async fn create_test_context_and_server() -> TestResult<(common::ArcContext, TestServer)> {
+pub async fn create_auth_test_context_and_server() -> TestResult<(common::ArcContext, TestServer)> {
     let ctx = common::Context::create_test_context().await?;
-    let router = router::create(ctx.clone());
-    let server = TestServer::new(router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let router = router::create(ctx.clone()).split_for_parts().0;
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let server = TestServer::new(service);
     Ok((ctx, server))
 }
 

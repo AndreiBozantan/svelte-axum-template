@@ -44,7 +44,7 @@ url = { version = "2.5" }
 uuid = { version = "1.23", features = ["v4"] }
 validator = { version = "0.20", features = ["derive"] }
 utoipa = { version = "5.5", features = ["axum_extras", "chrono", "uuid"] }
-utoipa-axum = { version = "0.2" }
+utoipax = { version = "0.2", package="utoipa-axum" }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"], optional = true }
 
 [features]

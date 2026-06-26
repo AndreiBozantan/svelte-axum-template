@@ -1,13 +1,15 @@
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::sync::OnceLock;
+
 use axum::http::Request;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use governor::middleware::NoOpMiddleware;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::OnceLock;
 use tower_governor::errors::GovernorError;
 use tower_governor::governor::GovernorConfig;
 use tower_governor::governor::GovernorConfigBuilder;
+use utoipax;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClientIpExtractor;
@@ -27,9 +29,9 @@ pub static GLOBAL_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor,
 pub static LOGIN_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>> = OnceLock::new();
 
 pub fn add_global_rate_limiting<S>(
-    router: axum::Router<S>,
+    router: utoipax::router::OpenApiRouter<S>,
     settings: &crate::platform::config::RateLimitSettings,
-) -> axum::Router<S>
+) -> utoipax::router::OpenApiRouter<S>
 where
     S: Clone + Send + Sync + 'static,
 {
@@ -37,9 +39,9 @@ where
 }
 
 pub fn add_login_rate_limiting<S>(
-    router: axum::Router<S>,
+    router: utoipax::router::OpenApiRouter<S>,
     settings: &crate::platform::config::RateLimitSettings,
-) -> axum::Router<S>
+) -> utoipax::router::OpenApiRouter<S>
 where
     S: Clone + Send + Sync + 'static,
 {
@@ -47,10 +49,10 @@ where
 }
 
 pub fn add_rate_limiting<S>(
-    router: axum::Router<S>,
+    router: utoipax::router::OpenApiRouter<S>,
     settings: &crate::platform::config::RateLimitSettings,
     limiter_config: &'static OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>>,
-) -> axum::Router<S>
+) -> utoipax::router::OpenApiRouter<S>
 where
     S: Clone + Send + Sync + 'static,
 {

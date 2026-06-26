@@ -4,6 +4,7 @@ use axum::http;
 use axum::response::IntoResponse;
 use tracing::info;
 use tracing::warn;
+use utoipax;
 
 use crate::platform::api;
 use crate::platform::common;
@@ -13,11 +14,11 @@ use crate::platform::crypto;
 use crate::platform::identity::auth;
 use crate::platform::identity::oauth;
 
-pub fn router(service: oauth::Service) -> axum::Router<common::ArcContext> {
-    use axum::routing::get;
-    axum::Router::new()
-        .route("/oauth/google", get(google_auth_init))
-        .route("/oauth/google/callback", get(google_auth_callback))
+pub fn router(service: oauth::Service) -> utoipax::router::OpenApiRouter<common::ArcContext> {
+    use utoipax::routes;
+    utoipax::router::OpenApiRouter::new()
+        .routes(routes!(google_auth_init))
+        .routes(routes!(google_auth_callback))
         .with_state(service)
 }
 
@@ -26,6 +27,7 @@ impl From<oauth::Error> for api::Error {
         #[allow(clippy::enum_glob_use)]
         use oauth::Error::*;
 
+        #[allow(clippy::match_same_arms)]
         match error {
             InvalidUserInfo => Self::invalid_credentials(),
             UnverifiedEmail => Self::invalid_credentials(),
@@ -41,6 +43,16 @@ impl From<oauth::Error> for api::Error {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/oauth/google",
+    params(
+        ("redirect_url" = Option<String>, Query, description = "Client redirect URL after login")
+    ),
+    responses(
+        (status = 303, description = "Redirect to Google authorization page")
+    )
+)]
 async fn google_auth_init(
     State(service): State<oauth::Service>,
     params: api::Query<std::collections::BTreeMap<String, String>>,
@@ -66,6 +78,17 @@ async fn google_auth_init(
     Ok(response)
 }
 
+#[utoipa::path(
+    get,
+    path = "/oauth/google/callback",
+    params(
+        ("code" = String, Query, description = "Google authorization code"),
+        ("state" = String, Query, description = "CSRF state token")
+    ),
+    responses(
+        (status = 303, description = "Redirect to client final landing URL")
+    )
+)]
 async fn google_auth_callback(
     State(service): State<oauth::Service>,
     headers: http::HeaderMap,
@@ -120,6 +143,7 @@ async fn google_auth_callback(
         err
     })?;
 
+    #[allow(clippy::match_wildcard_for_single_variants)]
     oauth::validate_redirect_path(&redirect_url).map_err(|err| {
         warn!(error = %err, "invalid_final_redirect_url");
         api::Error::sso_failed()

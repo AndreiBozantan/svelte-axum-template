@@ -34,7 +34,6 @@ fn test_extract_client_ip() -> Result<(), axum::http::Error> {
 async fn test_rate_limiting_middleware_enabled() {
     static TEST_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>> = OnceLock::new();
 
-    let router = axum::Router::new().route("/test", get(|| async { "ok" }));
     let settings = RateLimitSettings {
         enabled: true,
         rate: 1,
@@ -42,8 +41,11 @@ async fn test_rate_limiting_middleware_enabled() {
         burst_size: 1,
     };
 
-    let rate_limited_router = add_rate_limiting(router, &settings, &TEST_LIMITER_CONFIG);
-    let server = TestServer::new(rate_limited_router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let router = utoipax::router::OpenApiRouter::new().route("/test", get(|| async { "ok" }));
+    let router = add_rate_limiting(router, &settings, &TEST_LIMITER_CONFIG);
+    let router = router.split_for_parts().0;
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let server = TestServer::new(service);
 
     // first request should succeed
     let response1 = server.get("/test").await;
@@ -64,7 +66,6 @@ async fn test_rate_limiting_middleware_disabled() {
     static TEST_LIMITER_CONFIG_DISABLED: OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>> =
         OnceLock::new();
 
-    let router = axum::Router::new().route("/test", get(|| async { "ok" }));
     let settings = RateLimitSettings {
         enabled: false,
         rate: 1,
@@ -72,8 +73,11 @@ async fn test_rate_limiting_middleware_disabled() {
         burst_size: 1,
     };
 
-    let rate_limited_router = add_rate_limiting(router, &settings, &TEST_LIMITER_CONFIG_DISABLED);
-    let server = TestServer::new(rate_limited_router.into_make_service_with_connect_info::<std::net::SocketAddr>());
+    let router = utoipax::router::OpenApiRouter::new().route("/test", get(|| async { "ok" }));
+    let router = add_rate_limiting(router, &settings, &TEST_LIMITER_CONFIG_DISABLED);
+    let router = router.split_for_parts().0;
+    let service = router.into_make_service_with_connect_info::<std::net::SocketAddr>();
+    let server = TestServer::new(service);
 
     // all 20 parallel requests should succeed because rate limiting is disabled
     let server = Arc::new(server);

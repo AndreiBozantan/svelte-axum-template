@@ -9,8 +9,9 @@ use tracing::info;
 use crate::platform::db;
 use crate::platform::jwt;
 
-#[derive(Debug, Clone, thiserror::Error, Serialize)]
+#[derive(Debug, Clone, thiserror::Error, Serialize, utoipa::ToSchema)]
 #[error("{message}")]
+#[schema(as = ApiError)]
 pub struct Error {
     #[serde(skip)]
     status: StatusCode,

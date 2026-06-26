@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use serde::Deserialize;
 use serde::Serialize;
 use tracing::info;
+use utoipax;
 
 use crate::platform::api;
 use crate::platform::common;
@@ -14,59 +15,61 @@ use crate::platform::crypto;
 use crate::platform::identity::auth;
 use crate::platform::identity::users;
 
-pub fn router(service: auth::Service) -> axum::Router<common::ArcContext> {
-    use crate::platform::rate_limiter;
-    use axum::routing::post;
+pub fn router(service: auth::Service) -> utoipax::router::OpenApiRouter<common::ArcContext> {
+    use utoipax::routes;
 
-    let base_router = axum::Router::new()
-        .route("/auth/register", post(register))
-        .route("/auth/login", post(login));
+    let login_register_router = utoipax::router::OpenApiRouter::new()
+        .routes(routes!(register))
+        .routes(routes!(login));
 
-    // strict brute-force protection for unauthenticated, CPU-heavy routes (e.g. argon2 hashing on login).
-    let rate_limited_router =
-        rate_limiter::add_login_rate_limiting(base_router, &service.context.settings.rate_limiter.login);
+    let logout_refresh_router = utoipax::router::OpenApiRouter::new()
+        .routes(routes!(logout))
+        .routes(routes!(refresh));
 
-    // logout and refresh are protected by the global rate limiter; they use cheap token validation
-    // and would block legitimate background client refreshes if subjected to strict login limits.
-    rate_limited_router
-        .route("/auth/logout", post(logout))
-        .route("/auth/refresh", post(refresh))
-        .with_state(service)
+    let login_register_router = crate::platform::rate_limiter::add_login_rate_limiting(
+        login_register_router,
+        &service.context.settings.rate_limiter.login,
+    );
+
+    login_register_router.merge(logout_refresh_router).with_state(service)
 }
 
-#[derive(Deserialize, validator::Validate)]
+#[derive(Deserialize, validator::Validate, utoipa::ToSchema)]
 pub struct RegisterRequest {
     #[validate(email(message = "invalid email address"))]
+    #[schema(example = "alice@example.com", format = "email")]
     pub email: String,
     #[validate(length(min = 8, message = "password must be at least 8 characters"))]
+    #[schema(min_length = 8)]
     pub password: String,
     pub first_name: Option<String>,
     pub last_name: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct RegisterResponse {
     pub user: UserResponse,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, utoipa::ToSchema)]
 pub struct LoginRequest {
+    #[schema(example = "alice@example.com", format = "email")]
     pub email: String,
     pub password: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct LoginResponse {
     pub user: UserResponse,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct RefreshResponse {
     pub expires_in: u32,
     pub user: UserResponse,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct UserResponse {
     pub id: i64,
     pub email: String,
@@ -83,6 +86,16 @@ impl From<users::User> for UserResponse {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    request_body = RegisterRequest,
+    responses(
+        (status = 201, description = "Registration successful", body = RegisterResponse),
+        (status = 400, description = "Validation failed", body = api::Error),
+        (status = 409, description = "User already exists", body = api::Error)
+    )
+)]
 async fn register(
     State(service): State<auth::Service>,
     request: api::ValidatedJson<RegisterRequest>,
@@ -91,12 +104,21 @@ async fn register(
     let email = common::Email::parse(&request.email)
         .ok_or_else(|| api::Error::validation_failed("email", "invalid email format"))?;
     let user = service
-        .register(email, &request.password, request.first_name, request.last_name)
+        .register(email, request.password, request.first_name, request.last_name)
         .await?;
     let body = RegisterResponse { user: user.into() };
     Ok((http::StatusCode::CREATED, axum::Json(body)))
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 401, description = "Invalid credentials", body = api::Error)
+    )
+)]
 async fn login(
     State(service): State<auth::Service>,
     request: api::Json<LoginRequest>,
@@ -127,6 +149,13 @@ async fn login(
     )?)
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    responses(
+        (status = 204, description = "Logout successful")
+    )
+)]
 async fn logout(
     State(service): State<auth::Service>,
     headers: http::HeaderMap,
@@ -145,6 +174,14 @@ async fn logout(
     )?)
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/refresh",
+    responses(
+        (status = 200, description = "Session refresh successful", body = RefreshResponse),
+        (status = 401, description = "Unauthorized", body = api::Error)
+    )
+)]
 async fn refresh(
     State(service): State<auth::Service>,
     headers: http::HeaderMap,
