@@ -101,11 +101,11 @@ impl Service {
     pub async fn register(
         &self,
         email: common::Email,
-        password: &str,
+        password: String,
         first_name: Option<String>,
         last_name: Option<String>,
     ) -> Result<users::User, Error> {
-        let password_hash = crypto::hash_password(password)?;
+        let password_hash = crypto::hash_password(&password)?;
         let cmd = users::CreateUserCommand {
             tenant_id: common::TenantId(0),
             status: users::UserStatus::Active,

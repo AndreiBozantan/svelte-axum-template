@@ -1,21 +1,22 @@
 use axum;
 use axum::extract::State;
 use serde::Serialize;
+use utoipax;
 
 use crate::platform::api;
 use crate::platform::common;
 use crate::platform::identity::users;
 use crate::platform::jwt;
 
-pub fn router(service: users::Service) -> axum::Router<common::ArcContext> {
-    use axum::routing::get;
-    axum::Router::new()
-        .route("/users", get(list_users))
-        .route("/users/me", get(user_info))
+pub fn router(service: users::Service) -> utoipax::router::OpenApiRouter<common::ArcContext> {
+    use utoipax::routes;
+    utoipax::router::OpenApiRouter::new()
+        .routes(routes!(list_users))
+        .routes(routes!(user_info))
         .with_state(service)
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct UserResponse {
     pub id: i64,
     pub email: String,
@@ -32,15 +33,15 @@ impl From<users::User> for UserResponse {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct ListUsersResponse {
-    users: Vec<UserResponse>,
-    total: i64,
-    limit: i64,
-    offset: i64,
+    pub users: Vec<UserResponse>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, utoipa::ToSchema)]
 pub struct UserInfoResponse {
     pub user: UserResponse,
 }
@@ -55,6 +56,21 @@ impl From<users::Error> for api::Error {
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/users",
+    params(
+        ("limit" = Option<i64>, Query, description = "Pagination limit"),
+        ("offset" = Option<i64>, Query, description = "Pagination offset")
+    ),
+    responses(
+        (status = 200, description = "List of users successful", body = ListUsersResponse),
+        (status = 401, description = "Unauthorized", body = api::Error)
+    ),
+    security(
+        ("cookieAuth" = [])
+    )
+)]
 async fn list_users(
     State(service): State<users::Service>,
     pagination: api::Pagination,
@@ -74,6 +90,17 @@ async fn list_users(
     }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/users/me",
+    responses(
+        (status = 200, description = "Get current user info successful", body = UserInfoResponse),
+        (status = 401, description = "Unauthorized", body = api::Error)
+    ),
+    security(
+        ("cookieAuth" = [])
+    )
+)]
 async fn user_info(
     State(service): State<users::Service>,
     claims: jwt::TokenClaims,

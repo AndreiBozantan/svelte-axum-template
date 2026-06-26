@@ -18,6 +18,7 @@ async fn main() {
 }
 
 pub mod cli;
+pub mod openapi;
 pub mod router;
 pub mod server;
 

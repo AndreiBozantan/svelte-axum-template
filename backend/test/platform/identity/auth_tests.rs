@@ -115,7 +115,7 @@ async fn refresh_token_success() -> TestResult {
 
 #[tokio::test]
 async fn refresh_token_reuse_detection() -> TestResult {
-    let (ctx, server) = create_test_context_and_server().await?;
+    let (ctx, server) = create_auth_test_context_and_server().await?;
 
     // register the test user
     let register_resp = server
@@ -211,7 +211,7 @@ async fn refresh_token_concurrent_reuse_within_grace_period() -> TestResult {
 
 #[tokio::test]
 async fn refresh_token_reuse_outside_grace_period() -> TestResult {
-    let (ctx, server) = create_test_context_and_server().await?;
+    let (ctx, server) = create_auth_test_context_and_server().await?;
 
     // Register the test user
     let register_resp = server
@@ -263,7 +263,7 @@ async fn refresh_token_reuse_outside_grace_period() -> TestResult {
 
 #[tokio::test]
 async fn revoke_token_success() -> TestResult {
-    let (ctx, server) = create_test_context_and_server().await?;
+    let (ctx, server) = create_auth_test_context_and_server().await?;
 
     // Register the test user
     let register_resp = server
@@ -513,7 +513,7 @@ async fn login_rehashes_outdated_password_hash_api() -> TestResult {
     use serde_json::json;
 
     // 1. manually instantiate the context and router so we retain access to  `ctx.db`
-    let (ctx, server) = create_test_context_and_server().await?;
+    let (ctx, server) = create_auth_test_context_and_server().await?;
     let email = common::Email::parse("api_rehash_test@example.com").ok_or("invalid email")?;
 
     // 2. register the user via HTTP
@@ -574,7 +574,7 @@ async fn refresh_token_tenant_isolation() -> TestResult {
     use crate::platform::identity::tokens;
     use crate::platform::identity::users;
 
-    let (ctx, _server) = create_test_context_and_server().await?;
+    let (ctx, _server) = create_auth_test_context_and_server().await?;
 
     // 1. Insert Tenant 2 into the database
     sqlx::query(
@@ -649,7 +649,7 @@ async fn refresh_token_cleanup_task_deletes_expired() -> TestResult {
     use crate::platform::identity::tokens;
     use crate::platform::identity::users;
 
-    let (ctx, _server) = create_test_context_and_server().await?;
+    let (ctx, _server) = create_auth_test_context_and_server().await?;
 
     // create a user for testing
     let email = common::Email::parse("cleanup_test@example.com").ok_or("invalid email")?;

@@ -1,4 +1,3 @@
-use axum::Router;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::Request;
@@ -9,6 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use tracing::error;
 use tracing::info;
+use utoipax::router::OpenApiRouter;
 
 use crate::platform::api;
 use crate::platform::assets;
@@ -20,19 +20,40 @@ use crate::platform::common::ArcContext;
 #[derive(Clone)]
 struct CustomPanicHandler;
 
-pub fn create(context: ArcContext) -> Router {
-    let api = Router::new()
-        .merge(auth_router(&context))
-        .merge(users_router(&context))
-        .merge(app_router(&context))
-        .merge(public_router(&context))
+pub fn create(context: ArcContext) -> OpenApiRouter {
+    use crate::app;
+    use crate::platform::identity::auth;
+    use crate::platform::identity::oauth;
+    use crate::platform::identity::tokens;
+    use crate::platform::identity::users;
+
+    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, context.clone());
+    let oauth_service = oauth::Service::new(context.clone(), auth_service.clone());
+    let users_service = users::Service::new(users::db::Repository, context.clone());
+
+    // unauthenticated routes setup
+    let public_router = OpenApiRouter::new()
+        .merge(auth::api::router(auth_service))
+        .merge(oauth::api::router(oauth_service))
+        .merge(OpenApiRouter::new().routes(utoipax::routes!(health_check)))
+        .with_state(context.clone());
+
+    // authenticated routes setup
+    let private_router = OpenApiRouter::new()
+        .merge(users::api::router(users_service))
+        .merge(app::sample::api::router())
+        .route_layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware));
+
+    // merge routers and specify fallback for unmatched /api routes
+    let api = OpenApiRouter::new()
+        .merge(public_router)
+        .merge(private_router)
         .fallback(|| async { api::Error::not_found() });
 
-    let global_settings = context.settings.rate_limiter.global.clone();
+    let router = OpenApiRouter::new().nest("/api", api).fallback(assets::static_handler);
+    let router = rate_limiter::add_global_rate_limiting(router, &context.settings.rate_limiter.global);
 
-    let raw_router = Router::new()
-        .nest("/api", api)
-        .fallback(assets::static_handler)
+    router
         .layer(
             tower_http::trace::TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
                 let client_ip = rate_limiter::extract_client_ip(request);
@@ -48,45 +69,16 @@ pub fn create(context: ArcContext) -> Router {
             }),
         )
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
-        .with_state(context);
-
-    rate_limiter::add_global_rate_limiting(raw_router, &global_settings)
+        .with_state(context)
 }
 
-fn public_router(context: &ArcContext) -> axum::Router<ArcContext> {
-    Router::new()
-        .route("/health", axum::routing::get(health_check))
-        .with_state(context.clone())
-}
+pub fn add_swagger(router: OpenApiRouter) -> axum::Router {
+    let (router, _openapi) = router.split_for_parts();
 
-fn app_router(context: &ArcContext) -> axum::Router<ArcContext> {
-    use crate::app;
+    #[cfg(feature = "swagger")]
+    let router = router.merge(utoipa_swagger_ui::SwaggerUi::new("/docs").url("/openapi.json", _openapi.clone()));
 
-    axum::Router::new()
-        .merge(app::sample::api::router())
-        .route_layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware))
-}
-
-fn users_router(context: &ArcContext) -> axum::Router<ArcContext> {
-    use crate::platform::identity::users;
-
-    let users_service = users::Service::new(users::db::Repository, context.clone());
-    axum::Router::new()
-        .merge(users::api::router(users_service))
-        .route_layer(axum::middleware::from_fn_with_state(context.clone(), auth_middleware))
-}
-
-fn auth_router(context: &ArcContext) -> axum::Router<ArcContext> {
-    use crate::platform::identity::auth;
-    use crate::platform::identity::oauth;
-    use crate::platform::identity::tokens;
-    use crate::platform::identity::users;
-
-    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, context.clone());
-    let oauth_service = oauth::Service::new(context.clone(), auth_service.clone());
-    axum::Router::new()
-        .merge(auth::api::router(auth_service))
-        .merge(oauth::api::router(oauth_service))
+    router
 }
 
 async fn auth_middleware(
@@ -99,19 +91,30 @@ async fn auth_middleware(
     Ok(next.run(req).await)
 }
 
-#[derive(Serialize)]
-struct HealthCheckResponse {
-    message: String,
-    time: String,
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct HealthCheckResponse {
+    pub message: String,
+    pub time: String,
 }
 
-#[derive(Deserialize)]
-struct HealthCheckQuery {
+#[derive(Deserialize, utoipa::ToSchema, utoipa::IntoParams)]
+pub struct HealthCheckQuery {
     #[serde(default)]
-    panic: bool,
+    pub panic: bool,
 }
 
 #[allow(clippy::unused_async)]
+#[utoipa::path(
+    get,
+    path = "/health",
+    params(
+        HealthCheckQuery
+    ),
+    responses(
+        (status = 200, description = "Health check successful", body = HealthCheckResponse),
+        (status = 500, description = "Database or server unhealthy", body = api::Error)
+    )
+)]
 async fn health_check(
     State(context): State<ArcContext>,
     query: api::Query<HealthCheckQuery>,

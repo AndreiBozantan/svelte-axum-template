@@ -54,6 +54,8 @@
         "tlsv",
         "tmpfs",
         "usermod",
+        "utoipa",
+        "utoipax",
         "xtask"
     ],
     "editor.formatOnSave": true,

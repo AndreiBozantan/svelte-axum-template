@@ -52,7 +52,7 @@ async fn oauth_user_linking_existing_password_user() -> TestResult {
     let user = auth_service
         .register(
             email.clone(),
-            "super_secure_pass_123",
+            "super_secure_pass_123".to_string(),
             Some("First".to_string()),
             Some("Last".to_string()),
         )

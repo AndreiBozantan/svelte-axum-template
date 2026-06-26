@@ -96,7 +96,6 @@ impl Context {
         Ok(context.into())
     }
 
-    #[cfg(test)]
     pub async fn create_test_context() -> Result<ArcContext, ContextCreationError> {
         let settings = config::AppSettings {
             jwt: config::JwtSettings {

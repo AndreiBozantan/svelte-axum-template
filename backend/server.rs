@@ -42,6 +42,9 @@ pub enum Error {
 
     #[error("Context creation error: {0}")]
     ContextCreationFailed(#[from] common::ContextCreationError),
+
+    #[error("OpenAPI error: {0}")]
+    OpenApiGenerationFailed(String),
 }
 
 pub async fn run() {
@@ -64,6 +67,8 @@ pub async fn run() {
 }
 
 async fn start_server() -> Result<(), Error> {
+    crate::openapi::export().await.map_err(Error::OpenApiGenerationFailed)?;
+
     let settings = config::AppSettings::new()?;
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
@@ -85,14 +90,16 @@ async fn start_server() -> Result<(), Error> {
         migrations::run_migrations(&ctx).await?;
 
         let addr = ctx.settings.get_server_address().parse::<SocketAddr>()?;
-        let router = router::create(ctx.clone()).into_make_service_with_connect_info::<SocketAddr>();
+        let router = router::create(ctx.clone());
+        let router = router::add_swagger(router);
+        let service = router.into_make_service_with_connect_info::<SocketAddr>();
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
         crate::platform::identity::oauth::check_oauth_config(&ctx.settings.oauth);
 
         start_background_cleanup_tasks(&ctx);
 
-        axum::serve(listener, router)
+        axum::serve(listener, service)
             .with_graceful_shutdown(shutdown_signal())
             .await?;
     }
