@@ -10,10 +10,15 @@ const NO_REFRESH_PATHS = new Set(['/api/auth/login', '/api/auth/refresh', '/api/
 // tested, reset, or eventually instantiated per-client if needed.
 // ---------------------------------------------------------------------------
 
-class AuthRefreshManager {
+export class AuthRefreshManager {
     private refreshPromise: Promise<boolean> | null = null;
     private refreshTimer: ReturnType<typeof setTimeout> | null = null;
     private onAuthFailure: (() => void) | null = null;
+    private readonly fetchFn: typeof fetch;
+
+    constructor(fetchFn: typeof fetch = globalThis.fetch) {
+        this.fetchFn = fetchFn;
+    }
 
     setAuthFailureCallback(cb: () => void) {
         this.onAuthFailure = cb;
@@ -41,7 +46,7 @@ class AuthRefreshManager {
 
     private async doRefresh(): Promise<boolean> {
         try {
-            const r = await fetch('/api/auth/refresh', {
+            const r = await this.fetchFn('/api/auth/refresh', {
                 method: 'POST',
                 credentials: 'same-origin',
             });
