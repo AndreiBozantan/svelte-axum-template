@@ -1,174 +1,58 @@
-import type { User } from './types';
+import createClient from 'openapi-fetch';
+import { type Middleware } from 'openapi-fetch';
+import { type paths } from './generated/api';
+import { AppState } from './AppState.svelte';
 
-export class ApiError extends Error {
-    readonly code: string;
-    constructor(code: string, message: string) {
-        super(message);
-        this.code = code;
-        this.name = 'ApiError';
-    }
-}
+let refreshPromise: Promise<boolean> | null = null;
 
-export interface PaginatedResponse<T> {
-    items: T[];
-    total: number;
-    limit: number;
-    offset: number;
-}
+// paths where a 401 should not trigger a refresh attempt.
+const NO_REFRESH_PATHS = new Set(['/api/auth/login', '/api/auth/refresh']);
 
-export interface PaginationParams {
-    limit?: number;
-    offset?: number;
-}
+const authMiddleware: Middleware = {
+    async onResponse({ request, response }) {
+        if (response.status !== 401) return response;
 
-class Api {
-    constructor(private readonly baseUrl = '') {}
+        const url = new URL(request.url);
+        if (NO_REFRESH_PATHS.has(url.pathname)) return response;
 
-    // ---- core helpers ----
+        // only retry GET requests transparently; for POST/PUT/PATCH, let the
+        // call site handle it since request bodies cannot be easily re-read/retried
+        if (request.method !== 'GET') return response;
 
-    private jsonHeaders(): Record<string, string> {
-        return { Accept: 'application/json', 'Content-Type': 'application/json' };
-    }
-
-    private buildUrl(path: string, params?: Record<string, unknown>): string {
-        const url = new URL(this.baseUrl + path, window.location.origin);
-        if (params) {
-            for (const [key, value] of Object.entries(params)) {
-                if (value !== undefined && value !== null) {
-                    url.searchParams.set(key, String(value));
-                }
-            }
+        const refreshed = await coalescedRefresh();
+        if (!refreshed) {
+            AppState.setUser(null);
+            return response;
         }
-        return url.pathname + url.search;
-    }
 
-    private async handleResponse<T>(res: Response): Promise<T> {
-        if (res.status === 204) return undefined as T;
-        const contentType = res.headers.get('content-type');
-        let data: unknown;
-        if (contentType?.includes('application/json')) {
-            data = await res.json();
-        } else {
-            const text = await res.text();
+        // retry the original GET request once
+        return fetch(request);
+    },
+};
+
+async function coalescedRefresh(): Promise<boolean> {
+    if (!refreshPromise) {
+        // if there is no active refresh request in flight, initiate one
+        refreshPromise = (async () => {
             try {
-                data = JSON.parse(text);
-            } catch {
-                if (!res.ok) throw new ApiError('error', text || res.statusText);
-                return text as T;
+                const r = await fetch('/api/auth/refresh', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                });
+                return r.ok;
+            } finally {
+                // clear the promise reference once completed (on success or failure)
+                // so that subsequent 401s in the future can trigger a new refresh flow.
+                refreshPromise = null;
             }
-        }
-        if (!res.ok) {
-            const err = data as Record<string, string>;
-            throw new ApiError(err.code ?? 'error', err.message ?? res.statusText);
-        }
-        return data as T;
+        })();
     }
-
-    private async get<T>(
-        path: string,
-        params?: Record<string, unknown>,
-        signal?: AbortSignal
-    ): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.buildUrl(path, params), {
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    private async post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.baseUrl + path, {
-            method: 'POST',
-            headers: this.jsonHeaders(),
-            body: JSON.stringify(body),
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    private async postEmpty<T>(path: string, signal?: AbortSignal): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.baseUrl + path, {
-            method: 'POST',
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    private async put<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.baseUrl + path, {
-            method: 'PUT',
-            headers: this.jsonHeaders(),
-            body: JSON.stringify(body),
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    private async patch<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.baseUrl + path, {
-            method: 'PATCH',
-            headers: this.jsonHeaders(),
-            body: JSON.stringify(body),
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    private async del<T>(path: string, signal?: AbortSignal): Promise<T> {
-        // nosemgrep: gitlab.nodejs_scan.javascript-ssrf-rule-node_ssrf
-        const res = await fetch(this.baseUrl + path, {
-            method: 'DELETE',
-            credentials: 'same-origin',
-            signal,
-        });
-        return this.handleResponse(res);
-    }
-
-    // ---- auth ----
-
-    async login(email: string, password: string, signal?: AbortSignal): Promise<{ user: User }> {
-        return this.post('/api/auth/login', { email, password }, signal);
-    }
-
-    async logout(signal?: AbortSignal): Promise<void> {
-        return this.postEmpty('/api/auth/logout', signal);
-    }
-
-    // ---- users ----
-
-    async getUserInfo(signal?: AbortSignal): Promise<{ user: User }> {
-        return this.get('/api/users/me', undefined, signal); // was /api/auth/user_info
-    }
-
-    async getUsers(
-        { limit = 50, offset = 0 }: PaginationParams = {},
-        signal?: AbortSignal
-    ): Promise<PaginatedResponse<User>> {
-        const raw = await this.get<{
-            users: User[];
-            total: number;
-            limit: number;
-            offset: number;
-        }>('/api/users', { limit, offset }, signal);
-
-        // normalise to a consistent shape regardless of backend field name
-        return { items: raw.users, total: raw.total, limit: raw.limit, offset: raw.offset };
-    }
-
-    // ---- misc ----
-
-    async getHealth(signal?: AbortSignal): Promise<{ message: string }> {
-        return this.get('/api/health', undefined, signal);
-    }
+    // return the active refresh promise so that
+    // multiple concurrent 401s will await this same promise
+    return refreshPromise;
 }
 
-export const api = new Api();
+export const api = createClient<paths>({
+    credentials: 'same-origin',
+});
+api.use(authMiddleware);
