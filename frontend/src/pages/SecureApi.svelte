@@ -8,8 +8,12 @@
         AppState.startLoading();
         response = '';
         try {
-            const data = await api.getUserInfo();
-            response = JSON.stringify(data, null, 2);
+            const { data, error } = await api.GET('/api/users/me');
+            if (error) {
+                response = `Error: ${error.message}`;
+            } else if (data) {
+                response = JSON.stringify(data, null, 2);
+            }
         } catch (e) {
             response = `Error: ${e}`;
         } finally {

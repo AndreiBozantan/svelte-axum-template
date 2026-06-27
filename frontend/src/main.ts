@@ -23,17 +23,16 @@ async function bootstrap() {
         let user = null;
 
         if (isLoggedIn) {
-            user = await api
-                .getUserInfo()
-                .then((r) => r.user)
-                .catch((err) => {
-                    // 401 is expected (not logged in); anything else is worth knowing about
-                    if (err.code !== 'not_authenticated') console.warn('getUserInfo failed:', err);
-                    // clear client-side indicator since auth failed
-                    document.cookie =
-                        'logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
-                    return null;
-                });
+            const { data, error } = await api.GET('/api/users/me');
+            if (error) {
+                // 401 is expected (not logged in); anything else is worth knowing about
+                if (error.code !== 'not_authenticated') console.warn('getUserInfo failed:', error);
+                // clear client-side indicator since auth failed
+                document.cookie =
+                    'logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
+            } else if (data) {
+                user = data.user;
+            }
         }
 
         AppState.setUser(user);
