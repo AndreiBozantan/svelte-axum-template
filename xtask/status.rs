@@ -60,7 +60,13 @@ fn extract_json_u64(
 
 fn run_clippy_and_count() -> usize {
     let output = Command::new("cargo")
-        .args(["clippy", "--workspace --all-targets --message-format=json"])
+        .args([
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--message-format=json",
+        ])
         .output();
 
     let mut count = 0;
@@ -78,7 +84,9 @@ fn run_clippy_and_count() -> usize {
 }
 
 fn run_tests_and_count() -> (usize, usize) {
-    let output = Command::new("cargo").args(["test"]).output();
+    let output = Command::new("cargo")
+        .args(["test", "--workspace", "--all-targets", "--all-features"])
+        .output();
 
     let mut total_passed = 0;
     let mut total_failed = 0;

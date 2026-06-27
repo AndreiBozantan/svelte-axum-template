@@ -20,6 +20,7 @@
         "binstall",
         "chrono",
         "clippy",
+        "cxapi",
         "cxdbpr",
         "distroless",
         "dotenvy",
