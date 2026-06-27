@@ -92,7 +92,15 @@ pub fn check_backend_lint() -> std::io::Result<()> {
     println!("Running Rust lints (cargo clippy)...");
     let status = crate::run_command(
         "cargo",
-        &["clippy", "--workspace", "--all-targets", "--", "-D", "warnings"],
+        &[
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings",
+        ],
         None,
     )?;
     if !status.success() {
@@ -103,7 +111,19 @@ pub fn check_backend_lint() -> std::io::Result<()> {
 
 pub fn check_backend_sqlx() -> std::io::Result<()> {
     println!("Verifying SQLx offline query metadata...");
-    let status = crate::run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)?;
+    let status = crate::run_command(
+        "cargo",
+        &[
+            "sqlx",
+            "prepare",
+            "--check",
+            "--workspace",
+            "--",
+            "--all-targets",
+            "--all-features",
+        ],
+        None,
+    )?;
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
@@ -112,7 +132,11 @@ pub fn check_backend_sqlx() -> std::io::Result<()> {
 
 pub fn check_backend_test() -> std::io::Result<()> {
     println!("Running Rust tests (cargo test)...");
-    let status = crate::run_command("cargo", &["test", "--workspace"], None)?;
+    let status = crate::run_command(
+        "cargo",
+        &["test", "--workspace", "--all-targets", "--all-features"],
+        None,
+    )?;
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }

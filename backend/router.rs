@@ -73,12 +73,13 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
 }
 
 pub fn add_swagger(router: OpenApiRouter) -> axum::Router {
-    let (router, _openapi) = router.split_for_parts();
-
     #[cfg(feature = "swagger")]
-    let router = router.merge(utoipa_swagger_ui::SwaggerUi::new("/docs").url("/openapi.json", _openapi.clone()));
-
-    router
+    {
+        let (router, openapi) = router.split_for_parts();
+        router.merge(utoipa_swagger_ui::SwaggerUi::new("/docs").url("/openapi.json", openapi))
+    }
+    #[cfg(not(feature = "swagger"))]
+    router.split_for_parts().0
 }
 
 async fn auth_middleware(

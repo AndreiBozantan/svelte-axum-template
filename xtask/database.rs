@@ -66,13 +66,36 @@ pub fn db_migrate() -> std::io::Result<ExitStatus> {
 
 pub fn db_prepare() -> std::io::Result<ExitStatus> {
     println!("Preparing SQLx offline queries metadata...");
-    crate::run_command("cargo", &["sqlx", "prepare", "--workspace"], None)
+    crate::run_command(
+        "cargo",
+        &[
+            "sqlx",
+            "prepare",
+            "--workspace",
+            "--",
+            "--all-targets",
+            "--all-features",
+        ],
+        None,
+    )
 }
 
 pub fn db_prepare_check() -> std::io::Result<ExitStatus> {
     ensure_sqlx_cli();
     println!("Checking if SQLx offline queries metadata is up to date...");
-    crate::run_command("cargo", &["sqlx", "prepare", "--check", "--workspace"], None)
+    crate::run_command(
+        "cargo",
+        &[
+            "sqlx",
+            "prepare",
+            "--check",
+            "--workspace",
+            "--",
+            "--all-targets",
+            "--all-features",
+        ],
+        None,
+    )
 }
 
 pub fn db_drop() -> std::io::Result<ExitStatus> {
