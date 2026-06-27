@@ -1,6 +1,6 @@
 import createClient from 'openapi-fetch';
-import { type Middleware } from 'openapi-fetch';
-import { type paths } from './generated/api';
+import type { Middleware } from 'openapi-fetch';
+import type { paths } from './generated/api';
 import { AppState } from './AppState.svelte';
 
 let refreshPromise: Promise<boolean> | null = null;
