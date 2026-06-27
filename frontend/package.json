@@ -10,6 +10,7 @@
         "build": "vite build",
         "preview": "vite preview",
         "check": "svelte-check --tsconfig ./tsconfig.json",
+        "check:ts": "tsc --noEmit",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
         "test": "vitest run",
