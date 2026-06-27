@@ -397,5 +397,25 @@ fn openapi() {
         },
     }
 
-    println!("Successfully generated TypeScript definitions: frontend/src/lib/generated/api.d.ts");
+    println!("Formatting TypeScript definitions with Prettier...");
+    let prettier_status = run_command(
+        "npx",
+        &["prettier", "--write", "src/lib/generated/api.d.ts"],
+        Some("frontend"),
+    );
+
+    match prettier_status {
+        Ok(st) => {
+            if !st.success() {
+                eprintln!("Error: Prettier formatting failed.");
+                std::process::exit(st.code().unwrap_or(1));
+            }
+        },
+        Err(e) => {
+            eprintln!("Error: failed to execute prettier: {e}");
+            std::process::exit(1);
+        },
+    }
+
+    println!("Successfully generated and formatted TypeScript definitions: frontend/src/lib/generated/api.d.ts");
 }
