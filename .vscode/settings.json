@@ -6,7 +6,9 @@
         ".gitignore": ".dockerignore, .gitignore, .semgrepignore, .gitattributes",
         "AGENTS.md": "README.md, LICENSE",
         ".env": ".env.example",
-        "Dockerfile": "docker-compose.yml"
+        "Dockerfile": "docker-compose.yml",
+        "jsconfig.json": "svelte.config.js, tsconfig.json, tsconfig.node.json, vite.config.ts",
+        ".prettierrc": ".prettierignore"
     },
     "cSpell.ignorePaths": ["**/Cargo.lock", "**/settings.json"],
     "cSpell.words": [
