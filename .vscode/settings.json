@@ -4,7 +4,7 @@
         "configs.common.toml": "configs.*.toml",
         "Cargo.toml": "Cargo.toml, Cargo.lock, rustfmt.toml, .editorconfig",
         ".gitignore": ".dockerignore, .gitignore, .semgrepignore, .gitattributes",
-        "AGENTS.md": "README.md, LICENSE",
+        "AGENTS.md": "README.md, LICENSE, openapi.json",
         ".env": ".env.example",
         "Dockerfile": "docker-compose.yml",
         "jsconfig.json": "svelte.config.js, tsconfig.json, tsconfig.node.json, vite.config.ts",

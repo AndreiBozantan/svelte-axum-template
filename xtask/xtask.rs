@@ -62,6 +62,7 @@ fn main() {
             checks::ci_frontend().expect("failed to run CI frontend checks");
         },
         "dev" => dev(),
+        "openapi" => openapi(),
         "docker-build" => {
             docker::docker_build().expect("failed to build docker image");
         },
@@ -100,6 +101,7 @@ Available commands:
   ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
   ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
   dev              - Runs backend watch and frontend dev server concurrently
+  openapi          - Generates OpenAPI spec and frontend TypeScript client
   stop             - Stops any running backend servers
   docker-build     - Builds the production Docker image (svelaxum:release)
   docker-run       - Runs the production Docker container locally
@@ -334,4 +336,88 @@ fn release() {
 fn lint_security() -> std::io::Result<ExitStatus> {
     println!("Running Semgrep security scan...");
     run_command("semgrep", &["--config", "r/all"], None)
+}
+
+fn openapi() {
+    println!("Generating OpenAPI JSON specification...");
+
+    let output = Command::new("cargo")
+        .args(["run", "--package", "app", "--quiet", "--", "export-openapi"])
+        .output();
+
+    let output = match output {
+        Ok(out) => {
+            if !out.status.success() {
+                eprintln!("Error: backend failed to export OpenAPI spec.");
+                std::process::exit(out.status.code().unwrap_or(1));
+            }
+            out
+        },
+        Err(e) => {
+            eprintln!("Error: failed to execute cargo run: {e}");
+            std::process::exit(1);
+        },
+    };
+
+    if let Err(e) = fs::write("openapi.json", &output.stdout) {
+        eprintln!("Error: failed to write openapi.json: {e}");
+        std::process::exit(1);
+    }
+    println!("Saved OpenAPI JSON specification to openapi.json");
+
+    let gen_dir = Path::new("frontend/src/lib/generated");
+    if let Err(e) = fs::create_dir_all(gen_dir) {
+        eprintln!("Error: failed to create directory frontend/src/lib/generated: {e}");
+        std::process::exit(1);
+    }
+
+    println!("Generating TypeScript definitions from OpenAPI spec...");
+    let status = run_command(
+        "npx",
+        &[
+            "-y",
+            "openapi-typescript",
+            "../openapi.json",
+            "-o",
+            "src/lib/generated/api.d.ts",
+            "--root-types",
+            "--root-types-no-schema-prefix",
+        ],
+        Some("frontend"),
+    );
+
+    match status {
+        Ok(st) => {
+            if !st.success() {
+                eprintln!("Error: npx openapi-typescript failed.");
+                std::process::exit(st.code().unwrap_or(1));
+            }
+        },
+        Err(e) => {
+            eprintln!("Error: failed to execute npx openapi-typescript: {e}");
+            std::process::exit(1);
+        },
+    }
+
+    println!("Formatting TypeScript definitions with Prettier...");
+    let prettier_status = run_command(
+        "npx",
+        &["prettier", "--write", "src/lib/generated/api.d.ts"],
+        Some("frontend"),
+    );
+
+    match prettier_status {
+        Ok(st) => {
+            if !st.success() {
+                eprintln!("Error: Prettier formatting failed.");
+                std::process::exit(st.code().unwrap_or(1));
+            }
+        },
+        Err(e) => {
+            eprintln!("Error: failed to execute prettier: {e}");
+            std::process::exit(1);
+        },
+    }
+
+    println!("Successfully generated and formatted TypeScript definitions: frontend/src/lib/generated/api.d.ts");
 }

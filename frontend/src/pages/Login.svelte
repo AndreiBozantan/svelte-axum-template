@@ -1,6 +1,6 @@
 <script lang="ts">
     import { AppState } from '$lib/AppState.svelte';
-    import { api, ApiError } from '$lib/api';
+    import { api } from '$lib/api';
     import { onMount, tick } from 'svelte';
 
     let email = $state('');
@@ -21,13 +21,18 @@
         errorMessage = '';
         isLoading = true;
         try {
-            const { user } = await api.login(email, password);
-            AppState.setUser(user);
-        } catch (error) {
-            errorMessage =
-                error instanceof ApiError
-                    ? error.message
-                    : 'An unexpected error occurred. Please try again.';
+            const { data, error } = await api.POST('/api/auth/login', {
+                body: { email, password },
+            });
+
+            if (error) {
+                errorMessage = error.message;
+                AppState.setUser(null);
+            } else if (data) {
+                AppState.setUser(data.user);
+            }
+        } catch (err) {
+            errorMessage = 'An unexpected error occurred. Please try again.';
             AppState.setUser(null);
         } finally {
             isLoading = false;

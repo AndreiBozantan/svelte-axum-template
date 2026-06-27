@@ -17,13 +17,13 @@ pub fn router(service: users::Service) -> utoipax::router::OpenApiRouter<common:
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
-pub struct UserResponse {
+pub struct UserInfo {
     pub id: i64,
     pub email: String,
     pub tenant_id: i64,
 }
 
-impl From<users::User> for UserResponse {
+impl From<users::User> for UserInfo {
     fn from(user: users::User) -> Self {
         Self {
             id: user.id.0,
@@ -35,7 +35,7 @@ impl From<users::User> for UserResponse {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct ListUsersResponse {
-    pub users: Vec<UserResponse>,
+    pub users: Vec<UserInfo>,
     pub total: i64,
     pub limit: i64,
     pub offset: i64,
@@ -43,7 +43,7 @@ pub struct ListUsersResponse {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct UserInfoResponse {
-    pub user: UserResponse,
+    pub user: UserInfo,
 }
 
 impl From<users::Error> for api::Error {

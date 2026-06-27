@@ -5,7 +5,7 @@
 
     onMount(async () => {
         try {
-            await api.logout();
+            await api.POST('/api/auth/logout');
         } catch {
             // already expired or invalid — clear local state regardless
         }
