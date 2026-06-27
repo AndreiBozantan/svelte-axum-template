@@ -380,6 +380,8 @@ fn openapi() {
             "../openapi.json",
             "-o",
             "src/lib/generated/api.d.ts",
+            "--root-types",
+            "--root-types-no-schema-prefix",
         ],
         Some("frontend"),
     );

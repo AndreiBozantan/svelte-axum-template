@@ -1,4 +1,4 @@
-import type { User } from './types';
+import type { UserInfo } from './generated/api';
 
 class AppStateDef {
     isLoading = $state<boolean>(true);
@@ -19,11 +19,11 @@ class AppStateDef {
         this.intendedPage = page;
     }
 
-    user = $state<User | null>(null);
+    user = $state<UserInfo | null>(null);
     userId = $state<number>(-1);
     isLoggedIn = $derived(this.user != null);
     isAdmin = $derived(this.user !== null && this.user.id === 1);
-    setUser(user: User | null) {
+    setUser(user: UserInfo | null) {
         this.user = user;
     }
 }

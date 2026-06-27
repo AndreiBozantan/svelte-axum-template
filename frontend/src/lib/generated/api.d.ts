@@ -239,6 +239,18 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type ApiError = components['schemas']['ApiError'];
+export type HashMap = components['schemas']['HashMap'];
+export type HealthCheckResponse = components['schemas']['HealthCheckResponse'];
+export type ListUsersResponse = components['schemas']['ListUsersResponse'];
+export type LoginRequest = components['schemas']['LoginRequest'];
+export type LoginResponse = components['schemas']['LoginResponse'];
+export type RefreshResponse = components['schemas']['RefreshResponse'];
+export type RegisterRequest = components['schemas']['RegisterRequest'];
+export type RegisterResponse = components['schemas']['RegisterResponse'];
+export type SampleResponse = components['schemas']['SampleResponse'];
+export type UserInfo = components['schemas']['UserInfo'];
+export type UserInfoResponse = components['schemas']['UserInfoResponse'];
 export type $defs = Record<string, never>;
 export interface operations {
     get_sample: {

@@ -15,7 +15,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "start": "npm run dev",
-        "generate:api": "openapi-typescript ../openapi.json -o src/lib/generated/api.d.ts && prettier --write src/lib/generated/api.d.ts"
+        "generate:api": "openapi-typescript ../openapi.json -o src/lib/generated/api.d.ts --root-types --root-types-no-schema-prefix && prettier --write src/lib/generated/api.d.ts"
     },
     "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
