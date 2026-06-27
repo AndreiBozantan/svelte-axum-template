@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { AppState } from '$lib/AppState.svelte';
-    import { api } from '$lib/api';
     import { onMount, tick } from 'svelte';
+
+    import { api } from '$lib/api';
+    import { AppState } from '$lib/AppState.svelte';
+    import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
     let email = $state('');
     let password = $state('');
@@ -30,6 +32,7 @@
                 AppState.setUser(null);
             } else if (data) {
                 AppState.setUser(data.user);
+                AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
             }
         } catch (err) {
             errorMessage = 'An unexpected error occurred. Please try again.';

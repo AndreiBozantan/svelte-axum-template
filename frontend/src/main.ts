@@ -1,8 +1,10 @@
 import './app.css';
 
 import { mount } from 'svelte';
-import { AppState } from '$lib/AppState.svelte';
+
 import { api } from '$lib/api';
+import { AppState } from '$lib/AppState.svelte';
+import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
 import App from './App.svelte';
 
@@ -32,6 +34,9 @@ async function bootstrap() {
                     'logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
             } else if (data) {
                 user = data.user;
+                if (typeof data.expires_in === 'number') {
+                    AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
+                }
             }
         }
 

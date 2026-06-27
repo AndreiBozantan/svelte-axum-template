@@ -198,6 +198,8 @@ export interface components {
             password: string;
         };
         LoginResponse: {
+            /** Format: int32 */
+            expires_in: number;
             user: components['schemas']['UserInfo'];
         };
         RefreshResponse: {
@@ -230,6 +232,8 @@ export interface components {
             tenant_id: number;
         };
         UserInfoResponse: {
+            /** Format: int32 */
+            expires_in: number;
             user: components['schemas']['UserInfo'];
         };
     };

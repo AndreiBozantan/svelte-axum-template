@@ -158,6 +158,12 @@ pub fn check_frontend_diagnostics() -> std::io::Result<()> {
     if !status.success() {
         std::process::exit(status.code().unwrap_or(1));
     }
+
+    println!("Checking frontend types (tsc --noEmit)...");
+    let status = crate::run_command("npm", &["run", "check:ts"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
     Ok(())
 }
 

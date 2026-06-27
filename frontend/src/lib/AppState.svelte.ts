@@ -1,4 +1,5 @@
 import type { UserInfo } from './generated/api';
+import { AuthRefreshManager } from './auth-refresh-manager';
 
 class AppStateDef {
     isLoading = $state<boolean>(true);
@@ -25,7 +26,14 @@ class AppStateDef {
     isAdmin = $derived(this.user !== null && this.user.id === 1);
     setUser(user: UserInfo | null) {
         this.user = user;
+        if (user === null) {
+            AuthRefreshManager.instance.clearRefreshTimer();
+        }
     }
 }
 
 export const AppState = new AppStateDef();
+
+AuthRefreshManager.instance.setAuthFailureCallback(() => {
+    AppState.setUser(null);
+});
