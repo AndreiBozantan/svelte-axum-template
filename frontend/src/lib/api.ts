@@ -229,31 +229,38 @@ export const coalescedRefresh = () => refreshManager.coalescedRefresh();
 // Auth middleware
 // ---------------------------------------------------------------------------
 
-const authMiddleware: Middleware = {
-    async onResponse({ request, response }) {
-        if (response.status !== 401) return response;
+export function createAuthMiddleware(
+    manager: AuthRefreshManager,
+    retryFetch: typeof fetch = globalThis.fetch
+): Middleware {
+    return {
+        async onResponse({ request, response }) {
+            if (response.status !== 401) return response;
 
-        const url = new URL(request.url);
-        if (NO_REFRESH_PATHS.has(url.pathname)) return response;
+            const url = new URL(request.url);
+            if (NO_REFRESH_PATHS.has(url.pathname)) return response;
 
-        // for non-GET requests we can't transparently retry (body already
-        // consumed), but we still refresh the token so subsequent calls succeed
-        if (request.method !== 'GET') {
-            const refreshed = await refreshManager.coalescedRefresh();
-            if (!refreshed) refreshManager.notifyAuthFailure();
-            return response;
-        }
+            // for non-GET requests we can't transparently retry (body already
+            // consumed), but we still refresh the token so subsequent calls succeed
+            if (request.method !== 'GET') {
+                const refreshed = await manager.coalescedRefresh();
+                if (!refreshed) manager.notifyAuthFailure();
+                return response;
+            }
 
-        // GET — attempt refresh, then retry once
-        const refreshed = await refreshManager.coalescedRefresh();
-        if (!refreshed) {
-            refreshManager.notifyAuthFailure();
-            return response;
-        }
+            // GET — attempt refresh, then retry once
+            const refreshed = await manager.coalescedRefresh();
+            if (!refreshed) {
+                manager.notifyAuthFailure();
+                return response;
+            }
 
-        return fetch(request);
-    },
-};
+            return retryFetch(request);
+        },
+    };
+}
+
+const authMiddleware = createAuthMiddleware(refreshManager);
 
 // ---------------------------------------------------------------------------
 // Cross-tab sync & visibility handlers

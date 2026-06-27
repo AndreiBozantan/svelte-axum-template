@@ -5,7 +5,7 @@ vi.mock('openapi-fetch', () => ({
     default: () => ({ use: vi.fn() }),
 }));
 
-import { AuthRefreshManager } from '$lib/api';
+import { AuthRefreshManager, createAuthMiddleware } from '$lib/api';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,6 +54,7 @@ describe('AuthRefreshManager', () => {
         manager.clearRefreshTimer();
         vi.useRealTimers();
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     // -----------------------------------------------------------------------
@@ -99,12 +100,21 @@ describe('AuthRefreshManager', () => {
             expect(mockFetch).not.toHaveBeenCalled();
         });
 
-        it('defaults lead time to 60s when auth_lead_time_ms is missing', () => {
-            const future = Date.now() + 300_000;
-            localStorage.setItem('auth_expires_at', future.toString());
+        it('defaults lead time to 60s and fires at expiresAt - 60_000', async () => {
+            mockFetch.mockResolvedValue(jsonResponse({ expires_in: 300 }));
 
-            // Should not throw — defaults to 60_000 lead time
+            vi.setSystemTime(0);
+            localStorage.setItem('auth_expires_at', '300000');
+            // No auth_lead_time_ms — should default to 60_000
+            // delay = 300_000 - 0 - 60_000 - 0 = 240_000
+
             manager.setupRefreshTimer();
+
+            await vi.advanceTimersByTimeAsync(239_999);
+            expect(mockFetch).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockFetch).toHaveBeenCalledOnce();
         });
     });
 
@@ -125,6 +135,22 @@ describe('AuthRefreshManager', () => {
 
             // At 240_000 — proactiveRefresh fires → calls fetch
             await vi.advanceTimersByTimeAsync(1);
+            expect(mockFetch).toHaveBeenCalledOnce();
+        });
+
+        it('cancels the previous timer when called again', async () => {
+            mockFetch.mockResolvedValue(jsonResponse({ expires_in: 600 }));
+
+            vi.setSystemTime(0);
+            manager.setupRefreshTimer(300); // timer at 240_000
+            manager.setupRefreshTimer(600); // replaces → timer at 540_000
+
+            // Past first timer's delay — should NOT fire (cancelled)
+            await vi.advanceTimersByTimeAsync(240_000);
+            expect(mockFetch).not.toHaveBeenCalled();
+
+            // At second timer's delay — should fire
+            await vi.advanceTimersByTimeAsync(300_000);
             expect(mockFetch).toHaveBeenCalledOnce();
         });
     });
@@ -198,6 +224,16 @@ describe('AuthRefreshManager', () => {
             // Stored expiry is still present (setupRefreshTimer() read it back)
             expect(localStorage.getItem('auth_expires_at')).not.toBeNull();
         });
+
+        it('does not reschedule timer when response lacks expires_in', async () => {
+            mockFetch.mockResolvedValueOnce(jsonResponse({ some: 'data' }));
+
+            const result = await manager.coalescedRefresh();
+
+            expect(result).toBe(true);
+            // setupRefreshTimer was never called — no expiry stored
+            expect(localStorage.getItem('auth_expires_at')).toBeNull();
+        });
     });
 
     // -----------------------------------------------------------------------
@@ -223,6 +259,42 @@ describe('AuthRefreshManager', () => {
 
             expect(result).toBe(false);
             expect(localStorage.getItem('auth_expires_at')).toBeNull();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // 8. isTokenFresh double-check after lock acquisition
+    // -----------------------------------------------------------------------
+    describe('proactiveRefresh with Web Locks', () => {
+        it('skips refresh when token becomes fresh during lock acquisition', async () => {
+            vi.setSystemTime(0);
+
+            // Stale token: expires in 10s but lead time is 60s → clearly stale
+            localStorage.setItem('auth_expires_at', '10000');
+            localStorage.setItem('auth_lead_time_ms', '60000');
+
+            // Mock navigator.locks — simulate another tab refreshing during lock wait
+            vi.stubGlobal('navigator', {
+                locks: {
+                    request: vi.fn(
+                        async (
+                            _name: string,
+                            _options: unknown,
+                            callback: (lock: unknown) => Promise<void>
+                        ) => {
+                            // Another tab pushed the expiry forward before we got the lock
+                            localStorage.setItem('auth_expires_at', String(Date.now() + 300_000));
+                            await callback({}); // grant the lock
+                        }
+                    ),
+                },
+            });
+
+            manager.setupRefreshTimer(); // delay <= 0 → immediate proactiveRefresh
+            await vi.advanceTimersByTimeAsync(0);
+
+            // Token was fresh by the time refreshIfStale ran — no fetch
+            expect(mockFetch).not.toHaveBeenCalled();
         });
     });
 
@@ -256,6 +328,109 @@ describe('AuthRefreshManager', () => {
 
         it('does not throw when no callback is registered', () => {
             expect(() => manager.notifyAuthFailure()).not.toThrow();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Auth middleware (via createAuthMiddleware)
+    // -----------------------------------------------------------------------
+    describe('authMiddleware', () => {
+        let retryFetch: ReturnType<typeof vi.fn> & typeof fetch;
+        let middleware: ReturnType<typeof createAuthMiddleware>;
+        let authFailureCb: ReturnType<typeof vi.fn> & (() => void);
+
+        beforeEach(() => {
+            retryFetch = vi.fn() as ReturnType<typeof vi.fn> & typeof fetch;
+            middleware = createAuthMiddleware(manager, retryFetch);
+            authFailureCb = vi.fn() as ReturnType<typeof vi.fn> & (() => void);
+            manager.setAuthFailureCallback(authFailureCb);
+        });
+
+        function callMiddleware(url: string, method: string, status: number) {
+            const request = new Request(url, { method });
+            const response = new Response('', { status });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return middleware.onResponse!({ request, response } as any);
+        }
+
+        it('passes through non-401 responses unchanged', async () => {
+            const request = new Request('http://localhost/api/data', { method: 'GET' });
+            const response = new Response('ok', { status: 200 });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await middleware.onResponse!({ request, response } as any);
+
+            expect(result).toBe(response);
+            expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('skips refresh for NO_REFRESH_PATHS', async () => {
+            for (const path of ['/api/auth/login', '/api/auth/refresh', '/api/auth/logout']) {
+                await callMiddleware(`http://localhost${path}`, 'POST', 401);
+            }
+
+            expect(mockFetch).not.toHaveBeenCalled();
+            expect(authFailureCb).not.toHaveBeenCalled();
+        });
+
+        it('GET 401 → refresh succeeds → retries the request', async () => {
+            mockFetch.mockResolvedValueOnce(jsonResponse({ expires_in: 300 }));
+            const retryResponse = new Response('retried', { status: 200 });
+            retryFetch.mockResolvedValueOnce(retryResponse);
+
+            const request = new Request('http://localhost/api/data', { method: 'GET' });
+            const original401 = new Response('', { status: 401 });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await middleware.onResponse!({ request, response: original401 } as any);
+
+            expect(mockFetch).toHaveBeenCalledOnce(); // refresh
+            expect(retryFetch).toHaveBeenCalledOnce(); // retry
+            expect(result).toBe(retryResponse); // retried response returned
+            expect(authFailureCb).not.toHaveBeenCalled();
+        });
+
+        it('GET 401 → refresh fails → notifyAuthFailure, returns original response', async () => {
+            mockFetch.mockResolvedValueOnce(new Response('', { status: 401 }));
+
+            const request = new Request('http://localhost/api/data', { method: 'GET' });
+            const original401 = new Response('', { status: 401 });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await middleware.onResponse!({ request, response: original401 } as any);
+
+            expect(mockFetch).toHaveBeenCalledOnce();
+            expect(retryFetch).not.toHaveBeenCalled(); // no retry
+            expect(result).toBe(original401);
+            expect(authFailureCb).toHaveBeenCalledOnce();
+        });
+
+        it('POST 401 → refreshes token but does not retry the request', async () => {
+            mockFetch.mockResolvedValueOnce(jsonResponse({ expires_in: 300 }));
+
+            const request = new Request('http://localhost/api/data', { method: 'POST' });
+            const original401 = new Response('', { status: 401 });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await middleware.onResponse!({ request, response: original401 } as any);
+
+            expect(mockFetch).toHaveBeenCalledOnce(); // refresh
+            expect(retryFetch).not.toHaveBeenCalled(); // no retry for POST
+            expect(result).toBe(original401); // original returned
+            expect(authFailureCb).not.toHaveBeenCalled();
+        });
+
+        it('POST 401 → refresh fails → notifyAuthFailure', async () => {
+            mockFetch.mockResolvedValueOnce(new Response('', { status: 401 }));
+
+            const request = new Request('http://localhost/api/data', { method: 'POST' });
+            const original401 = new Response('', { status: 401 });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await middleware.onResponse!({ request, response: original401 } as any);
+
+            expect(result).toBe(original401);
+            expect(authFailureCb).toHaveBeenCalledOnce();
         });
     });
 });
