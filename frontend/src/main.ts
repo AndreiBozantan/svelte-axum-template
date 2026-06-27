@@ -1,8 +1,10 @@
 import './app.css';
 
 import { mount } from 'svelte';
+
+import { api } from '$lib/api';
 import { AppState } from '$lib/AppState.svelte';
-import { api, setupRefreshTimer } from '$lib/api';
+import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
 import App from './App.svelte';
 
@@ -33,7 +35,7 @@ async function bootstrap() {
             } else if (data) {
                 user = data.user;
                 if (typeof data.expires_in === 'number') {
-                    setupRefreshTimer(data.expires_in);
+                    AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
                 }
             }
         }

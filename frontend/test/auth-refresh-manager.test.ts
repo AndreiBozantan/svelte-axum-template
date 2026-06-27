@@ -5,7 +5,8 @@ vi.mock('openapi-fetch', () => ({
     default: () => ({ use: vi.fn() }),
 }));
 
-import { AuthRefreshManager, createAuthMiddleware } from '$lib/api';
+import { createAuthMiddleware } from '$lib/api';
+import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
 // ---------------------------------------------------------------------------
 // Helpers
