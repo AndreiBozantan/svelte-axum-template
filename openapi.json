@@ -1,548 +1,519 @@
 {
-  "openapi": "3.1.0",
-  "info": {
-    "title": "utoipa-axum",
-    "description": "Utoipa's axum bindings for seamless integration for the two",
-    "contact": {
-      "name": "Juha Kukkonen",
-      "email": "juha7kukkonen@gmail.com"
-    },
-    "license": {
-      "name": "MIT OR Apache-2.0",
-      "identifier": "MIT OR Apache-2.0"
-    },
-    "version": "0.2.0"
-  },
-  "paths": {
-    "/api/api/sample": {
-      "get": {
-        "operationId": "get_sample",
-        "responses": {
-          "200": {
-            "description": "Sample response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SampleResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/login": {
-      "post": {
-        "operationId": "login",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
-            }
-          },
-          "required": true
+    "openapi": "3.1.0",
+    "info": {
+        "title": "utoipa-axum",
+        "description": "Utoipa's axum bindings for seamless integration for the two",
+        "contact": {
+            "name": "Juha Kukkonen",
+            "email": "juha7kukkonen@gmail.com"
         },
-        "responses": {
-          "200": {
-            "description": "Login successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid credentials",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
-        "operationId": "logout",
-        "responses": {
-          "204": {
-            "description": "Logout successful"
-          }
-        }
-      }
-    },
-    "/api/auth/refresh": {
-      "post": {
-        "operationId": "refresh",
-        "responses": {
-          "200": {
-            "description": "Session refresh successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RefreshResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/register": {
-      "post": {
-        "operationId": "register",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegisterRequest"
-              }
-            }
-          },
-          "required": true
+        "license": {
+            "name": "MIT OR Apache-2.0",
+            "identifier": "MIT OR Apache-2.0"
         },
-        "responses": {
-          "201": {
-            "description": "Registration successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RegisterResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "User already exists",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
+        "version": "0.2.0"
     },
-    "/api/health": {
-      "get": {
-        "operationId": "health_check",
-        "parameters": [
-          {
-            "name": "panic",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Health check successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HealthCheckResponse"
+    "paths": {
+        "/api/api/sample": {
+            "get": {
+                "operationId": "get_sample",
+                "responses": {
+                    "200": {
+                        "description": "Sample response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SampleResponse"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
             }
-          },
-          "500": {
-            "description": "Database or server unhealthy",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/oauth/google": {
-      "get": {
-        "operationId": "google_auth_init",
-        "parameters": [
-          {
-            "name": "redirect_url",
-            "in": "query",
-            "description": "Client redirect URL after login",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "303": {
-            "description": "Redirect to Google authorization page"
-          }
-        }
-      }
-    },
-    "/api/oauth/google/callback": {
-      "get": {
-        "operationId": "google_auth_callback",
-        "parameters": [
-          {
-            "name": "code",
-            "in": "query",
-            "description": "Google authorization code",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "in": "query",
-            "description": "CSRF state token",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "303": {
-            "description": "Redirect to client final landing URL"
-          }
-        }
-      }
-    },
-    "/api/users": {
-      "get": {
-        "operationId": "list_users",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "Pagination limit",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "description": "Pagination offset",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "List of users successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ListUsersResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
         },
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ]
-      }
-    },
-    "/api/users/me": {
-      "get": {
-        "operationId": "user_info",
-        "responses": {
-          "200": {
-            "description": "Get current user info successful",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UserInfoResponse"
+        "/api/auth/login": {
+            "post": {
+                "operationId": "login",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Login successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LoginResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
                 }
-              }
             }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
         },
-        "security": [
-          {
-            "cookieAuth": []
-          }
-        ]
-      }
+        "/api/auth/logout": {
+            "post": {
+                "operationId": "logout",
+                "responses": {
+                    "204": {
+                        "description": "Logout successful"
+                    }
+                }
+            }
+        },
+        "/api/auth/refresh": {
+            "post": {
+                "operationId": "refresh",
+                "responses": {
+                    "200": {
+                        "description": "Session refresh successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RefreshResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/register": {
+            "post": {
+                "operationId": "register",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Registration successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RegisterResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Validation failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/health": {
+            "get": {
+                "operationId": "health_check",
+                "parameters": [
+                    {
+                        "name": "panic",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Health check successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HealthCheckResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Database or server unhealthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/google": {
+            "get": {
+                "operationId": "google_auth_init",
+                "parameters": [
+                    {
+                        "name": "redirect_url",
+                        "in": "query",
+                        "description": "Client redirect URL after login",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "Redirect to Google authorization page"
+                    }
+                }
+            }
+        },
+        "/api/oauth/google/callback": {
+            "get": {
+                "operationId": "google_auth_callback",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "description": "Google authorization code",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "description": "CSRF state token",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "Redirect to client final landing URL"
+                    }
+                }
+            }
+        },
+        "/api/users": {
+            "get": {
+                "operationId": "list_users",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Pagination limit",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "description": "Pagination offset",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of users successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ListUsersResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "cookieAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/users/me": {
+            "get": {
+                "operationId": "user_info",
+                "responses": {
+                    "200": {
+                        "description": "Get current user info successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserInfoResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "cookieAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ApiError": {
+                "type": "object",
+                "required": ["code", "message"],
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "details": {
+                        "oneOf": [
+                            {
+                                "type": "null"
+                            },
+                            {
+                                "$ref": "#/components/schemas/HashMap"
+                            }
+                        ]
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                }
+            },
+            "HashMap": {
+                "type": "object",
+                "additionalProperties": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "propertyNames": {
+                    "type": "string"
+                }
+            },
+            "HealthCheckResponse": {
+                "type": "object",
+                "required": ["message", "time"],
+                "properties": {
+                    "message": {
+                        "type": "string"
+                    },
+                    "time": {
+                        "type": "string"
+                    }
+                }
+            },
+            "ListUsersResponse": {
+                "type": "object",
+                "required": ["users", "total", "limit", "offset"],
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "users": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UserInfo"
+                        }
+                    }
+                }
+            },
+            "LoginRequest": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "alice@example.com"
+                    },
+                    "password": {
+                        "type": "string"
+                    }
+                }
+            },
+            "LoginResponse": {
+                "type": "object",
+                "required": ["expires_in", "user"],
+                "properties": {
+                    "expires_in": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/UserInfo"
+                    }
+                }
+            },
+            "RefreshResponse": {
+                "type": "object",
+                "required": ["expires_in", "user"],
+                "properties": {
+                    "expires_in": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/UserInfo"
+                    }
+                }
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "alice@example.com"
+                    },
+                    "first_name": {
+                        "type": ["string", "null"]
+                    },
+                    "last_name": {
+                        "type": ["string", "null"]
+                    },
+                    "password": {
+                        "type": "string",
+                        "minLength": 8
+                    }
+                }
+            },
+            "RegisterResponse": {
+                "type": "object",
+                "required": ["user"],
+                "properties": {
+                    "user": {
+                        "$ref": "#/components/schemas/UserInfo"
+                    }
+                }
+            },
+            "SampleResponse": {
+                "type": "object",
+                "required": ["status", "data"],
+                "properties": {
+                    "data": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    }
+                }
+            },
+            "UserInfo": {
+                "type": "object",
+                "required": ["id", "email", "tenant_id"],
+                "properties": {
+                    "email": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "tenant_id": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "UserInfoResponse": {
+                "type": "object",
+                "required": ["expires_in", "user"],
+                "properties": {
+                    "expires_in": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0
+                    },
+                    "user": {
+                        "$ref": "#/components/schemas/UserInfo"
+                    }
+                }
+            }
+        }
     }
-  },
-  "components": {
-    "schemas": {
-      "ApiError": {
-        "type": "object",
-        "required": [
-          "code",
-          "message"
-        ],
-        "properties": {
-          "code": {
-            "type": "string"
-          },
-          "details": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/HashMap"
-              }
-            ]
-          },
-          "message": {
-            "type": "string"
-          }
-        }
-      },
-      "HashMap": {
-        "type": "object",
-        "additionalProperties": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "propertyNames": {
-          "type": "string"
-        }
-      },
-      "HealthCheckResponse": {
-        "type": "object",
-        "required": [
-          "message",
-          "time"
-        ],
-        "properties": {
-          "message": {
-            "type": "string"
-          },
-          "time": {
-            "type": "string"
-          }
-        }
-      },
-      "ListUsersResponse": {
-        "type": "object",
-        "required": [
-          "users",
-          "total",
-          "limit",
-          "offset"
-        ],
-        "properties": {
-          "limit": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "offset": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "total": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "users": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UserInfo"
-            }
-          }
-        }
-      },
-      "LoginRequest": {
-        "type": "object",
-        "required": [
-          "email",
-          "password"
-        ],
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "alice@example.com"
-          },
-          "password": {
-            "type": "string"
-          }
-        }
-      },
-      "LoginResponse": {
-        "type": "object",
-        "required": [
-          "user"
-        ],
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/UserInfo"
-          }
-        }
-      },
-      "RefreshResponse": {
-        "type": "object",
-        "required": [
-          "expires_in",
-          "user"
-        ],
-        "properties": {
-          "expires_in": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
-          "user": {
-            "$ref": "#/components/schemas/UserInfo"
-          }
-        }
-      },
-      "RegisterRequest": {
-        "type": "object",
-        "required": [
-          "email",
-          "password"
-        ],
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "alice@example.com"
-          },
-          "first_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "last_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8
-          }
-        }
-      },
-      "RegisterResponse": {
-        "type": "object",
-        "required": [
-          "user"
-        ],
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/UserInfo"
-          }
-        }
-      },
-      "SampleResponse": {
-        "type": "object",
-        "required": [
-          "status",
-          "data"
-        ],
-        "properties": {
-          "data": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          }
-        }
-      },
-      "UserInfo": {
-        "type": "object",
-        "required": [
-          "id",
-          "email",
-          "tenant_id"
-        ],
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "tenant_id": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      },
-      "UserInfoResponse": {
-        "type": "object",
-        "required": [
-          "user"
-        ],
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/UserInfo"
-          }
-        }
-      }
-    }
-  }
 }

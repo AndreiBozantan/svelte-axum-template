@@ -1,6 +1,6 @@
 <script lang="ts">
     import { AppState } from '$lib/AppState.svelte';
-    import { api } from '$lib/api';
+    import { api, setupRefreshTimer } from '$lib/api';
     import { onMount, tick } from 'svelte';
 
     let email = $state('');
@@ -30,6 +30,7 @@
                 AppState.setUser(null);
             } else if (data) {
                 AppState.setUser(data.user);
+                setupRefreshTimer(data.expires_in);
             }
         } catch (err) {
             errorMessage = 'An unexpected error occurred. Please try again.';
