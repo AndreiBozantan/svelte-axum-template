@@ -43,6 +43,7 @@ pub struct ListUsersResponse {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct UserInfoResponse {
+    pub expires_in: u32,
     pub user: UserInfo,
 }
 
@@ -111,5 +112,10 @@ async fn user_info(
         .users
         .find_by_id(&service.context.db, tenant_id, user_id)
         .await?;
-    Ok(axum::Json(UserInfoResponse { user: user.into() }))
+    let now = chrono::Utc::now().timestamp();
+    let expires_in = u32::try_from(claims.exp - now).unwrap_or(0);
+    Ok(axum::Json(UserInfoResponse {
+        expires_in,
+        user: user.into(),
+    }))
 }

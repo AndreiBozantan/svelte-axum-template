@@ -60,6 +60,7 @@ pub struct LoginRequest {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct LoginResponse {
+    pub expires_in: u32,
     pub user: users::api::UserInfo,
 }
 
@@ -122,6 +123,7 @@ async fn login(
         "login_success"
     );
     let body = LoginResponse {
+        expires_in: service.context.jwt.access_token_expiry,
         user: session.user.into(),
     };
     Ok(cookies::create_response_with_auth_cookies(
