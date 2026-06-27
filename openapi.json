@@ -405,7 +405,7 @@
           "users": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/UserResponse"
+              "$ref": "#/components/schemas/UserInfo"
             }
           }
         }
@@ -434,7 +434,7 @@
         ],
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/UserResponse"
+            "$ref": "#/components/schemas/UserInfo"
           }
         }
       },
@@ -451,7 +451,7 @@
             "minimum": 0
           },
           "user": {
-            "$ref": "#/components/schemas/UserResponse"
+            "$ref": "#/components/schemas/UserInfo"
           }
         }
       },
@@ -492,7 +492,7 @@
         ],
         "properties": {
           "user": {
-            "$ref": "#/components/schemas/UserResponse"
+            "$ref": "#/components/schemas/UserInfo"
           }
         }
       },
@@ -511,18 +511,7 @@
           }
         }
       },
-      "UserInfoResponse": {
-        "type": "object",
-        "required": [
-          "user"
-        ],
-        "properties": {
-          "user": {
-            "$ref": "#/components/schemas/UserResponse"
-          }
-        }
-      },
-      "UserResponse": {
+      "UserInfo": {
         "type": "object",
         "required": [
           "id",
@@ -540,6 +529,17 @@
           "tenant_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "UserInfoResponse": {
+        "type": "object",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/UserInfo"
           }
         }
       }

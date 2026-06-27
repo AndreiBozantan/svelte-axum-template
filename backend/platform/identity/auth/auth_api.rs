@@ -48,7 +48,7 @@ pub struct RegisterRequest {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct RegisterResponse {
-    pub user: UserResponse,
+    pub user: users::api::UserInfo,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -60,30 +60,13 @@ pub struct LoginRequest {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct LoginResponse {
-    pub user: UserResponse,
+    pub user: users::api::UserInfo,
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct RefreshResponse {
     pub expires_in: u32,
-    pub user: UserResponse,
-}
-
-#[derive(Serialize, utoipa::ToSchema)]
-pub struct UserResponse {
-    pub id: i64,
-    pub email: String,
-    pub tenant_id: i64,
-}
-
-impl From<users::User> for UserResponse {
-    fn from(user: users::User) -> Self {
-        Self {
-            id: user.id.0,
-            email: user.email.as_str().to_string(),
-            tenant_id: user.tenant_id.0,
-        }
-    }
+    pub user: users::api::UserInfo,
 }
 
 #[utoipa::path(

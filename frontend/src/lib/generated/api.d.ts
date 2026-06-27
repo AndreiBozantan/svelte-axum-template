@@ -187,7 +187,7 @@ export interface components {
             offset: number;
             /** Format: int64 */
             total: number;
-            users: components['schemas']['UserResponse'][];
+            users: components['schemas']['UserInfo'][];
         };
         LoginRequest: {
             /**
@@ -198,12 +198,12 @@ export interface components {
             password: string;
         };
         LoginResponse: {
-            user: components['schemas']['UserResponse'];
+            user: components['schemas']['UserInfo'];
         };
         RefreshResponse: {
             /** Format: int32 */
             expires_in: number;
-            user: components['schemas']['UserResponse'];
+            user: components['schemas']['UserInfo'];
         };
         RegisterRequest: {
             /**
@@ -216,21 +216,21 @@ export interface components {
             password: string;
         };
         RegisterResponse: {
-            user: components['schemas']['UserResponse'];
+            user: components['schemas']['UserInfo'];
         };
         SampleResponse: {
             data: string;
             status: string;
         };
-        UserInfoResponse: {
-            user: components['schemas']['UserResponse'];
-        };
-        UserResponse: {
+        UserInfo: {
             email: string;
             /** Format: int64 */
             id: number;
             /** Format: int64 */
             tenant_id: number;
+        };
+        UserInfoResponse: {
+            user: components['schemas']['UserInfo'];
         };
     };
     responses: never;
