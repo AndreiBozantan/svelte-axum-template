@@ -20,6 +20,7 @@
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
         "@tsconfig/svelte": "^5.0.8",
         "@types/node": "^26.0.1",
+        "openapi-typescript": "^7.13.0",
         "prettier": "^3.8.4",
         "prettier-plugin-svelte": "^4.1.0",
         "svelte": "^5.55.10",
@@ -33,6 +34,7 @@
     "dependencies": {
         "@fortawesome/fontawesome-svg-core": "^7.2.0",
         "@fortawesome/free-solid-svg-icons": "^7.2.0",
+        "openapi-fetch": "^0.17.0",
         "svelte-fa": "^4.0.4",
         "svelte-spa-router": "^5.1.0"
     },
