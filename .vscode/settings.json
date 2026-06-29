@@ -20,6 +20,7 @@
         "binstall",
         "chrono",
         "clippy",
+        "codegen",
         "cxapi",
         "cxdbpr",
         "distroless",
