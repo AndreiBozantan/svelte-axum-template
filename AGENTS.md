@@ -48,3 +48,7 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - configured in `.githooks/` and installed via `cargo xtask setup-hooks` (also executed with `cargo xtask dev-init`)
 - `pre-commit`: runs `cargo fmt`, `cargo clippy`, and `sqlx prepare --check` if backend/xtask changes are staged; runs `prettier` and `svelte-check` if frontend changes are staged
 - `pre-push`: runs backend tests (`cargo test`) and frontend tests (`vitest`) selectively based on what directories have changed
+
+# CUSTOM AGENT SKILLS
+
+`review-backend`: detailed code review criteria for the Rust backend code; trigger when review or feedback is requested.
