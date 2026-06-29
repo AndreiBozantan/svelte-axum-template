@@ -22,24 +22,18 @@
         e.preventDefault();
         errorMessage = '';
         isLoading = true;
-        try {
-            const { data, error } = await api.POST('/api/auth/login', {
-                body: { email, password },
-            });
 
-            if (error) {
-                errorMessage = error.message;
-                AppState.setUser(null);
-            } else if (data) {
-                AppState.setUser(data.user);
-                AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
-            }
-        } catch (err) {
-            errorMessage = 'An unexpected error occurred. Please try again.';
+        const { data, error } = await api.auth.login({ email, password });
+
+        if (error) {
+            errorMessage = error.message;
             AppState.setUser(null);
-        } finally {
-            isLoading = false;
+            return;
         }
+
+        AppState.setUser(data.user);
+        AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
+        isLoading = false;
     }
 
     function handleGoogleLogin() {

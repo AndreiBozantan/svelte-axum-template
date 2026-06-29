@@ -4,11 +4,7 @@
     import { onMount } from 'svelte';
 
     onMount(async () => {
-        try {
-            await api.POST('/api/auth/logout');
-        } catch {
-            // already expired or invalid — clear local state regardless
-        }
+        await api.auth.logout();
         AppState.setUser(null);
     });
 </script>
