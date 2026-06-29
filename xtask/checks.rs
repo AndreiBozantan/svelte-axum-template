@@ -220,7 +220,7 @@ pub fn check_backend_openapi_drift() -> std::io::Result<()> {
 pub fn check_frontend_openapi_drift() -> std::io::Result<()> {
     println!("Checking for frontend OpenAPI client drift...");
 
-    let status = crate::run_command("node", &["scripts/generate-api.js"], Some("frontend"))?;
+    let status = crate::run_command("node", &["scripts/generate-api.ts"], Some("frontend"))?;
 
     if !status.success() {
         eprintln!("Error: frontend API client generation failed.");

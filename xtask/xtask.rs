@@ -366,7 +366,7 @@ pub(crate) fn openapi() {
     println!("Saved OpenAPI JSON specification to openapi.json");
 
     println!("Generating frontend TypeScript client...");
-    let status = run_command("node", &["scripts/generate-api.js"], Some("frontend"));
+    let status = run_command("node", &["scripts/generate-api.ts"], Some("frontend"));
 
     match status {
         Ok(st) => {

@@ -16,7 +16,7 @@
         "test": "vitest run",
         "test:watch": "vitest",
         "start": "npm run dev",
-        "generate:api": "node scripts/generate-api.js"
+        "generate:api": "node scripts/generate-api.ts"
     },
     "devDependencies": {
         "@sveltejs/vite-plugin-svelte": "^7.0.0",
