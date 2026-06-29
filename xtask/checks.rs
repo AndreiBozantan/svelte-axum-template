@@ -185,6 +185,63 @@ pub fn check_frontend_build() -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn check_backend_openapi_drift() -> std::io::Result<()> {
+    println!("Checking for OpenAPI spec drift...");
+
+    let output = Command::new("cargo")
+        .args(["run", "--package", "app", "--quiet", "--", "export-openapi"])
+        .output()?;
+
+    if !output.status.success() {
+        eprintln!("Error: backend failed to export OpenAPI spec.");
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
+
+    if let Err(e) = fs::write("openapi.json", &output.stdout) {
+        eprintln!("Error: failed to write openapi.json: {e}");
+        std::process::exit(1);
+    }
+
+    let status = Command::new("git")
+        .args(["diff", "--exit-code", "openapi.json"])
+        .status()?;
+
+    if !status.success() {
+        eprintln!(
+            "Error: openapi.json is out of sync with backend code. Run 'cargo xtask openapi' and commit the changes."
+        );
+        std::process::exit(1);
+    }
+
+    println!("OpenAPI spec is in sync.");
+    Ok(())
+}
+
+pub fn check_frontend_openapi_drift() -> std::io::Result<()> {
+    println!("Checking for frontend OpenAPI client drift...");
+
+    let status = crate::run_command("node", &["scripts/generate-api.ts"], Some("frontend"))?;
+
+    if !status.success() {
+        eprintln!("Error: frontend API client generation failed.");
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    let diff_status = Command::new("git")
+        .args(["diff", "--exit-code", "frontend/src/lib/generated/"])
+        .status()?;
+
+    if !diff_status.success() {
+        eprintln!(
+            "Error: frontend/src/lib/generated/ is out of sync with openapi.json. Run 'cargo xtask openapi' and commit the changes."
+        );
+        std::process::exit(1);
+    }
+
+    println!("Frontend OpenAPI client is in sync.");
+    Ok(())
+}
+
 pub fn ci_backend() -> std::io::Result<()> {
     println!("Running all backend CI checks...");
     check_backend_fmt()?;
@@ -194,6 +251,7 @@ pub fn ci_backend() -> std::io::Result<()> {
     // Stale/missing .sqlx/ files are already caught by clippy (SQLX_OFFLINE=true
     // makes the proc macros validate queries against the cached .sqlx/ files).
     check_backend_test()?;
+    check_backend_openapi_drift()?;
     println!("All backend CI checks passed!");
     Ok(())
 }
@@ -204,19 +262,20 @@ pub fn ci_frontend() -> std::io::Result<()> {
     check_frontend_diagnostics()?;
     check_frontend_build()?;
     check_frontend_test()?;
+    check_frontend_openapi_drift()?;
     println!("All frontend CI checks passed!");
     Ok(())
 }
 
 pub fn pre_commit() -> std::io::Result<()> {
-    println!("Running pre-commit formatting checks...");
+    println!("Running pre-commit formatting and OpenAPI drift checks...");
     let files = get_staged_files()?;
 
     let mut has_backend = false;
     let mut has_frontend = false;
 
     if files.is_empty() {
-        println!("No staged files found. Running all formatting checks as fallback.");
+        println!("No staged files found. Running all checks as fallback.");
         has_backend = true;
         has_frontend = true;
     } else {
@@ -226,10 +285,11 @@ pub fn pre_commit() -> std::io::Result<()> {
                 || file == "Cargo.toml"
                 || file == "Cargo.lock"
                 || file == "rustfmt.toml"
+                || file == "openapi.json"
             {
                 has_backend = true;
             }
-            if file.starts_with("frontend/") {
+            if file.starts_with("frontend/") || file == "openapi.json" {
                 has_frontend = true;
             }
         }
@@ -237,22 +297,24 @@ pub fn pre_commit() -> std::io::Result<()> {
 
     if has_backend {
         check_backend_fmt()?;
+        check_backend_openapi_drift()?;
     } else {
-        println!("No backend changes detected. Skipping Rust formatting.");
+        println!("No backend changes detected. Skipping Rust formatting and spec drift check.");
     }
 
     if has_frontend {
         check_frontend_fmt()?;
+        check_frontend_openapi_drift()?;
     } else {
-        println!("No frontend changes detected. Skipping frontend formatting.");
+        println!("No frontend changes detected. Skipping frontend formatting and client drift check.");
     }
 
-    println!("All pre-commit formatting checks passed!");
+    println!("All pre-commit checks passed!");
     Ok(())
 }
 
 pub fn pre_push() -> std::io::Result<()> {
-    println!("Running intelligent pre-push checks (lints and tests)...");
+    println!("Running intelligent pre-push checks (lints, tests, and drift)...");
     let files = get_pushed_files()?;
 
     let mut has_backend = false;
@@ -268,10 +330,11 @@ pub fn pre_push() -> std::io::Result<()> {
                 || file.starts_with("xtask/")
                 || file == "Cargo.toml"
                 || file == "Cargo.lock"
+                || file == "openapi.json"
             {
                 has_backend = true;
             }
-            if file.starts_with("frontend/") {
+            if file.starts_with("frontend/") || file == "openapi.json" {
                 has_frontend = true;
             }
         }
@@ -281,17 +344,19 @@ pub fn pre_push() -> std::io::Result<()> {
         check_backend_lint()?;
         check_backend_sqlx()?;
         check_backend_test()?;
+        check_backend_openapi_drift()?;
     } else {
-        println!("No backend changes detected. Skipping Rust lints and tests.");
+        println!("No backend changes detected. Skipping Rust lints, tests, and spec drift check.");
     }
 
     if has_frontend {
         check_frontend_diagnostics()?;
         check_frontend_test()?;
+        check_frontend_openapi_drift()?;
     } else {
-        println!("No frontend changes detected. Skipping frontend diagnostics and tests.");
+        println!("No frontend changes detected. Skipping frontend diagnostics, tests, and client drift check.");
     }
 
-    println!("All lints, checks, and tests passed!");
+    println!("All lints, checks, tests, and drift checks passed!");
     Ok(())
 }

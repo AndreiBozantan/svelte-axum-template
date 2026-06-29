@@ -25,7 +25,7 @@ async function bootstrap() {
         let user = null;
 
         if (isLoggedIn) {
-            const { data, error } = await api.GET('/api/users/me');
+            const { data, error } = await api.users.user_info();
             if (error) {
                 // 401 is expected (not logged in); anything else is worth knowing about
                 if (error.code !== 'not_authenticated') console.warn('getUserInfo failed:', error);

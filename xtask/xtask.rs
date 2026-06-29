@@ -338,7 +338,7 @@ fn lint_security() -> std::io::Result<ExitStatus> {
     run_command("semgrep", &["--config", "r/all"], None)
 }
 
-fn openapi() {
+pub(crate) fn openapi() {
     println!("Generating OpenAPI JSON specification...");
 
     let output = Command::new("cargo")
@@ -365,59 +365,23 @@ fn openapi() {
     }
     println!("Saved OpenAPI JSON specification to openapi.json");
 
-    let gen_dir = Path::new("frontend/src/lib/generated");
-    if let Err(e) = fs::create_dir_all(gen_dir) {
-        eprintln!("Error: failed to create directory frontend/src/lib/generated: {e}");
-        std::process::exit(1);
-    }
-
-    println!("Generating TypeScript definitions from OpenAPI spec...");
-    let status = run_command(
-        "npx",
-        &[
-            "-y",
-            "openapi-typescript",
-            "../openapi.json",
-            "-o",
-            "src/lib/generated/api.d.ts",
-            "--root-types",
-            "--root-types-no-schema-prefix",
-        ],
-        Some("frontend"),
-    );
+    println!("Generating frontend TypeScript client...");
+    let status = run_command("node", &["scripts/generate-api.ts"], Some("frontend"));
 
     match status {
         Ok(st) => {
             if !st.success() {
-                eprintln!("Error: npx openapi-typescript failed.");
+                eprintln!("Error: frontend API client generation failed.");
                 std::process::exit(st.code().unwrap_or(1));
             }
         },
         Err(e) => {
-            eprintln!("Error: failed to execute npx openapi-typescript: {e}");
+            eprintln!("Error: failed to execute npm run generate:api: {e}");
             std::process::exit(1);
         },
     }
 
-    println!("Formatting TypeScript definitions with Prettier...");
-    let prettier_status = run_command(
-        "npx",
-        &["prettier", "--write", "src/lib/generated/api.d.ts"],
-        Some("frontend"),
+    println!(
+        "Successfully generated and formatted TypeScript client: frontend/src/lib/generated/api.d.ts and endpoints.ts"
     );
-
-    match prettier_status {
-        Ok(st) => {
-            if !st.success() {
-                eprintln!("Error: Prettier formatting failed.");
-                std::process::exit(st.code().unwrap_or(1));
-            }
-        },
-        Err(e) => {
-            eprintln!("Error: failed to execute prettier: {e}");
-            std::process::exit(1);
-        },
-    }
-
-    println!("Successfully generated and formatted TypeScript definitions: frontend/src/lib/generated/api.d.ts");
 }
