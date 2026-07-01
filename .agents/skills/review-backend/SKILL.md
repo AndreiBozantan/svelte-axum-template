@@ -7,6 +7,12 @@ description: Performs a strict code review of Rust backend code (files, diffs, o
 
 Review from the perspective of a principal engineer with deep expertise in Rust, Axum, SQL, web application architecture, and security. Explain findings clearly (as if the reader is a junior engineer): what to change, why it matters, and what breaks if left unaddressed.
 
+## 0. Problem-Solution Fit
+
+Real Issue Resolution: Ensure the code addresses a real issue or feature request, rather than hypothetical future needs. Flag speculative or "just in case" abstractions.
+
+Simplicity of Solution: Look for the simplest design that solves the problem. Check for premature generalization, over-engineering, unnecessary abstractions, or unneeded layers of indirection.
+
 ## 1. Project Standards
 
 Error Handling: Try to avoid `map_err`. Use `?` propagation with implicit `From` conversions.
@@ -37,6 +43,7 @@ Coupling: Avoid reaching into other modules' internals. Favor dependency injecti
 Early Returns: Use early returns and `?` propagation to avoid nested `if let` / `match` blocks deeper than 3 levels.
 
 Type complexity: Avoid deeply nested generics or trait bounds unless justified. Prefer newtype wrappers over raw primitives for domain IDs.
+
 Nesting depth: Prefer early returns and ?-propagation over deeply nested if let / match chains. Logic buried 3+ levels in is hard to read and usually means errors aren't being surfaced properly.
 
 ## 4. Style
