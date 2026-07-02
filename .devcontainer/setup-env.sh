@@ -205,9 +205,19 @@ echo "@AGENTS.md" > "$REPO_DIR/CLAUDE.md"
 # Claude Code discovers skills under .claude/skills; reuse the shared .agents/skills
 mkdir -p "$REPO_DIR/.claude"
 ln -sfn ../.agents/skills "$REPO_DIR/.claude/skills"
-# Auto-approve safe tools (mirrors the Antigravity allowlist)
+# Install the status line script
+mkdir -p /home/vscode/.claude
+cp "$REPO_DIR/.devcontainer/statusline-command.sh" /home/vscode/.claude/statusline-command.sh
+chmod +x /home/vscode/.claude/statusline-command.sh
+
+# Auto-approve safe tools (mirrors the Antigravity allowlist) + status line
 cat << 'EOF' > "$REPO_DIR/.claude/settings.json"
 {
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/statusline-command.sh",
+    "refreshInterval": 60
+  },
   "permissions": {
     "allow": [
       "Bash(ls:*)",

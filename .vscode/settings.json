@@ -10,6 +10,8 @@
         "jsconfig.json": "svelte.config.js, tsconfig.json, tsconfig.node.json, vite.config.ts",
         ".prettierrc": ".prettierignore"
     },
+    "terminal.integrated.mouseWheelScrollSensitivity": 3,
+    "terminal.integrated.gpuAcceleration": "off",
     "cSpell.ignorePaths": ["**/Cargo.lock", "**/settings.json"],
     "cSpell.words": [
         "addgroup",
@@ -50,6 +52,7 @@
         "semgrep",
         "serde",
         "sqlx",
+        "statusline",
         "subfeature",
         "svelaxum",
         "testuser",
@@ -60,6 +63,7 @@
         "usermod",
         "utoipa",
         "utoipax",
+        "vitest",
         "xtask"
     ],
     "editor.formatOnSave": true,
