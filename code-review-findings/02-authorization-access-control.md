@@ -3,6 +3,13 @@
 This is the weakest area relative to the "production SaaS" bar. Authentication is enforced;
 **authorization is essentially absent.**
 
+> **Target design chosen:** the maintainer has decided the authorization model —
+> DB-driven roles, many-to-many tenant memberships, a generic ACL for entity-level access,
+> shipped via a `projects`/`tasks` reference feature. The full architecture (schema, claims,
+> enforcement pattern, build order) is in **[authorization-design.md](authorization-design.md)**.
+> The recommendations in 2.1/2.2 below are the minimum fixes; the design doc is the plan
+> that supersedes them.
+
 ---
 
 ## 2.1 — `GET /api/users` discloses every user in the shared default tenant
@@ -20,12 +27,20 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
   this is a serious data-isolation and privacy failure (and a spam/phishing target list).
   The "tenant isolation" that the code appears to provide is illusory because all public
   users share one tenant.
-- **Recommendation (pick per product intent):**
-  - If users are *not* meant to see each other: gate `list_users` behind an admin/role
-    check (see 2.2) and return `404`/`403` otherwise.
-  - If the platform is genuinely multi-tenant: give each self-signup user their own tenant
-    (or organization) instead of the shared tenant 0, so tenant scoping actually isolates.
-  - Either way, add a test asserting a normal user cannot enumerate other users.
+- **Recommendation:** This is a product decision, but it must be made **now**, while there
+  are no users and no deployments — the migration is free today and painful later:
+  - **Option A (recommended for the template): drop the half-implemented multi-tenancy.**
+    Remove `tenant_id` from `users` and the tenants table, or reduce it to a single implicit
+    tenant. The current state is the worst of both worlds: multi-tenant complexity in every
+    query with zero actual isolation. A single-tenant template is simpler, honest, and easy
+    to extend later when a real tenancy requirement exists (YAGNI).
+  - **Option B: make tenancy real.** Each self-signup creates its own tenant/organization
+    (row in `tenants`), `UNIQUE(tenant_id, email)` replaces the global unique (see
+    [10](10-database-data-layer.md) 10.3), SSO linking is reworked, and a membership/invite
+    flow is added. Substantially more work; only choose this if multi-org SaaS is the goal.
+  - In both cases: gate `list_users` behind the admin role from 2.2 (it is an admin
+    operation, not a user-facing one), and add a test asserting a normal user cannot
+    enumerate other users.
 
 ---
 
@@ -43,10 +58,14 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 - **Risk:** Any future admin/internal endpoint has nothing to gate on. Today it means
   every authenticated user is equally privileged, which combined with 2.1 is the disclosure
   vector.
-- **Recommendation:** Add an explicit `role` (or `is_admin`) column to `users`, thread it
-  into `TokenClaims`, and add an extractor/middleware that enforces roles per route. Protect
-  `list_users` (and any future admin endpoints) with it. Design this before adding more
-  endpoints, not after.
+- **Recommendation:** Add an explicit `role` column to `users` (`admin | user` is enough to
+  start; avoid speculative permission matrices), thread it into `TokenClaims` and `UserInfo`,
+  and add a `RequireAdmin` extractor (or middleware) so route protection is declarative and
+  impossible to forget. Seed the admin (user id 0) with `role = 'admin'` and have the CLI
+  set it. Protect `list_users` with it. **Do this before adding any app endpoints** — every
+  endpoint written without an authz convention is future rework, and the frontend's fake
+  `isAdmin` (see [09](09-frontend-code-quality.md) 9.3) can then be replaced with the real
+  field. Since nothing is deployed, this is a small additive migration today.
 
 ---
 

@@ -24,10 +24,16 @@ overrides that to `development`, and there is no fail-fast validation of require
 - **Risk:** Verbose/debug logging in prod, potential test-data seeding, and any other
   `is_dev_env()`-gated behavior silently active in production. This is the highest-impact config
   issue.
-- **Recommendation:** Do not set `env` in `configs.common.toml` at all (leave it to the
-  env-specific file / env var, falling back to the safe `production` default). Or invert the
-  precedence so the deployment must opt *into* development. Add a startup assertion that logs the
-  effective env prominently and refuses to seed test data unless `env` is explicitly dev/test.
+- **Recommendation:** Fix the design, not just the value: **the environment must never be
+  determined by the contents of a config file**, because the environment is what decides
+  *which* config files load — that circularity is the root cause here. Take `env` exclusively
+  from the process environment (`APP__SERVER__ENV`, or a dedicated `APP_ENV`) with
+  `production` as the fallback, remove `env` from every TOML layer (and reject it if present),
+  and set it explicitly in the Dockerfile/compose (see
+  [16](16-containerization-deployment.md) 16.1) and in `cargo xtask dev`. Add a startup
+  assertion that logs the effective env prominently and refuses to seed test data unless the
+  env is explicitly dev/test. This is a small refactor of `AppSettings::new` and is safe to
+  do now, pre-deployment.
 
 ---
 

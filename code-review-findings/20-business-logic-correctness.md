@@ -58,11 +58,16 @@ identity/tenant assumptions and unenforced domain invariants.
   domain admin controls addresses); (b) `sso_id` is overwritten on every login, so a second Google
   account with the same email (edge case) would relink.
 - **Risk:** Account-linking is a classic auth pitfall. The `verified_email` gate mitigates the
-  common case, but silent auto-linking without an explicit "connect your Google account" consent
-  step is worth a deliberate decision.
-- **Recommendation:** Make auto-linking an explicit, documented product decision. Consider requiring
-  the user to be logged in (or to confirm) before linking a new SSO identity to an existing
-  password account, rather than linking implicitly on first Google login.
+  SSO→password direction, but the reverse direction is exploitable: because password
+  registration never verifies email ownership, an attacker can pre-register a victim's email
+  and wait for the victim to "sign in with Google" — the link lands on the attacker-controlled
+  row with the attacker's password intact. See [01](01-authentication-session.md) **1.8** for
+  the full pre-hijacking write-up; that finding supersedes the "reasonably safe" assessment
+  above.
+- **Recommendation:** Fix together with 1.8: require email verification before a password
+  account is linkable (or reset `password_hash` + revoke sessions on link), and make
+  auto-linking an explicit, documented product decision — consider requiring the user to be
+  logged in (or to confirm) before linking a new SSO identity to an existing password account.
 
 ---
 

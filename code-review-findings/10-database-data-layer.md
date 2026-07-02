@@ -55,10 +55,13 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
   global `ON CONFLICT(email)`, so changing this touches SSO linking.
 - **Risk:** Architectural ambiguity that will force a painful migration later; SSO-linking
   logic is coupled to the global-unique assumption.
-- **Recommendation:** Decide the tenancy model explicitly. If multi-tenant, move to
-  `UNIQUE(tenant_id, email)` and rework `link_sso_user`'s conflict target. If effectively
-  single-tenant, document that tenants are an internal grouping and drop the pretense of
-  isolation in the API.
+- **Decided:** the maintainer chose **real multi-tenancy with many-to-many memberships**
+  (see [authorization-design.md](authorization-design.md)). Under that model users are
+  **global accounts** and the user↔tenant link moves to a `memberships` table — so the
+  global `UNIQUE(email)` is actually *correct* (one account, many tenants) and this tension
+  resolves without a composite key. The work is: drop the single `tenant_id` FK from `users`,
+  add `memberships`, and rework `link_sso_user` (SSO links a global user, not a tenant-scoped
+  one). Tracked in the authorization design's build order, backend plan Phase 0.
 
 ---
 

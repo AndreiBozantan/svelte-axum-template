@@ -31,10 +31,16 @@ Severity legend: **Critical** (exploitable/data-loss/prod-breaking), **Important
 - [20 — Business Logic Correctness](20-business-logic-correctness.md)
 - [21 — General Code Hygiene](21-general-hygiene.md)
 
-Cross-cutting plans:
+Cross-cutting plans & designs:
 
+- [Backend Stabilization Plan](backend-stabilization.md) — all backend findings ordered as a
+  phased work plan, starting with the settled architectural decisions (tenancy, authorization,
+  environment selection).
 - [Frontend Stabilization Plan](frontend-stabilization.md) — all frontend findings ordered
   as a phased work plan.
+- [Authorization Architecture](authorization-design.md) — target design for the
+  roles/permissions/tenancy feature: DB-driven roles, many-to-many memberships, generic ACL
+  for entity-level access, shipped via a projects/tasks reference feature.
 
 ## Top issues (start here)
 
@@ -46,17 +52,21 @@ Cross-cutting plans:
    sets `env = "development"`, which seeds test data and enables debug logging. A deploy
    that ships the repo config (or omits `configs.production.toml`) runs non-prod behavior
    in prod. See [15](15-configuration-environment.md).
-3. **`isAdmin` is computed from `user.id === 1`** on the frontend, but the seeded system
+3. **Account pre-hijacking via unverified registration + SSO auto-linking** — anyone can
+   register a victim's email (no verification); when the victim later signs in with Google,
+   the identity links onto the attacker's row with the attacker's password intact. See
+   [01](01-authentication-session.md) 1.8.
+4. **`isAdmin` is computed from `user.id === 1`** on the frontend, but the seeded system
    admin is `id = 0`, and `id = 1` is just the first-registered ordinary user. Wrong user
    is shown admin UI. See [09](09-frontend-code-quality.md) / [20](20-business-logic-correctness.md).
-4. **Duplicated `/api/api/sample` route path** (double `/api`) ships in the OpenAPI spec
+5. **Duplicated `/api/api/sample` route path** (double `/api`) ships in the OpenAPI spec
    and generated client. See [11](11-api-design.md).
-5. **A failed login leaves the Sign In button permanently disabled** — the error path in
+6. **A failed login leaves the Sign In button permanently disabled** — the error path in
    `Login.svelte` returns without resetting `isLoading`, so after a wrong password the user
    must reload the page to retry. See [09](09-frontend-code-quality.md).
-6. **`Logout.svelte` renders `{AppState.user}`** (the whole object) instead of the email.
+7. **`Logout.svelte` renders `{AppState.user}`** (the whole object) instead of the email.
    See [09](09-frontend-code-quality.md).
-7. **Sidebar navigation does full page reloads** — nav `<a>` links are not intercepted, so
+8. **Sidebar navigation does full page reloads** — nav `<a>` links are not intercepted, so
    the SPA re-bootstraps on every click and the hand-rolled `pushState`/`popstate` routing
    is mostly dead code. See [09](09-frontend-code-quality.md).
 

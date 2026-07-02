@@ -1,7 +1,8 @@
 # 01 — Authentication & Session Management
 
 Overall this is the strongest part of the codebase. Findings below are refinements,
-plus a couple of real correctness gaps.
+plus a couple of real correctness gaps — and two structural gaps added on second pass
+(1.8 email verification, 1.9 account recovery).
 
 ---
 
@@ -123,3 +124,57 @@ plus a couple of real correctness gaps.
   when validation fails silently, which is safe, but the callback re-validates the stored
   `redirect_url` (`:314`) — belt and suspenders, good. No change required; documenting that
   this area was reviewed and is acceptable.
+
+---
+
+## 1.8 — No email verification on registration → account pre-hijacking via SSO auto-linking
+
+- **Severity:** Important (escalates to Critical the moment real users exist)
+- **Location:** `backend/platform/identity/auth/auth_service.rs:101-122` (`register` creates
+  an `active` account with any email, unverified);
+  `backend/platform/identity/users/users_db.rs:277-316` (`link_sso_user`
+  `ON CONFLICT(email) DO UPDATE SET sso_provider/sso_id` — **`password_hash` is preserved**).
+- **Finding:** Password registration never verifies that the caller owns the email address.
+  Combined with silent SSO auto-linking (see [20](20-business-logic-correctness.md) 20.3),
+  this enables the classic **account pre-hijacking** attack:
+  1. Attacker registers `victim@gmail.com` with an attacker-chosen password (no verification
+     required).
+  2. Victim later clicks "Sign in with Google". Google attests the email is verified, and
+     `link_sso_user` links the Google identity onto the attacker-created row — keeping the
+     attacker's `password_hash` intact.
+  3. The victim now uses what they believe is their account, while the attacker retains
+     full password access to it indefinitely.
+
+  Google's `verified_email` check protects the SSO→password direction; nothing protects
+  the password→SSO direction.
+- **Risk:** Persistent account takeover of any user who registers via Google after an
+  attacker pre-registered their address. Also enables impersonation/squatting on emails.
+- **Recommendation:** Two independent fixes; do both:
+  - Add an email-verification step to password registration (account stays `onboarding`
+    until verified — this is exactly what the unused `onboarding` status is for; see 20.2).
+    Requires minimal email-sending infrastructure (see 1.9).
+  - Make `link_sso_user` refuse to auto-link onto a password account whose email was never
+    verified (or clear/reset `password_hash` and revoke all sessions upon linking). Add a
+    test for the pre-hijack scenario.
+
+---
+
+## 1.9 — No password change, password reset, or account recovery flow exists
+
+- **Severity:** Important (missing core capability for a production template)
+- **Location:** `backend/platform/identity/auth/auth_api.rs` (routes: login, logout, refresh,
+  register only); no email-sending infrastructure anywhere in the backend.
+- **Finding:** There is no way for a user to change their password, recover a forgotten
+  password, or manage their credentials — the only credential-update path is the operator-only
+  CLI (`create-admin`, targeting user id 0). A user who forgets their password is permanently
+  locked out; a user whose password leaks cannot rotate it. There is also no email-delivery
+  abstraction (SMTP/provider client), which is the shared prerequisite for reset flows,
+  verification (1.8), and any future notification.
+- **Risk:** Not shippable as an app foundation: password reset is table-stakes account
+  management, and its absence also blocks the fix for 1.8.
+- **Recommendation:** Add a `mailer` abstraction in `platform/shared` (trait + dev
+  log-to-console impl + one real provider impl), then implement: change-password
+  (authenticated, requires current password, revokes other sessions) and forgot/reset-password
+  (single-use, short-lived, hashed token — reuse the refresh-token storage patterns already in
+  place). This slots cleanly into the existing `auth` subfeature as `_api/_service/_db`
+  additions.

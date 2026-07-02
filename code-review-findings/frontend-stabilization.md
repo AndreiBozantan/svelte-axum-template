@@ -13,8 +13,9 @@ become one GitHub issue; links point to the finding with full context and the re
 
 - [ ] Routing: nav links do full page reloads; adopt `svelte-spa-router` or finish the custom
       router (click interception, shared `pathToPage()`, 404 route) — [09 § 9.4](09-frontend-code-quality.md)
-- [ ] `isAdmin` derived from `user.id === 1`; needs a backend `role` field on `UserInfo` —
-      [09 § 9.3](09-frontend-code-quality.md), depends on [02 § 02.2](02-authorization-access-control.md)
+- [ ] Replace `isAdmin` (`user.id === 1`) with a real capability model derived from the
+      backend permission set on `UserInfo` — [09 § 9.3](09-frontend-code-quality.md), depends on
+      [02 § 2.2](02-authorization-access-control.md) / [authorization-design.md](authorization-design.md)
 - [ ] Align error codes: frontend expects `not_authenticated`, backend emits
       `invalid_token`/`expired_token` — [09 § 9.8](09-frontend-code-quality.md),
       [11 § 11.3](11-api-design.md), [18 § 18.1](18-documentation-dx.md)
@@ -36,6 +37,21 @@ become one GitHub issue; links point to the finding with full context and the re
       [09 § 9.9](09-frontend-code-quality.md)
 - [ ] Settings toggles are non-functional placeholders; wire up or mark —
       [09 § 9.9](09-frontend-code-quality.md)
+
+## Phase 4.5 — Access-control UI (follows the backend authorization build-out)
+
+Consumes the [authorization design](authorization-design.md); depends on the backend exposing
+permissions in `UserInfo`, the tenant-switch endpoint, and the projects/tasks + invite APIs.
+
+- [ ] Capability helpers on `AppState`: derive `can(permission)` from the backend permission
+      set; drive nav visibility and route guards off `can(...)` instead of `isAdmin` —
+      [09 § 9.3](09-frontend-code-quality.md)
+- [ ] Tenant switcher UI for users with multiple memberships (calls the switch-tenant endpoint,
+      refreshes the session) — [authorization-design.md](authorization-design.md)
+- [ ] Invite UI (owner/admin invites an email + role) and an invitation-accept page
+- [ ] Projects/tasks reference page: consumes the generated client for the new reference
+      feature; owner sees all, client sees only granted projects — the frontend half of the
+      backend reference feature
 
 ## Phase 5 — Tests (lock in the fixes)
 
