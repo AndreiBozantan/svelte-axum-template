@@ -11,15 +11,27 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - Cargo.toml - workspace root with member [backend]
 - frontend/ - Svelte 5 SPA with Vite
 - backend/ - unified backend package containing platform and application code
-- data/ - config files and SQLite database
+- data/ - config files (`configs.common.toml` + per-env + git-ignored `configs.local.toml`) and SQLite database
 - migrations/ - SQL migration files embedded via sqlx; main SQL schema is in migrations/01_initial_schema.sql
-- xtask/ - Rust-based automation scripts for: env setup, dev scripts, git-hooks, release, CI
+- xtask/ - Rust-based automation scripts; run `cargo xtask --help` for the full command list
+- docs/ - API conventions, codegen, and devops docs
 - .githooks/ - pre-commit and pre-push hook templates (copied via `cargo xtask setup-hooks`)
+- .agents/skills/ - agent skills (see below)
+
+# WORKFLOW
+
+- when asked a question or for proposals/alternatives: answer and explain, do NOT change code until told to proceed
+- when asked to evaluate a review finding or plan: verify the claim against the actual code first, judge whether it really applies, explain your assessment, then wait for a go-ahead
+- implement larger changes as a sequence of small, individually reviewable steps; stop after each step for review
+- never run `git commit` or `git push` - the user reviews and commits
+- if the user edited files since your last read, re-read them before making further changes
+- ask clarifying questions when the request is ambiguous, before writing code
 
 # BACKEND STRUCTURE
 
 - backend/platform/ - platform library code (identity, shared, internal)
 - backend/platform/identity - APIs and services for: users, tokens, auth, oauth
+- backend/platform/shared - cross-cutting code: api error types, config, jwt, cookies, crypto, rate limiter
 - backend/app/ - application specific API endpoints and corresponding services
 - backend/test/ - unit and integration tests (without the 's' suffix to prevent separate integration test binary builds, reducing binary count to exactly 1)
 
@@ -43,6 +55,14 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - use idiomatic Rust and work like an world-expert Rust senior software engineer
 - prioritize following already existing patterns from the code
 
+# API & CODEGEN
+
+- API conventions (status codes, error shape, REST rules) are in docs/api/conventions.md - all endpoints must follow them
+- the TypeScript API client is generated from the backend OpenAPI spec; see docs/api/codegen.md
+- after adding or changing an endpoint: annotate handlers/DTOs with utoipa, then run `cargo xtask openapi` to regenerate openapi.json and the frontend client
+- never hand-edit files under frontend/src/lib/generated/
+- frontend code calls the API via the generated client (e.g. `api.auth.login(...)` from `$lib/generated/endpoints.ts`), never via raw fetch
+
 # GIT HOOKS
 
 - configured in `.githooks/` and installed via `cargo xtask setup-hooks` (also executed with `cargo xtask dev-init`)
@@ -51,4 +71,8 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 # CUSTOM AGENT SKILLS
 
-`review-backend`: detailed code review criteria for the Rust backend code; trigger when review or feedback is requested.
+Skills are stored in the agent-agnostic `.agents/skills/` directory. Agent-specific shims (e.g. a git-ignored `CLAUDE.md` and `.claude/` pointing here) are generated locally by `.devcontainer/setup-env.sh` and must not be committed.
+
+- `review-backend`: detailed code review criteria for the Rust backend code; trigger when review or feedback is requested.
+- `review-frontend`: detailed code review criteria for the Svelte 5 frontend code; trigger when review or feedback is requested.
+- `triage-review-finding`: verify a pasted code review finding against the actual code before acting on it.

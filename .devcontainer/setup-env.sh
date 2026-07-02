@@ -197,6 +197,49 @@ cat << 'EOF' > /home/vscode/.gemini/antigravity-cli/settings.json
 }
 EOF
 
+# Configure Claude Code (local shims, git-ignored - the repo itself stays agent-agnostic)
+echo "Configuring Claude Code..."
+REPO_DIR="/workspaces/svelaxum"
+# Claude Code reads CLAUDE.md; point it at the agent-agnostic AGENTS.md
+echo "@AGENTS.md" > "$REPO_DIR/CLAUDE.md"
+# Claude Code discovers skills under .claude/skills; reuse the shared .agents/skills
+mkdir -p "$REPO_DIR/.claude"
+ln -sfn ../.agents/skills "$REPO_DIR/.claude/skills"
+# Auto-approve safe tools (mirrors the Antigravity allowlist)
+cat << 'EOF' > "$REPO_DIR/.claude/settings.json"
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(jq:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo xtask ci-backend:*)",
+      "Bash(cargo xtask ci-frontend:*)",
+      "Bash(cargo xtask openapi:*)",
+      "Bash(cargo xtask db-prepare-check:*)",
+      "Bash(npx prettier:*)",
+      "Bash(npx svelte-check:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npx tsc:*)"
+    ],
+    "deny": [
+      "Bash(git push:*)"
+    ]
+  }
+}
+EOF
+
 # Ensure local bin directory exists
 mkdir -p /home/vscode/.local/bin
 
