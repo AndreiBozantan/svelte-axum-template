@@ -62,6 +62,7 @@ enum CliCommand {
         #[arg(short, long)]
         email: String,
     },
+    Deploy,
 }
 
 #[derive(Subcommand)]
@@ -86,6 +87,10 @@ pub async fn run_cli(ctx: &common::ArcContext) -> Result<bool, Error> {
         },
         Some(CliCommand::CreateAdmin { email }) => {
             create_admin(email, ctx).await?;
+            Ok(true)
+        },
+        Some(CliCommand::Deploy) => {
+            deploy(ctx).await?;
             Ok(true)
         },
     }
@@ -168,5 +173,51 @@ async fn create_admin(
         .await?;
 
     println!("Admin user updated successfully.");
+    Ok(())
+}
+
+async fn deploy(ctx: &common::ArcContext) -> Result<(), Error> {
+    println!("🚀 Running deployment tasks...");
+
+    migrations::run_migrations(ctx)
+        .await
+        .map_err(|e| Error::MigrationRunFailed { source: e })?;
+    println!("✅ Database migrations applied successfully.");
+
+    bootstrap_admin_from_env(ctx).await?;
+
+    Ok(())
+}
+
+async fn bootstrap_admin_from_env(ctx: &common::ArcContext) -> Result<(), Error> {
+    let Ok(email) = std::env::var("ADMIN_EMAIL") else {
+        return Ok(());
+    };
+
+    let Ok(password) = std::env::var("ADMIN_PASSWORD") else {
+        return Ok(());
+    };
+
+    println!("⚙️ Updating admin credentials from environment variables...");
+    if password.trim().is_empty() {
+        return Err(Error::Other("ADMIN_PASSWORD cannot be empty".to_string()));
+    }
+
+    let password_hash = crypto::hash_password(password.trim())?;
+    let parsed_email =
+        common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address in ADMIN_EMAIL".to_string()))?;
+
+    users::db::Repository
+        .update_admin_credentials(
+            &ctx.db,
+            users::UpdateAdminCredentialsCommand {
+                user_id: common::UserId(0),
+                email: parsed_email,
+                password_hash,
+            },
+        )
+        .await?;
+
+    println!("✅ Admin user credentials updated successfully.");
     Ok(())
 }
