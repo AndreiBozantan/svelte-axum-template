@@ -31,6 +31,11 @@ Severity legend: **Critical** (exploitable/data-loss/prod-breaking), **Important
 - [20 — Business Logic Correctness](20-business-logic-correctness.md)
 - [21 — General Code Hygiene](21-general-hygiene.md)
 
+Cross-cutting plans:
+
+- [Frontend Stabilization Plan](frontend-stabilization.md) — all frontend findings ordered
+  as a phased work plan.
+
 ## Top issues (start here)
 
 1. **`GET /api/users` leaks every user in the shared default tenant** — all self-signup
@@ -46,8 +51,14 @@ Severity legend: **Critical** (exploitable/data-loss/prod-breaking), **Important
    is shown admin UI. See [09](09-frontend-code-quality.md) / [20](20-business-logic-correctness.md).
 4. **Duplicated `/api/api/sample` route path** (double `/api`) ships in the OpenAPI spec
    and generated client. See [11](11-api-design.md).
-5. **`Logout.svelte` renders `{AppState.user}`** (the whole object) instead of the email.
+5. **A failed login leaves the Sign In button permanently disabled** — the error path in
+   `Login.svelte` returns without resetting `isLoading`, so after a wrong password the user
+   must reload the page to retry. See [09](09-frontend-code-quality.md).
+6. **`Logout.svelte` renders `{AppState.user}`** (the whole object) instead of the email.
    See [09](09-frontend-code-quality.md).
+7. **Sidebar navigation does full page reloads** — nav `<a>` links are not intercepted, so
+   the SPA re-bootstraps on every click and the hand-rolled `pushState`/`popstate` routing
+   is mostly dead code. See [09](09-frontend-code-quality.md).
 
 ## What is already solid
 

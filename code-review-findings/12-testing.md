@@ -56,10 +56,12 @@ assertions against real (in-memory SQLite) behavior. The gaps are in breadth, no
   `frontend/test/dummy.test.ts` (placeholder).
 - **Finding:** The refresh manager has excellent unit coverage (fake timers, coalescing, cross-
   tab). But there are no component tests (Login form, routing/redirect logic in `App.svelte`)
-  and no E2E (Playwright/Cypress). The routing `$effect` and the `isAdmin`/logout bugs
-  (see [09](09-frontend-code-quality.md)) would have been caught by a component test.
-- **Recommendation:** Add component tests for Login (submit, error display, disabled-while-
-  pending) and the auth-redirect logic. Consider a minimal Playwright smoke test for
+  and no E2E (Playwright/Cypress). Three shipped bugs would have been caught by basic component
+  tests: the Login stuck-spinner-on-error (9.1), the `[object Object]` render in Logout (9.2),
+  and the wrong `isAdmin` display (9.3) — see [09](09-frontend-code-quality.md).
+- **Recommendation:** Add component tests (e.g. vitest + `@testing-library/svelte`) for Login —
+  submit, error display re-enables the button, disabled-while-pending — and for the
+  auth-redirect logic. Consider a minimal Playwright smoke test for
   login→protected-page→logout. Remove `dummy.test.ts`.
 
 ---

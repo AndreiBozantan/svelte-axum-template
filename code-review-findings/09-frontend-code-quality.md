@@ -1,25 +1,46 @@
 # 09 — Frontend Code Quality & Svelte Idioms
 
-Runes are used correctly and consistently, the API layer goes through the generated client,
-and the token-refresh manager is genuinely well engineered. But there are two user-facing
-bugs and several correctness/idiom issues.
+Runes are used correctly and consistently, the API layer goes through the generated client
+(with one exception), and the token-refresh manager is genuinely well engineered. But there
+are three user-facing bugs and several correctness/idiom issues that should be fixed before
+building app features on top of this template.
 
 ---
 
-## 9.1 — `Logout.svelte` renders the whole user object instead of the email
+## 9.1 — Login error leaves the submit button permanently disabled
+
+- **Severity:** Important (user-facing bug on the most common error path)
+- **Location:** `frontend/src/pages/Login.svelte:21-37` (`handleLogin`).
+- **Finding:** `isLoading` is set to `true` at the start of `handleLogin`, but the error
+  branch `return`s before `isLoading = false` is reached. After any failed login (e.g. a
+  wrong password — the most common case), the error message is shown but the Sign In button
+  stays disabled with the "Signing in..." spinner forever. The user cannot retry without
+  reloading the page.
+- **Risk:** Broken retry on the app's front door; every user who ever mistypes a password
+  hits it.
+- **Recommendation:** Reset the flag on all paths — either `try { ... } finally { isLoading
+  = false; }`, or set `isLoading = false` before the early `return`. A component test
+  (submit → error → button enabled again) would lock this in; see
+  [12](12-testing.md) 12.4.
+
+---
+
+## 9.2 — `Logout.svelte` renders the whole user object instead of the email
 
 - **Severity:** Important (visible bug)
-- **Location:** `frontend/src/pages/Logout.svelte:15-17`.
+- **Location:** `frontend/src/pages/Logout.svelte:14-18`.
 - **Finding:** `You are still logged in as {AppState.user}.` interpolates the `UserInfo`
   object, which renders as `[object Object]`. Should be `{AppState.user?.email}`. Also, this
   branch is nearly unreachable because `onMount` logs out immediately, but if logout fails the
-  user sees the broken string.
-- **Recommendation:** Use `{AppState.user?.email}`. Consider showing a logout error state if
-  `api.auth.logout()` fails (currently the result is ignored).
+  user sees the broken string — and the `api.auth.logout()` result is ignored, so a failed
+  logout still calls `AppState.setUser(null)` and shows "You are now logged out" while the
+  session cookies may still be live.
+- **Recommendation:** Use `{AppState.user?.email}`, check the logout result, and show an
+  error state when the call fails instead of unconditionally clearing local state.
 
 ---
 
-## 9.2 — `isAdmin` is derived from `user.id === 1`, which is not the admin
+## 9.3 — `isAdmin` is derived from `user.id === 1`, which is not the admin
 
 - **Severity:** Important (incorrect privilege display)
 - **Location:** `frontend/src/lib/AppState.svelte.ts:26`
@@ -37,90 +58,147 @@ bugs and several correctness/idiom issues.
 
 ---
 
-## 9.3 — Custom routing lives in `App.svelte` `$effect` and duplicates logic; edge cases
+## 9.4 — Sidebar navigation does full page reloads; SPA routing only half-exists
 
-- **Severity:** Minor
-- **Location:** `frontend/src/App.svelte:10-55`, `frontend/src/AppPages.svelte.ts`.
-- **Finding:** Routing is hand-rolled: `onMount` parses `location.pathname`, a `popstate`
-  listener re-parses, and a redirect `$effect` handles auth gating. Issues: (a) the
-  `popstate`/`onMount` path-parsing logic is duplicated; (b) an unknown path becomes an
-  `activePage` id that renders the "Page Not Found" branch rather than a real 404 route;
-  (c) `svelte-spa-router` is a dependency (`package.json:41`) but appears unused — the app
-  rolls its own routing instead. The redirect effect also runs business logic (history
-  manipulation) inside an `$effect`, which the review criteria flag as a last resort.
-- **Recommendation:** Either adopt the already-installed `svelte-spa-router` or extract the
-  path→page mapping into one shared function and cover unknown-path handling. Remove the unused
-  router dep if you keep the custom approach. Move imperative navigation out of `$effect` where
-  practical.
+- **Severity:** Important (architecture; the template's routing pattern is what apps will copy)
+- **Location:** `frontend/src/AppSidebar.svelte:121-150` (`<a href={getPagePath(item.id)}>`
+  with no click handler), `frontend/src/App.svelte:10-55`, `frontend/src/AppPages.svelte.ts`.
+- **Finding:** The nav links are plain `<a>` elements without `preventDefault`/`pushState`,
+  so every sidebar click triggers a **full browser navigation**: the server re-serves
+  `index.html`, the bundle re-executes, `bootstrap()` re-fetches `/api/users/me`, and all
+  client state is discarded. The SPA machinery that does exist (`history.pushState` +
+  `popstate` listener + the redirect `$effect`) is only exercised by the logout button and
+  auth redirects — the `popstate` handling is effectively dead for normal navigation because
+  each click starts a fresh document. Related issues: (a) the path→page parsing is duplicated
+  between `onMount` and the `popstate` listener; (b) the `popstate` listener is added in
+  `onMount` without cleanup (harmless for the root component, but a bad pattern to copy);
+  (c) an unknown path renders a "Page Not Found" branch keyed off the raw path slice rather
+  than a real 404 route; (d) `svelte-spa-router` is a dependency (`package.json:41`) but
+  is never imported; (e) the redirect `$effect` performs imperative navigation
+  (`history.pushState`) inside an effect, which the review criteria flag as a last resort.
+- **Risk:** Every navigation pays a reload + an extra auth round-trip; in-memory state
+  (e.g. a half-filled form) is lost; apps built on the template inherit a routing pattern
+  that looks like SPA routing but isn't.
+- **Recommendation:** Decide the routing story once: either adopt the already-installed
+  `svelte-spa-router` (and delete the hand-rolled logic), or finish the custom approach —
+  intercept nav clicks (`onclick` with `preventDefault` + `pushState` + `setActivePage`),
+  extract one shared `pathToPage()` used by both `onMount` and `popstate`, and add a real
+  404 page entry. Remove the unused router dependency if the custom approach stays.
 
 ---
 
-## 9.4 — `PageDefinition.component` and other spots typed as `any`
+## 9.5 — `About.svelte` calls the API with raw `fetch`, bypassing the generated client
+
+- **Severity:** Important (project-standards breach in template code)
+- **Location:** `frontend/src/pages/About.svelte:9` (`await fetch('/api/health')`);
+  the generated client already exposes this endpoint
+  (`api.health.health_check`, `frontend/src/lib/generated/endpoints.ts:46-54`).
+- **Finding:** AGENTS.md and the review criteria mandate that all backend calls go through
+  the generated client; raw `fetch()` is only allowed inside `lib/fetch.ts`. `About.svelte`
+  hand-rolls the health call, skipping the client's error-normalization and auth middleware.
+  As template code, this is exactly the example a new contributor will copy.
+- **Recommendation:** Replace with `api.health.health_check()` and derive the three states
+  (`Operational` / `Service issues` / `Offline`) from `data`/`error`. The `NETWORK_ERROR`
+  normalization in `fetch.ts` (see 9.7) currently makes "offline" indistinguishable from a
+  500 through the client — fixing that finding makes this one clean.
+
+---
+
+## 9.6 — `PageDefinition.component` typed as `any`
 
 - **Severity:** Minor
-- **Location:** `frontend/src/AppPages.svelte.ts:23` (`component: any`),
-  `frontend/src/lib/fetch.ts:14-24` (`onError` returns a `Response` but the middleware body is
-  loosely typed; generated client calls cast `as any`).
+- **Location:** `frontend/src/AppPages.svelte.ts:23` (`component: any`);
+  generated `endpoints.ts` uses `as any` on every call (generated file — out of scope to
+  hand-edit, noted in [11](11-api-design.md)).
 - **Finding:** `tsconfig` is `strict`, but `component: any` defeats type-checking for the page
-  registry, and the generated `endpoints.ts` uses `as any` on every call (that file is
-  generated, so it is out of scope to hand-edit — noted in [11](11-api-design.md)). The
-  hand-written `any` in `AppPages` is fixable.
-- **Recommendation:** Type `component` as `Component` (Svelte 5's component type) instead of
-  `any`.
+  registry. The hand-written `any` is fixable.
+- **Recommendation:** Type `component` as `Component` (Svelte 5's component type from
+  `svelte`) instead of `any`.
 
 ---
 
-## 9.5 — `fetch.ts` `onError` middleware swallows the real error and always returns 500
+## 9.7 — `fetch.ts` `onError` middleware swallows the real error and always returns 500
 
 - **Severity:** Minor
 - **Location:** `frontend/src/lib/fetch.ts:10-23`.
-- **Finding:** Network/abort errors are converted into a synthetic `500` `NETWORK_ERROR`
-  response. That is a reasonable normalization, but it means a genuinely aborted request or
-  offline state is indistinguishable from a server 500, and the original error is discarded
-  (not even logged). Combined with the auth middleware, a network blip on a GET could trigger
-  a spurious refresh attempt.
-- **Recommendation:** Log the underlying error (at least in dev) and consider a distinct
-  `code`/status for offline vs server error so the UI can message appropriately.
+- **Finding:** Network/abort errors are converted into a synthetic `500` response with code
+  `NETWORK_ERROR`. That is a reasonable normalization, but: (a) an aborted request or offline
+  state is indistinguishable from a server 500, so the UI can't message appropriately (see
+  9.5); (b) the original error is discarded without even a dev log; (c) the code string is
+  `SCREAMING_CASE` while every backend error code is `snake_case` (`invalid_token`,
+  `validation_error`) — consumers matching on codes now face two conventions.
+- **Recommendation:** Log the underlying error (at least behind `import.meta.env.DEV`), use a
+  distinct status/code for network failure (e.g. `503` + `network_error` in snake_case), and
+  document the synthetic shape next to the middleware.
 
 ---
 
-## 9.6 — `Welcome.svelte`/`AppSidebar.svelte` read `AppState.user?.email` with non-null-safe assumptions elsewhere
+## 9.8 — Frontend expects error code `not_authenticated`, backend never emits it
 
 - **Severity:** Minor
-- **Location:** `frontend/src/pages/Welcome.svelte:11`, `AppSidebar.svelte:175`.
-- **Finding:** These correctly use optional chaining. The review criterion about "`!== null`
-  vs truthiness for API optionals" is generally respected. One spot to watch:
-  `main.ts:31` branches on `error.code !== 'not_authenticated'`, but the backend never emits
-  that code for the users endpoint (it emits `invalid_token`/`expired_token`, see
-  `api.rs`). So the "expected 401" special-case never matches and every auth failure is
-  `console.warn`-ed. Minor, but it's a code-string mismatch between front and back.
-- **Recommendation:** Align the frontend's expected error `code` with what the backend actually
-  returns (`invalid_token`/`expired_token`), or standardize the backend on `not_authenticated`
-  per `conventions.md:86`. The docs and code disagree here — see [11](11-api-design.md).
+- **Location:** `frontend/src/main.ts:31` (`error.code !== 'not_authenticated'`); backend
+  emits `invalid_token`/`expired_token` (`backend/platform/shared/api.rs`).
+- **Finding:** The "expected 401" special-case in `bootstrap()` never matches, so every
+  ordinary auth failure is `console.warn`-ed as unexpected. The frontend follows
+  `docs/api/conventions.md:86`, the backend doesn't — a doc/code mismatch, see
+  [11](11-api-design.md) 11.3 and [18](18-documentation-dx.md) 18.1.
+- **Recommendation:** Align on one set of codes (either implement `not_authenticated` in the
+  backend per the conventions doc, or match `invalid_token`/`expired_token` here) and fix the
+  doc in the same change.
 
 ---
 
-## 9.7 — Accessibility & responsive: mostly fine, some gaps
+## 9.9 — Logout confirmation is mouse-only, and keyboard users bypass it entirely
 
-- **Severity:** Minor
-- **Location:** `frontend/src/AppSidebar.svelte:99-116,164-170` (a11y-ignored mouse handlers;
-  logo `role="presentation"` with hover-only animation), `frontend/src/pages/Settings.svelte`
-  (dummy toggles with no persistence).
-- **Finding:** Interactive elements are real `<button>`/`<a>` (good). One suppressed a11y
-  warning (`a11y_mouse_events_have_key_events`) hides a real gap: the logout confirm popup is
-  driven by `mousemove`/`click` with no keyboard path. The Settings page toggles are
-  non-functional placeholders. Mobile layout is handled via media queries (reasonable).
-- **Recommendation:** Give the logout confirmation a keyboard-accessible path (Escape to close,
-  focus management) instead of suppressing the warning. Mark the Settings toggles as
-  non-functional or wire them up.
+- **Severity:** Minor (accessibility / UX consistency)
+- **Location:** `frontend/src/AppSidebar.svelte:59-94` (global `mousemove`/`click` effect),
+  `:153-184` (popup markup with `svelte-ignore a11y_mouse_events_have_key_events`),
+  `:46-57` (`handleLogoutSidebarClick`).
+- **Finding:** The logout confirm popup opens on `mouseenter` and closes based on global
+  mouse position, with the a11y warning suppressed. The result is two inconsistent flows:
+  a mouse user gets the popup and must click its "Logout" button, while a keyboard user
+  (focus + Enter, popup never opened) triggers `handleLogoutSidebarClick`'s else-branch and
+  is logged out immediately with **no confirmation at all**. There is also no Escape-to-close
+  or focus management, and the "close when mouse moves above/right of the popup" heuristic is
+  fragile.
+- **Recommendation:** Make the confirmation state click-toggled rather than hover-driven so
+  both input methods share one flow; close on Escape and on focus leaving the popup; remove
+  the `svelte-ignore`. Also mark or wire up the non-functional Settings toggles
+  (`Settings.svelte:29-55`) so template users don't assume they persist.
 
 ---
 
-## 9.8 — State/runes usage is correct; verified
+## 9.10 — Small issues: dead proxy entry, unloaded font, hardcoded version, global loading flag, silent bootstrap failure
+
+- **Severity:** Minor (grouped hygiene)
+- **Location / Finding:**
+  - `frontend/vite.config.ts:35-38` — dev proxy forwards `/user_info.js` to the backend, but
+    nothing in the repo references that path (leftover from an older template). Delete it.
+  - `frontend/src/AppSidebar.svelte:191` — `@import url('https://fonts.googleapis.com/...')`
+    fetches the Dancing Script font from Google at runtime (third-party request, breaks
+    offline/air-gapped use); meanwhile `App.svelte:76` lists `'Inter'` first in the body
+    font stack but Inter is never loaded, so the app silently falls back to system fonts.
+    Self-host the logo font (or inline it) and either load Inter or drop it from the stack.
+  - `frontend/src/pages/About.svelte:52` — version is hardcoded as `v1.0.0-beta`; the
+    package version is `0.8.0`. Inject it at build time (`define` in `vite.config.ts` from
+    `package.json`) instead of hardcoding.
+  - `frontend/src/pages/SecureApi.svelte:8-16` — a page-local API call drives the **global**
+    `AppState.isLoading` flag (which also animates the sidebar logo). Use a local
+    `let loading = $state(false)`; reserve the global flag for app bootstrap.
+  - `frontend/src/main.ts:51-53` — if `bootstrap()` throws, the error is logged and the app
+    is never mounted: the user gets a permanently blank page. Mount the app (or render a
+    minimal error screen) even when the user-info fetch fails unexpectedly.
+
+---
+
+## 9.11 — State/runes usage is correct; verified
 
 - **Severity:** Informational
 - **Location:** `frontend/src/lib/AppState.svelte.ts`, page components.
 - **Finding:** Global state is a single rune-based class instance with small setters (matches
-  the documented pattern), `$derived` is used for computed values (not `$effect`), and effects
-  that add listeners return cleanup functions (`AppSidebar.svelte:88-93`). No legacy `$:` or
-  `svelte/store` for new code. Good.
+  the documented pattern), `$derived` is used for computed values (not `$effect`), and the
+  popup-listener effect returns a proper cleanup function (`AppSidebar.svelte:88-93`). No
+  legacy `$:` or `svelte/store`. Optional values are checked null-safely
+  (`AppState.user?.email`). The `AuthRefreshManager` (coalesced refresh, cross-tab Web Locks,
+  jittered proactive timers, injectable `fetch`) is the strongest piece of frontend code and
+  is thoroughly unit-tested. Good foundation to build on once 9.1–9.5 are fixed.
