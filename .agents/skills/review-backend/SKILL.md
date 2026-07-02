@@ -136,7 +136,3 @@ let user = db.get_user(id).await.map_err(ApiError::from)?;
 // after (using Svelaxum error conversion)
 let user = db.get_user(id).await?;
 ```
-
-```
-
-```
