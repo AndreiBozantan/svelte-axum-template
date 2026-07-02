@@ -48,8 +48,7 @@ ENV RUSTUP_HOME="/home/vscode/.rustup" \
     CARGO_HOME="/home/vscode/.cargo" \
     PATH="/home/vscode/.cargo/bin:/home/vscode/.local/bin:${PATH}"
 
-# Install Antigravity CLI
-RUN curl -fsSL https://antigravity.google/cli/install.sh | bash
+
 
 # Install Semgrep using uv. The --mount=type=cache option is used to cache 
 # the downloaded packages on the host machine, which speeds up subsequent 
@@ -82,4 +81,5 @@ RUN mkdir -p \
   /home/vscode/.vscode-server \
   /home/vscode/.local/share/fish \
   /home/vscode/.config \
-  /home/vscode/.gemini
+  /home/vscode/.gemini \
+  /home/vscode/.claude

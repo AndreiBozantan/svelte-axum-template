@@ -1,66 +1,66 @@
 {
-  "name": "Svelaxum",
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
-
-  "runArgs": [
-    "--cpus=8",
-    "--memory=16g"
-  ] ,
-
-  // Run everything as the non-root vscode user.
-  "containerUser": "vscode",
-  "remoteUser": "vscode",
- 
-  // Named volumes persist across container rebuilds, avoiding re-downloads.
-  // Rename the svelaxum- prefix if you clone this config for another project.
-  "mounts": [
-    // Cargo registry: crate source tarballs and git-sourced checkouts
-    "source=svelaxum-cargo-registry,target=/home/vscode/.cargo/registry,type=volume",
-    "source=svelaxum-cargo-git,target=/home/vscode/.cargo/git,type=volume",
-    // npm package cache
-    "source=svelaxum-npm-cache,target=/home/vscode/.npm,type=volume",
-    // VS Code Server, extensions, and CodeLLDB
-    "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume",
-    // Fish history and other data files
-    "source=svelaxum-fish-history,target=/home/vscode/.local/share/fish,type=volume",
-    // CLI tool configurations (fish, git, gh, etc.)
-    "source=svelaxum-config,target=/home/vscode/.config,type=volume",
-    // Antigravity (agy) CLI configuration, logs, and conversation history
-    "source=svelaxum-gemini,target=/home/vscode/.gemini,type=volume"
-  ],
-
-  "forwardPorts": [
-    5173,
-    3000
-  ],
-  "portsAttributes": {
-    "5173": {
-      "label": "Frontend",
-      "onAutoForward": "openBrowser"
+    "name": "Svelaxum",
+    "build": {
+        "dockerfile": "Dockerfile"
     },
-    "3000": {
-      "label": "Backend",
-      "onAutoForward": "silent"
-    }
-  },
- 
-  "customizations": {
-    "vscode": {
-      "settings": {
-        "rust-analyzer.server.path": "/home/vscode/.cargo/bin/rust-analyzer",
-        "rust-analyzer.check.command": "clippy"
-      },
-      "extensions": [
-        "rust-lang.rust-analyzer",
-        "vadimcn.vscode-lldb",
-        "svelte.svelte-vscode",
-        "semgrep.semgrep",
-        "alexcvzz.vscode-sqlite"
-      ]
-    }
-  },
 
-  "postCreateCommand": "bash ./.devcontainer/setup-env.sh && npm install --prefix frontend && cargo fetch"
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+
+    "runArgs": ["--cpus=8", "--memory=16g"],
+
+    // Run everything as the non-root vscode user.
+    "containerUser": "vscode",
+    "remoteUser": "vscode",
+
+    // Named volumes persist across container rebuilds, avoiding re-downloads.
+    // Rename the svelaxum- prefix if you clone this config for another project.
+    "mounts": [
+        // Cargo registry: crate source tarballs and git-sourced checkouts
+        "source=svelaxum-cargo-registry,target=/home/vscode/.cargo/registry,type=volume",
+        "source=svelaxum-cargo-git,target=/home/vscode/.cargo/git,type=volume",
+        // npm package cache
+        "source=svelaxum-npm-cache,target=/home/vscode/.npm,type=volume",
+        // VS Code Server, extensions, and CodeLLDB
+        "source=svelaxum-vscode-server,target=/home/vscode/.vscode-server,type=volume",
+        // Fish history and other data files
+        "source=svelaxum-fish-history,target=/home/vscode/.local/share/fish,type=volume",
+        // CLI tool configurations (fish, git, gh, etc.)
+        "source=svelaxum-config,target=/home/vscode/.config,type=volume",
+        // Antigravity (agy) CLI configuration, logs, and conversation history
+        "source=svelaxum-gemini,target=/home/vscode/.gemini,type=volume",
+        // Claude Code CLI configuration, logs, and session history
+        "source=svelaxum-claude,target=/home/vscode/.claude,type=volume"
+    ],
+
+    "forwardPorts": [5173, 3000],
+    "portsAttributes": {
+        "5173": {
+            "label": "Frontend",
+            "onAutoForward": "openBrowser"
+        },
+        "3000": {
+            "label": "Backend",
+            "onAutoForward": "silent"
+        }
+    },
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "rust-analyzer.server.path": "/home/vscode/.cargo/bin/rust-analyzer",
+                "rust-analyzer.check.command": "clippy"
+            },
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "vadimcn.vscode-lldb",
+                "svelte.svelte-vscode",
+                "semgrep.semgrep",
+                "alexcvzz.vscode-sqlite"
+            ]
+        }
+    },
+
+    "postCreateCommand": "bash ./.devcontainer/setup-env.sh && npm install --prefix frontend && cargo fetch"
 }
