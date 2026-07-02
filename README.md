@@ -1,124 +1,79 @@
 # svelte-axum-template
 
-Starting project template for Rust, Axum, Sqlite backend and Svelte frontend.  Simple Single-Page-App (SPA) example.  Does not use SvelteKit.
+Starting project template for a Rust + Svelte fullstack SPA. Backend: Axum + SQLite + sqlx. Frontend: Svelte 5 (runes) + Vite. Does not use SvelteKit.
 
 Work in progress (new features coming), but should be usable as a starting point.
 
 # Cloning the template
-## Using Cargo
-- Must have cargo generate installed: `cargo install cargo-generate`
-- Then use `cargo generate AndreiBozantan/svelte-axum-project -n <your-project-name>`
-
-## Using git template
-- you can also just hit the "use this template" button in green on top of the repo
-- if you have gh cli installed check out `--template` option
-
+- Using cargo: `cargo install cargo-generate`, then `cargo generate AndreiBozantan/svelte-axum-template -n <your-project-name>`
+- Using git: hit the green "Use this template" button on top of the repo, or use the `--template` option of the `gh` CLI.
 
 # Running the project
-- Install the following:
-    - NodeJs - [Install](https://nodejs.org/en/download/)
-    - Rust  - [Install](https://www.rust-lang.org/tools/install)
 
-- Change current directory in the project folder:
-    - `cd <your-project-name>` - to go to the project root folder.
+The recommended dev environment is the VS Code devcontainer, which comes pre-configured with all toolchains, git hooks, and shell completions. Otherwise, install [NodeJs](https://nodejs.org/en/download/) and [Rust](https://www.rust-lang.org/tools/install) locally.
 
-- Initialization - run once before starting in dev mode:
-    - `cargo xtask dev-init`
+From the project root folder:
+- `cargo xtask dev-init` — one-time initialization (installs deps, git hooks, creates the database)
+- `cargo xtask dev` — run in dev mode with hot reloading
 
-- Run the project in dev mode, with hot reloading:
-    - `cargo xtask dev`
+The backend runs at `http://localhost:3000` and the frontend at `http://localhost:5173`. In dev mode, Vite proxies API requests to the backend, so the app is used via `http://localhost:5173`.
 
-By default, the backend will be available at `http://localhost:3000` and the frontend at `http://localhost:5173`.
+Run `cargo xtask --help` to see all available tasks (database management, CI checks, docker, release).
 
-In dev mode, the vite config is set to proxy the backend API requests to the backend server, so you can access the API at `http://localhost:5173/`.
+# Release build
 
+`cargo xtask release` builds the frontend and backend in release mode. The frontend is built **first**, because its static files are embedded into the backend binary at compile time (via `rust-embed`), producing a single self-contained executable.
 
-# Build the release version
-Execute `cargo xtask release` in the project root folder, to build the frontend and backend in release mode. The task will build the frontend **before** the backend, as the frontend static files are embedded in the backend binary.
+This means: whenever frontend changes should be reflected in the backend server on port `3000`, rebuild the frontend (`cd frontend && npm run build`) and recompile the backend. During normal development with `cargo xtask dev` this doesn't matter — the Vite dev server serves the frontend directly.
 
-Optionally, you can execute `cargo xtask clean` before the build, to remove all previous build artifacts, including the `node_modules` folders, so that the build starts from a clean state.
-After running the clean command, you have to run `cargo xtask dev-init` once, to reinitialize the project before running in dev mode.
+`cargo xtask clean` removes all build artifacts including `node_modules`; run `cargo xtask dev-init` again afterwards.
 
-# Embedded Assets & Updates
-The frontend static files are embedded directly into the Rust binary at **compile time** using the `rust-embed` crate.
+# Backend
 
-### How to update embedded files
-Whenever you make changes to the frontend code and want them to be reflected in the backend server (the one running on port `3000`), you must:
-1.  **Build the frontend**: `cd frontend && npm run build`
-2.  **Recompile/Restart the backend**: `cargo run` (or `cargo build`)
+- Located in `./backend`, organized using DDD-style bounded contexts (see `AGENTS.md` for the layout).
+- Session auth with short-lived JWT access tokens and rotating refresh tokens, both in HttpOnly cookies; `Authorization: Bearer` is also supported for programmatic clients.
+- Google OAuth2 SSO login (see setup below).
+- API conventions (status codes, error shape, pagination) are documented in `docs/api/conventions.md`.
 
-### Debug vs Release Mode
-- **Embedding works in both modes**: Whether you use `cargo run` (debug) or `cargo build --release`, the files currently sitting in `frontend/dist` will be baked into the resulting executable.
-- **Development Workflow**: During active development (`cargo xtask dev`), you typically don't need to worry about embedding. The Vite dev server (port `5173`) serves the frontend with hot-reloading and proxies API requests to the backend. You only need to build/embed when preparing for a production-like test or final deployment.
+## Configuration
 
-# Backend - Rust Axum
-- located in `./backend`
-- serves front end assets that are embedded in the binary during the build
-- middleware for checking authorization header
-- /api route example using authorization header
-- /secure route example using JWT for authorization
+The backend is configured with TOML files in the `data/` directory:
+- `configs.common.toml` — defaults shared by all environments
+- `configs.development.toml` / `configs.production.toml` — per-environment overrides
+- `configs.local.toml` — local overrides, git-ignored (put secrets here)
 
-Run `cargo run` from inside the repo root folder to start the backend server independently from the frontend.
+Values can also be overridden with environment variables, e.g. `APP__OAUTH__GOOGLE_CLIENT_ID`.
 
-## Backend Configuration
-The backend can be configured using TOML files in the project root directory:
-- `configs.default.toml` - Default configuration
-- `configs.development.toml` - Development-specific overrides
-- `configs.production.toml` - Production configuration example
-- `configs.local.toml` - Local overrides (git-ignored)
+## Database migrations
 
-
-## Database Migration Control
-You can run the database migrations by using the `migrate` command provided by the backend.
-It will run all pending migrations from the `migrations` directory, or the embedded migrations if the directory does not exist.
+Migrations live in `migrations/` and are embedded into the binary. To apply pending migrations:
 
 ```bash
-./your-app migrate run # run this in production
+cargo sqlx migrate run    # in development
+./your-app migrate run    # in production (uses embedded migrations)
 ```
-or
-```bash
-cargo sqlx migrate run # run this in development
-```
-When deploying to production, do not copy the migrations directory to the production server. You should use the embedded migrations instead, which are included in the binary.
 
-# Frontend - Svelte
-- Located in `./frontend`.
-- Includes a navbar with login and logout.
-- Secure page that shows session information once logged in.
-- API fetch example, login is required.
+Do not copy the `migrations/` directory to production; the binary falls back to the embedded migrations when the directory is absent.
 
-Run `npm run dev` from inside the `./frontend` directory to start serving the frontend.
+# Frontend
 
+- Located in `./frontend`; includes login/logout, a secure page showing session info, and typed API call examples.
+- The API client is generated from the backend's OpenAPI spec — `cargo xtask openapi` regenerates `openapi.json` and the typed client in `frontend/src/lib/generated/`. See `docs/api/codegen.md`.
 
 # OAuth2 SSO Setup (Google)
 
-This template includes Google OAuth2 SSO integration. To set it up:
+## 1. Create Google OAuth2 credentials
 
-## 1. Create Google OAuth2 Credentials
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) and create a new project.
+2. Configure **APIs & Services > Google Auth platform**: fill in Branding (app name, support email), set Audience to **External**, and optionally add the `openid`, `userinfo.email`, and `userinfo.profile` scopes.
+3. Create credentials: **+ Create Credentials > OAuth client ID**, type **Web application**, with:
+   - Authorized JavaScript origins: `http://localhost:5173`
+   - Authorized redirect URIs: `http://localhost:3000/api/oauth/google/callback`
+4. Copy the generated **Client ID** and **Client Secret**.
 
-1.  **Google Cloud Console**: Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2.  **Create Project**: Click the project dropdown in the top bar and select "New Project". Give it a name and click "Create".
-3.  **Configure Google Auth Platform** (formerly OAuth consent screen):
-    *   Navigate to **APIs & Services > Google Auth platform**.
-    *   **Branding**: Click **Get Started** or the **Branding** tab. Fill in the required App Information (App name, user support email, developer contact info) and click **Save and Continue**.
-    *   **Audience**: Go to the **Audience** tab (or step). Select **External** as the User Type. If you are using a personal `@gmail.com` account, this may be selected by default as "Internal" is restricted to Workspace users.
-    *   **Scopes**: You can skip or add `openid`, `https://www.googleapis.com/auth/userinfo.email`, and `https://www.googleapis.com/auth/userinfo.profile`.
-4.  **Create Credentials**:
-    *   Navigate to the **Clients** tab (or **APIs & Services > Credentials**).
-    *   Click **+ Create Credentials** at the top and select **OAuth client ID**.
-    *   Select **Web application** as the Application type.
-    *   **Authorized JavaScript origins**: Add `http://localhost:5173` (for the Svelte dev server).
-    *   **Authorized redirect URIs**: Add `http://localhost:3000/api/oauth/google/callback`.
-    *   Click **Create**.
-5.  **Get Your Keys**: A dialog will appear showing your **Client ID** and **Client Secret**. Copy these for the next step.
+## 2. Configure the backend
 
-## 2. Configure the Backend
-
-⚠️ **IMPORTANT SECURITY NOTE**: Never commit OAuth secrets to git!
-
-1.  Create a file named `configs.local.toml` in the **project root directory** (this file is already in `.gitignore`).
-2.  Copy the `[oauth]` section from `configs.default.toml` into your `configs.local.toml`.
-3.  Paste your credentials:
+⚠️ Never commit OAuth secrets to git! Put them in `data/configs.local.toml` (git-ignored):
 
 ```toml
 [oauth]
@@ -126,19 +81,8 @@ google_client_id = "your-client-id-here"
 google_client_secret = "your-client-secret-here"
 ```
 
-Alternatively, you can use environment variables: `APP__OAUTH__GOOGLE_CLIENT_ID` and `APP__OAUTH__GOOGLE_CLIENT_SECRET`.
+Alternatively, use the `APP__OAUTH__GOOGLE_CLIENT_ID` and `APP__OAUTH__GOOGLE_CLIENT_SECRET` environment variables.
 
-## 3. Using OAuth2 Login
+## 3. Log in
 
-1. Start the application with `cargo xtask dev`
-2. Navigate to the login page
-3. Click "Sign in with Google"
-4. Complete the Google OAuth flow
-5. You'll be redirected back and automatically logged in
-
-OAuth2 users are stored in the same `users` table with:
-- `sso_provider`: "google"
-- `sso_id`: Google user ID
-- `password_hash`: NULL (since OAuth users don't have passwords)
-
-The OAuth flow generates the same JWT tokens as regular login, so all existing authentication middleware works seamlessly.
+Start the app (`cargo xtask dev`), open the login page, and click "Sign in with Google". OAuth users are stored in the same `users` table (`sso_provider` = "google", `sso_id` = Google user ID, `password_hash` = NULL) and get the same JWT tokens as password login, so all auth middleware works identically.

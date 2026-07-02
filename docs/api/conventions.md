@@ -77,7 +77,7 @@ Every 4xx/5xx response uses the same shape (RFC 7807 Problem Details, simplified
 | `message` | Yes | Human-readable, may be shown to the user. May be localized in the future. |
 | `details` | No | Structured per-code data. For `validation_failed`, an array of `{ field, code }` entries. |
 
-**`code` values are part of the API contract.** Adding new ones is non-breaking; renaming/removing them is breaking. Define them in one place (`backend/src/errors.rs` or similar) and reuse.
+**`code` values are part of the API contract.** Adding new ones is non-breaking; renaming/removing them is breaking. Define them in one place (`backend/platform/shared/api.rs`) and reuse.
 
 Standard codes the template uses:
 
@@ -136,7 +136,7 @@ GET  /api/auth/oauth/google/callback
 
 - Access token: HttpOnly cookie (`access_token`), 16 minutes default. Short-lived.
 - Refresh token: HttpOnly cookie (`refresh_token`), scoped to `/api/auth/refresh`. Long-lived; rotated on every refresh.
-- Programmatic clients (CLI, server-to-server) may use `Authorization: Bearer <token>` instead of cookies. The backend already supports both (`backend/src/auth/tokens.rs:36-37`).
+- Programmatic clients (CLI, server-to-server) may use `Authorization: Bearer <token>` instead of cookies. The backend already supports both (`backend/platform/shared/cookies.rs`).
 
 Endpoints requiring auth return `401` with `code: "not_authenticated"` or `code: "token_expired"` when the token is missing/invalid. Clients use the code to decide between "redirect to login" and "attempt silent refresh."
 
@@ -158,7 +158,7 @@ The API is unversioned today (`/api/...`). When the first breaking change is nee
 
 - Prefer additive changes (new fields, new endpoints, new error codes) — these are non-breaking and don't need a version bump.
 - For genuine breaks, version via URL prefix: `/api/v2/...`. Old version stays operational for a deprecation window.
-- The OpenAPI spec carries `info.version` matching the Cargo crate version. CI fails if the spec changes without a version bump (see `api-codegen-plan.md`).
+- The OpenAPI spec carries `info.version` matching the Cargo crate version. CI fails if the spec drifts from the code (see `codegen.md`).
 
 Adding a field to a response: non-breaking. Removing or renaming a field: breaking. Tightening validation: breaking. Loosening validation: non-breaking. Changing an error `code` string: breaking.
 
@@ -210,10 +210,10 @@ If a future architecture splits the frontend onto a separate domain (CDN, separa
 
 ## 12. Observability
 
-Every response (success or error) includes:
+Target convention (request-ID propagation is not implemented yet):
 
-- `X-Request-ID` — propagated from the incoming request, generated if absent. Logs include the same ID. 
-- Server logs include status code, path, method, latency, request ID, and (for auth endpoints) the structured fields defined in `auth/logger.rs`.
+- `X-Request-ID` — propagated from the incoming request, generated if absent. Logs include the same ID.
+- Server logs include status code, path, method, latency, request ID, and structured key-value fields for auth events.
 
 Clients should log the `X-Request-ID` on errors so support can correlate.
 

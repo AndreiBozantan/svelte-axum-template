@@ -30,21 +30,17 @@ semgrep login
 
 ### 2. Running Analysis
 
-To scan the entire project using the configuration defined in `.semgrep.yml`:
-
-```bash
-semgrep --config r/all
-```
-
-Alternatively, you can use the cargo xtask command:
+To scan the entire project:
 
 ```bash
 cargo xtask lint-security
+# or directly:
+semgrep --config r/all
 ```
 
 ## Configuration
 
-The configuration is kept very simple - just run all rules (r/all), both in the local setup (xtask) and in the Github workflow config.
+The configuration is kept very simple - just run all rules (`r/all`), both in the local setup (xtask) and in the GitHub workflow config. There is no custom rules file.
 
 ## CI/CD Integration
 
