@@ -31,16 +31,12 @@ Severity legend: **Critical** (exploitable/data-loss/prod-breaking), **Important
 - [20 — Business Logic Correctness](20-business-logic-correctness.md)
 - [21 — General Code Hygiene](21-general-hygiene.md)
 
-Cross-cutting plans & designs:
+Cross-cutting plan:
 
-- [Backend Stabilization Plan](backend-stabilization.md) — all backend findings ordered as a
-  phased work plan, starting with the settled architectural decisions (tenancy, authorization,
-  environment selection).
-- [Frontend Stabilization Plan](frontend-stabilization.md) — all frontend findings ordered
-  as a phased work plan.
-- [Authorization Architecture](authorization-design.md) — target design for the
-  roles/permissions/tenancy feature: DB-driven roles, many-to-many memberships, generic ACL
-  for entity-level access, shipped via a projects/tasks reference feature.
+- **[Stabilization Master Plan](stabilization-plan.md) — start here.** The single plan for all
+  backend and frontend work: the settled architecture decisions, the target authorization
+  design (DB-driven roles, many-to-many memberships, generic ACL, projects/tasks reference
+  feature), and one staged timeline (Stages A–E) covering every finding.
 
 ## Top issues (start here)
 
