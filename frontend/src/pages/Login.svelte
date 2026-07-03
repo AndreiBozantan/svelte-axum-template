@@ -20,22 +20,17 @@
     async function handleLogin(e: Event): Promise<void> {
         e.preventDefault();
         errorMessage = '';
-        AppState.startLoading();
 
-        try {
-            const { data, error } = await api.auth.login({ email, password });
+        const { data, error } = await api.auth.login({ email, password });
 
-            if (error) {
-                errorMessage = error.message;
-                AppState.setUser(null);
-                return;
-            }
-
-            AppState.setUser(data.user);
-            AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
-        } finally {
-            AppState.stopLoading();
+        if (error) {
+            errorMessage = error.message;
+            AppState.setUser(null);
+            return;
         }
+
+        AppState.setUser(data.user);
+        AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
     }
 
     function handleGoogleLogin() {

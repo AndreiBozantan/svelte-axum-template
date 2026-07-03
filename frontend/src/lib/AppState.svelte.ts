@@ -2,12 +2,15 @@ import type { UserInfo } from './generated/api';
 import { AuthRefreshManager } from './auth-refresh-manager';
 
 class AppStateDef {
-    isLoading = $state<boolean>(true);
+    // counter which lets overlapping loads stack instead
+    // starts at 1 for the app-boot load; App.svelte's onMount clears it.
+    #loadingCount = $state<number>(1);
+    isLoading = $derived(this.#loadingCount > 0);
     startLoading() {
-        this.isLoading = true;
+        this.#loadingCount++;
     }
     stopLoading() {
-        this.isLoading = false;
+        this.#loadingCount = Math.max(0, this.#loadingCount - 1);
     }
 
     activePage = $state<string>('about'); // Default to 'about'
