@@ -7,6 +7,27 @@ files ([01](01-authentication-session.md)–[21](21-general-hygiene.md)) remain 
 base: links point to the finding with full context and the recommended fix, and each checkbox
 can become one GitHub issue.
 
+## Creating issues from this plan
+
+Each checkbox is one issue, written to be executable by anyone — a contributor who has never
+seen these planning docs, or an AI coding agent — without further clarification:
+
+- **Title:** the checkbox text (without the links).
+- **Body:** copy the linked finding section(s) **verbatim** — they carry the file paths
+  (Location), the problem (Finding), why it matters (Risk), and the fix (Recommendation).
+  For Stage B items, link the *design:* section(s) of
+  [docs/design/authorization.md](../docs/design/authorization.md) — the design doc lives in
+  the repo precisely so issues can reference it.
+- **Acceptance criteria:** state observable behavior, not implementation — e.g. "login as a
+  suspended user returns 403 with code `account_suspended`; their refresh token no longer
+  works", not "add a status check".
+- **Dependencies:** the stage ordering encodes them; if an item needs another to land first
+  (e.g. anything consuming the mailer), name that issue in the body so it can be scheduled.
+- **Definition of done, for every issue:** `cargo clippy --workspace --all-targets` clean and
+  `cargo test` green; frontend checks/tests green when frontend files are touched;
+  `cargo xtask openapi` re-run whenever an endpoint or DTO changes; API behavior follows
+  `docs/api/conventions.md`; code style follows `AGENTS.md`.
+
 ## Guiding principles
 
 - **Quality and architecture first.** The app is small, not deployed, and has no users. The
@@ -42,106 +63,44 @@ These supersede the "pick a direction" recommendations in
 
 ---
 
-# Part 1 — Authorization design (target)
+# Design docs
 
-## Three layers (keep them distinct)
+Durable decision-and-invariant references, kept under `docs/` (outside this review folder)
+precisely so GitHub issues can link to their sections. Keep them short and stable — record
+decisions, invariants, and rationale, **not** restatements of code that will drift (the
+drifted-`conventions.md` finding [18 § 18.1](18-documentation-dx.md) is the cautionary tale).
+One exists; four more are created by plan items in the stages where their content gets
+decided:
 
-1. **Authentication** — who you are. Exists today (JWT).
-2. **Tenant membership + RBAC** — *within a tenant*, which actions your role permits.
-   Coarse: "may this user create projects in tenant T?"
-3. **Resource access (ReBAC ACL)** — *which specific entities* you may act on.
-   Fine: "may this user view project P / task X?"
+- **[docs/design/authorization.md](../docs/design/authorization.md)** — *exists.* The three
+  authorization layers, resource-access resolution rule, data model, JWT claims, enforcement
+  pattern. Backs the Stage B issues, and provides the shared authorization convention
+  [02 § 2.4](02-authorization-access-control.md) asks for.
+- **`docs/design/authentication.md`** — *written in Stage B* (that stage rewrites
+  registration and adds the token flows). Contents: access/refresh token lifecycle (rotation,
+  reuse/breach detection, concurrency grace period); cookie strategy (`__Host-`/`__Secure-`
+  prefixes, HttpOnly, SameSite, why no token material in `localStorage`); the signed OAuth
+  state-cookie design (PKCE verifier + CSRF hash) and the `prompt` choice; the **shared
+  single-use hashed-token pattern** reused by email verification, password reset, and
+  invitations; the mailer abstraction; account lifecycle states and where they are enforced
+  (login + refresh). Much of this exists today only as code comments
+  ([18 § 18.2](18-documentation-dx.md)); the verified descriptions in
+  [01 § 1.5/1.7](01-authentication-session.md) are ready starting material.
+- **`docs/design/operations.md`** — *started in Stage A, extended in Stage D/E.* Contents:
+  the mandatory TLS-terminating proxy assumption and trusted-proxy header config;
+  graceful-shutdown (SIGTERM) behavior; healthcheck/readiness semantics; SQLite operational
+  choices (WAL, `synchronous=NORMAL`, pool timeouts), the backup strategy, and the accepted
+  write-throughput ceiling with the Postgres migration path; pointer to the release/rollback
+  workflow.
+- **`docs/design/frontend.md`** — *started in Stage A, extended in Stage C.* Contents: the
+  routing decision and its rationale; the rune-based `AppState` pattern; the "generated API
+  client only, never raw `fetch`" rule; the capability model (`can(permission)` derived from
+  `UserInfo`); the auth-refresh-manager contract (cross-linked to `authentication.md`).
+- **`docs/config.md`** — *Stage E.* Reference rather than design: TOML layering and
+  precedence (`common` → per-env → git-ignored `local`), every key with its default, and the
+  env-only environment selection from Stage A — [15 § 15.4](15-configuration-environment.md).
 
-A request is authorized when all applicable layers pass. RBAC gates the endpoint; the ACL
-gates the row.
-
-## Resource access resolution (who sees what)
-
-A user reaches an entity through one of two paths, checked in order:
-
-1. **Tenant-wide via RBAC.** Broad roles (owner, admin) hold tenant-scoped permissions like
-   `project:read`, so a tenant admin sees **all projects in their tenant** — and all their
-   tasks — with no ACL rows at all. This is the cheap check; do it first.
-2. **Per-entity via ACL.** Restricted roles (e.g. `client`) hold no tenant-wide read. They see
-   exactly the entities granted to them in `object_access`, plus children by inheritance
-   (tasks of a granted project).
-
-Consequences:
-
-- ACL rows exist **only for restricted access**; assigning a project to an admin is a no-op.
-- **Client assignment flow:** a project is assigned to a client (customer) by email. If the
-  client is not yet a member, the *invitation* stores the project grants; accepting it creates
-  the membership **and** the `object_access` rows in one transaction — so the client lands in
-  the app already seeing their assigned projects and related tasks. If they are already a
-  member, assignment just inserts the ACL row.
-- Direct user links on entities (`created_by`, a task's assignee) are metadata, not access —
-  access decisions flow only through the two paths above, so the rules live in one place.
-
-## Data model
-
-### Tenancy & membership
-
-- `tenants` — exists.
-- `users` — a **global account** (drop the single `tenant_id` FK). Keep `UNIQUE(email)`.
-- `tenant_memberships (id, user_id, tenant_id, role_id, status, created_at)`,
-  `UNIQUE(user_id, tenant_id)` — the user↔tenant link and where the per-tenant role lives.
-
-### RBAC (DB-driven roles, code-defined action catalog)
-
-- **Permission catalog = a fixed Rust enum** (`project:read`, `project:write`, `task:read`,
-  `task:write`, `member:invite`, `role:manage`, ...) with stable string forms used in DB rows
-  and docs. The vocabulary of actions is a code fact — you cannot grant an action the code
-  never checks — so it stays in code even though roles are DB-driven.
-- `roles (id, tenant_id NULL, name, is_system)` — `tenant_id NULL` = seeded system roles
-  (owner/admin/member/client); non-null = a tenant's custom role.
-- `role_permissions (role_id, permission)` — the mapping admins edit; `permission` is
-  validated against the enum on write (reject unknown actions).
-
-### ReBAC (entity-level access)
-
-- `object_access (id, tenant_id, object_type, object_id, user_id, relation, created_at)`,
-  `UNIQUE(user_id, object_type, object_id)`. `relation` ∈ {`owner`,`editor`,`viewer`}.
-  `object_type` values come from a **code-side registry enum** (no free strings).
-- **Inheritance** (task → its project) is resolved in the query/service layer, not stored.
-- Accepted trade-off: `object_type`/`object_id` are not real foreign keys, so integrity is
-  app-enforced. Mitigate: always scope by `tenant_id`; delete grants when the object is
-  deleted (same transaction, service layer — and test it); periodic orphan-sweep task.
-
-### Invitations
-
-- `invitations (id, tenant_id, email, role_id, token_hash, invited_by, expires_at,
-  accepted_at)` + a child table (or JSON column) for **carried entity grants** (the client
-  assignment flow above). Single-use, short-lived, **hashed** token (reuse refresh-token
-  storage patterns). Requires the mailer ([01 § 1.9](01-authentication-session.md)).
-
-## Claims & active tenant (the critical constraint)
-
-Roles and grants are mutable at runtime, so **do not put roles or permission sets in the
-JWT** — they would be stale after any edit/revoke. The access token carries only `user_id` +
-`active_tenant_id` (+ optionally `membership_id`); everything else is resolved per request.
-
-- **Active tenant:** `POST /api/auth/switch-tenant` verifies membership and re-issues the
-  token. (Alternative considered: tenant in the URL path — more RESTful but noisier;
-  token-carried is simpler for an SPA.)
-- **Resolution cost:** use a request-scoped cache (resolve membership+permissions once per
-  request). Add a TTL cache keyed by `(user_id, tenant_id)` with explicit invalidation only
-  if measured (see Deferred).
-
-## Enforcement pattern (declarative and hard to forget)
-
-- `Authenticated` extractor → `user_id` (exists).
-- `TenantContext` extractor → loads the membership for `(user, active_tenant)`; `403` if
-  none. Exposes the role + resolved permission set for the request.
-- `RequirePermission(perm)` guard → RBAC check on a route, e.g.
-  `.route_layer(require(Permission::ProjectWrite))`.
-- `authorize_resource(ctx, object_type, object_id, needed_relation)` helper → the resolution
-  rule above (RBAC tenant-wide first, then ACL with parent inheritance). Returns `404` on
-  failure per `conventions.md` §6 (don't reveal existence).
-
-This is the shared convention [02 § 2.4](02-authorization-access-control.md) asks for: new
-endpoints inherit it instead of re-deriving ownership ad hoc.
-
-## How this resolves existing findings
+## How the authorization design resolves existing findings
 
 | Finding | Resolution |
 | :-- | :-- |
@@ -156,7 +115,7 @@ endpoints inherit it instead of re-deriving ownership ad hoc.
 
 ---
 
-# Part 2 — The staged plan
+# The staged plan
 
 **The ordering principle: don't invest in code you're about to rewrite, and make the schema
 change while it's still free.** The authorization refactor goes as early as its prerequisites
@@ -187,11 +146,11 @@ Security fixes that don't touch the auth model:
       [13 § 13.1/13.2](13-error-handling-resilience.md)
 - [ ] Graceful shutdown on SIGTERM (container rollouts) —
       [13 § 13.3](13-error-handling-resilience.md)
-- [ ] Document the mandatory TLS-terminating proxy assumption —
-      [05 § 5.2](05-http-transport-security.md)
-- [ ] OAuth consent screen is not shown during Google sign-in — investigate the auth-URL
-      parameters (`prompt`, scopes) and fix so the user sees/approves what is granted
-      *(new item, no finding number)*
+- [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
+      and the trusted-proxy header config (from the item above) —
+      [05 § 5.2](05-http-transport-security.md); outline in [Design docs](#design-docs)
+- [ ] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
+      the authorize URL — [01 § 1.10](01-authentication-session.md)
 
 Configuration correctness:
 
@@ -204,88 +163,123 @@ Configuration correctness:
 Decisions that gate later work:
 
 - [ ] Frontend routing: adopt `svelte-spa-router` or finish the custom router (click
-      interception, shared `pathToPage()`, 404 route) — **before any new pages exist** —
-      [09 § 9.4](09-frontend-code-quality.md)
+      interception, shared `pathToPage()`, 404 route) — **before any new pages exist**;
+      record the decision + rationale as the first section of a new `docs/design/frontend.md`
+      ([Design docs](#design-docs)) — [09 § 9.4](09-frontend-code-quality.md)
 
 Tooling that protects every later commit:
 
 - [ ] CI supply-chain gating: `cargo audit`/`cargo deny` + `npm audit` as PR gates; Semgrep on
       PRs; Dependabot/Renovate — [06 § 6.1/6.2](06-dependency-supply-chain.md),
       [17 § 17.1](17-cicd.md)
-- [ ] Enforce code styling for frontend and backend through tooling: `.editorconfig`, and
-      `rustfmt`/`prettier`/`svelte-check` enforced in both the git hooks and CI, so style is
-      never a review topic *(new item)*
+- [ ] Enforce lint-level style rules through tooling (formatting is already gated): ESLint
+      (`typescript-eslint` + `eslint-plugin-svelte`) wired into hooks + CI, and a
+      `[workspace.lints]` table in the root `Cargo.toml` — [18 § 18.6](18-documentation-dx.md)
 
 ## Stage B — The authorization & multi-tenancy refactor (the spine)
 
-Implements Part 1, landed as **small, individually green PRs** in this order. Resolves
+Implements the [authorization design](../docs/design/authorization.md), landed as
+**small, individually green PRs** in this order. Resolves
 [02 § 2.1/2.2](02-authorization-access-control.md), [10 § 10.3](10-database-data-layer.md),
 [20 § 20.1/20.2](20-business-logic-correctness.md). Multi-write flows (signup→tenant→membership,
 invite acceptance) are wrapped in transactions **as they are written**, not retrofitted —
 [10 § 10.2](10-database-data-layer.md), [20 § 20.5](20-business-logic-correctness.md).
 
-- [ ] Permission catalog: Rust enum of actions with stable string forms
+The checklist items below are short summaries; their actual spec (schema, claims, enforcement
+pattern) is [docs/design/authorization.md](../docs/design/authorization.md). Each item carries
+a *design:* link to the section(s) that define it — put those links in the GitHub issue body
+(and quote the key details if the assignee works without repo access).
+
+- [ ] Permission catalog: Rust enum of actions with stable string forms —
+      design: [RBAC](../docs/design/authorization.md#rbac-db-driven-roles-code-defined-action-catalog)
 - [ ] Schema migration: drop `users.tenant_id`; add `tenant_memberships`, `roles`,
-      `role_permissions`; seed immutable system roles (owner, admin, member, client)
+      `role_permissions`; seed immutable system roles (owner, admin, member, client) —
+      design: [Tenancy & membership](../docs/design/authorization.md#tenancy--membership),
+      [RBAC](../docs/design/authorization.md#rbac-db-driven-roles-code-defined-action-catalog)
 - [ ] Registration/SSO flow: self-signup creates tenant + owner membership; adapt
-      `link_sso_user` to the new schema
+      `link_sso_user` to the new schema —
+      design: [Tenancy & membership](../docs/design/authorization.md#tenancy--membership)
 - [ ] Mailer abstraction (trait + dev console impl + one provider) — prerequisite for
       verification here and invites below — [01 § 1.9](01-authentication-session.md)
 - [ ] Email verification on registration + fix SSO auto-linking (account pre-hijacking) —
       [01 § 1.8](01-authentication-session.md), [20 § 20.3](20-business-logic-correctness.md)
 - [ ] User lifecycle: `onboarding → active → suspended/archived` transitions (invited users
-      start in `onboarding` until first login) — [20 § 20.2](20-business-logic-correctness.md)
+      start in `onboarding` until first login) — [20 § 20.2](20-business-logic-correctness.md);
+      design: [Tenancy & membership](../docs/design/authorization.md#tenancy--membership)
 - [ ] JWT claims: replace `tenant_id` with `active_tenant_id`; add `POST /api/auth/switch-tenant`
+      — design: [Claims & active tenant](../docs/design/authorization.md#claims--active-tenant-the-critical-constraint)
 - [ ] Authorization machinery: `TenantContext` + `RequirePermission` extractors, the
-      permission-resolution service (request-scoped), 404-on-denied per `conventions.md` §6
+      permission-resolution service (request-scoped), 404-on-denied per `conventions.md` §6 —
+      design: [Enforcement pattern](../docs/design/authorization.md#enforcement-pattern-declarative-and-hard-to-forget),
+      [Three layers](../docs/design/authorization.md#three-layers-keep-them-distinct)
 - [ ] Role management endpoints: tenant-admin CRUD for custom roles + assignment; system roles
-      immutable; covered by tests (the cost of the DB-driven choice — budget for it)
+      immutable; covered by tests (the cost of the DB-driven choice — budget for it) —
+      design: [RBAC](../docs/design/authorization.md#rbac-db-driven-roles-code-defined-action-catalog)
 - [ ] Invite flow: owner/admin invites an email with a role **and optional entity grants**
       (the client-assignment flow); single-use hashed token; accept creates membership + ACL
-      rows in one transaction
+      rows in one transaction —
+      design: [Invitations](../docs/design/authorization.md#invitations),
+      [Resource access resolution](../docs/design/authorization.md#resource-access-resolution-who-sees-what)
 - [ ] Entity ACL: `object_access` + `authorize_resource` helper (RBAC-first resolution rule,
-      parent inheritance); service-layer ACL cleanup on entity delete + test
+      parent inheritance); service-layer ACL cleanup on entity delete + test —
+      design: [ReBAC](../docs/design/authorization.md#rebac-entity-level-access),
+      [Resource access resolution](../docs/design/authorization.md#resource-access-resolution-who-sees-what),
+      [Enforcement pattern](../docs/design/authorization.md#enforcement-pattern-declarative-and-hard-to-forget)
 - [ ] Reference feature `projects` + `tasks` in `backend/app/`: full `_api/_db/_service` +
       utoipa + regenerated client + **boundary tests** (owner/admin sees all tenant projects;
       client sees only assigned projects and their tasks; cross-tenant → 404; member without a
       grant on P cannot read P's tasks) — replaces `sample`, which retires
       [07 § 7.4](07-code-structure-architecture.md) and the `/api/api/sample` path
-      [11 § 11.1](11-api-design.md)
+      [11 § 11.1](11-api-design.md);
+      design: the entire [design doc](../docs/design/authorization.md) (this feature
+      exercises every layer)
 - [ ] Rework `GET /api/users` into a tenant-scoped member listing gated by
-      `tenant:manage_members` — closes [02 § 2.1](02-authorization-access-control.md)
+      `tenant:manage_members` — closes [02 § 2.1](02-authorization-access-control.md);
+      design: [Enforcement pattern](../docs/design/authorization.md#enforcement-pattern-declarative-and-hard-to-forget)
 - [ ] Expose the caller's permission set in `UserInfo` so the frontend derives UI capabilities
-      — [09 § 9.3](09-frontend-code-quality.md)
+      — [09 § 9.3](09-frontend-code-quality.md);
+      design: [Claims & active tenant](../docs/design/authorization.md#claims--active-tenant-the-critical-constraint)
+- [ ] Write `docs/design/authentication.md` capturing the auth design as extended by this
+      stage — token lifecycle, cookies, OAuth state, the single-use-token pattern, mailer,
+      account lifecycle; content outline in [Design docs](#design-docs), verified starting
+      material in [01 § 1.5/1.7](01-authentication-session.md)
 
 ## Stage C — Frontend catches up (overlaps the tail of Stage B)
 
 As each backend capability lands, the matching frontend work unblocks.
 
 - [ ] Retire `isAdmin` (`user.id === 1`): capability helpers on `AppState` — `can(permission)`
-      derived from the backend permission set; nav visibility and route guards use `can(...)` —
+      derived from the backend permission set; nav visibility and route guards use `can(...)`;
+      document the capability model in `docs/design/frontend.md` —
       [09 § 9.3](09-frontend-code-quality.md)
 - [ ] Align error codes across backend + frontend: frontend expects `not_authenticated`,
       backend emits `invalid_token`/`expired_token`; settle the canonical `code` set in
       `conventions.md` — [09 § 9.8](09-frontend-code-quality.md), [11 § 11.3](11-api-design.md),
       [18 § 18.1](18-documentation-dx.md)
-- [ ] Tenant switcher UI for users with multiple memberships
+- [ ] Tenant switcher UI for users with multiple memberships —
+      design: [Claims & active tenant](../docs/design/authorization.md#claims--active-tenant-the-critical-constraint)
 - [ ] Invite UI (owner/admin invites an email + role + project assignment) and an
-      invitation-accept page
+      invitation-accept page — design: [Invitations](../docs/design/authorization.md#invitations),
+      [Resource access resolution](../docs/design/authorization.md#resource-access-resolution-who-sees-what)
 - [ ] Projects/tasks page consuming the generated client — the frontend half of the reference
-      feature (owner sees all, client sees only assigned)
+      feature (owner sees all, client sees only assigned) —
+      design: [Resource access resolution](../docs/design/authorization.md#resource-access-resolution-who-sees-what)
 
 ## Stage D — Hardening & polish (surface is now stable)
 
 Backend resilience & operability:
 
 - [ ] Argon2 hashing via `spawn_blocking` — [19 § 19.1](19-performance-scalability.md)
-- [ ] `PRAGMA synchronous = NORMAL` explicit; pool acquire timeout; document backup strategy —
+- [ ] `PRAGMA synchronous = NORMAL` explicit; pool acquire timeout; document the SQLite
+      choices + backup strategy in `docs/design/operations.md` —
       [10 § 10.1/10.7](10-database-data-layer.md)
 - [ ] `X-Request-ID` generation/propagation in the trace span — [14 § 14.1](14-logging-observability.md)
 - [ ] Supervise/log background cleanup-task exits — [13 § 13.4](13-error-handling-resilience.md)
 - [ ] Container healthcheck; drop obsolete compose `version` key —
       [16 § 16.2/16.3](16-containerization-deployment.md)
 - [ ] Response compression (`CompressionLayer`) — [19 § 19.6](19-performance-scalability.md)
-- [ ] Gate `/health?panic=true` to non-prod; consider `/ready` split —
+- [ ] Gate `/health?panic=true` to non-prod; consider `/ready` split; document the
+      health/readiness semantics in `docs/design/operations.md` —
       [14 § 14.4](14-logging-observability.md), [13 § 13.5](13-error-handling-resilience.md)
 
 API contract coherence (code, docs, and client must agree):
@@ -317,7 +311,8 @@ Frontend standards, UX & accessibility:
       `focus`/`storage` rescheduling on `AppState.isLoggedIn`, clear timing keys on auth
       failure, [01 § 1.6](01-authentication-session.md)); then simplify where possible without
       losing the tested behaviors ([09 § 9.11](09-frontend-code-quality.md),
-      [12 § 12.4](12-testing.md) rate it the strongest frontend code — keep it that way)
+      [12 § 12.4](12-testing.md) rate it the strongest frontend code — keep it that way);
+      record the resulting contract in `docs/design/frontend.md`
 
 ## Stage E — Lock it in
 
@@ -336,7 +331,8 @@ Remaining CI/CD:
 
 - [ ] Run `sqlx prepare --check` in CI — [17 § 17.2](17-cicd.md)
 - [ ] License allow-list (`cargo deny check licenses`) — [06 § 6.5](06-dependency-supply-chain.md)
-- [ ] Release workflow: tag → build → push image; documented rollback — [17 § 17.3](17-cicd.md)
+- [ ] Release workflow: tag → build → push image; rollback procedure documented in
+      `docs/design/operations.md` — [17 § 17.3](17-cicd.md)
 
 Backend hygiene (batch into few issues):
 
@@ -350,10 +346,25 @@ Backend hygiene (batch into few issues):
 - [ ] `xtask` overhaul: move the inline `dev`/`release`/`clean`/`dev_init` logic into modules,
       clean up the code, make the styling consistent with the backend, and add small shared
       abstractions (command-running, port-waiting, process supervision helpers) to reduce
-      overall size — extends [07 § 7.3](07-code-structure-architecture.md)
-- [ ] Docs: config reference, README architecture/testing sections, import-style convention
-      decision — [15 § 15.4](15-configuration-environment.md),
-      [18 § 18.2/18.3](18-documentation-dx.md), [21 § 21.4](21-general-hygiene.md)
+      overall size — [07 § 7.3](07-code-structure-architecture.md)
+- [ ] Import-style switch (decided): AGENTS.md convention becomes `use module::MyType;`
+      (direct type imports); update AGENTS.md and sweep the backend — new code follows the new
+      convention from now on — [21 § 21.4](21-general-hygiene.md)
+- [ ] Write `docs/config.md`: TOML layering/precedence, key reference with defaults, env-only
+      environment selection ([Design docs](#design-docs)) —
+      [15 § 15.4](15-configuration-environment.md)
+- [ ] README architecture/testing sections; link the design docs from the README —
+      [18 § 18.2/18.3](18-documentation-dx.md)
+
+Developer experience:
+
+- [ ] Devcontainer: split generic project setup from personal setup (fish/gemini/claude
+      configs and volumes become clearly-named opt-in scripts; optional `setup-zsh` variant
+      to prove the split) — [18 § 18.7](18-documentation-dx.md)
+- [ ] Add a `create-feature` agent skill: scaffold a new bounded context from a DB schema
+      (migration → `_db`/`_service`/`_api` → authz wiring → utoipa → codegen → frontend →
+      tests), using the Stage B projects/tasks feature as the exemplar — **after Stage B
+      lands** — [18 § 18.8](18-documentation-dx.md)
 
 Frontend hygiene (batch into one issue):
 

@@ -50,8 +50,12 @@ Findings are about a couple of leaks and premature structure.
   `dev_init`, and process monitoring live inline in `xtask.rs`. The `dev()` fn in particular
   is long and does port-waiting, spawning, and signal handling. This is build tooling, so the
   bar is lower, but it's production-adjacent per the review criteria.
-- **Recommendation:** Extract `dev`/`release`/`clean` into their own modules to match the rest.
-  Low priority.
+- **Recommendation:** Overhaul `xtask` as one cleanup pass: (a) extract `dev`/`release`/
+  `clean`/`dev_init` and the process-monitoring logic into their own modules to match the
+  rest; (b) bring the code style in line with the backend conventions (error handling,
+  logging, naming); (c) introduce small shared helpers for the repeated patterns — command
+  running with inherited stdio, port-waiting, child-process supervision — to reduce overall
+  size. Low priority; batch as a single issue.
 
 ---
 

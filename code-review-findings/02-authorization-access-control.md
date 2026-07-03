@@ -6,9 +6,9 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 > **Target design chosen:** the maintainer has decided the authorization model —
 > DB-driven roles, many-to-many tenant memberships, a generic ACL for entity-level access,
 > shipped via a `projects`/`tasks` reference feature. The full architecture (schema, claims,
-> enforcement pattern, build order) is in the
-> **[Stabilization Master Plan](stabilization-plan.md)** (Part 1).
-> The recommendations in 2.1/2.2 below are the minimum fixes; the master plan
+> enforcement pattern) is in **[docs/design/authorization.md](../docs/design/authorization.md)**;
+> the build order is Stage B of the [Stabilization Master Plan](stabilization-plan.md).
+> The recommendations in 2.1/2.2 below are the minimum fixes; the design doc
 > supersedes them.
 
 ---

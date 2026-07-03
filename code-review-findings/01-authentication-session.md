@@ -178,3 +178,23 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
   (single-use, short-lived, hashed token — reuse the refresh-token storage patterns already in
   place). This slots cleanly into the existing `auth` subfeature as `_api/_service/_db`
   additions.
+
+---
+
+## 1.10 — Google OAuth flow skips the consent / account-chooser screen
+
+- **Severity:** Minor
+- **Location:** `backend/platform/identity/oauth/oauth_service.rs:220-241`
+  (`begin_google_flow`, the authorize-URL builder).
+- **Finding:** The authorization URL requests scopes `openid`, `email`, `profile` but sets no
+  `prompt` parameter. For a user with an active Google session who has previously approved the
+  app, Google silently redirects straight back — no consent screen and no account chooser is
+  shown. The user cannot see what is being shared and, with multiple Google accounts, cannot
+  pick which one to sign in with.
+- **Risk:** Users with several Google accounts get silently logged in with whichever session
+  Google considers active — potentially the wrong account — and there is no in-flow way to
+  switch. Consent is effectively invisible after the first approval.
+- **Recommendation:** Add `.add_extra_param("prompt", "select_account")` to the authorize-URL
+  builder so the account chooser appears on every sign-in. Use `"consent"` instead only if the
+  app ever needs refresh tokens / offline access (it forces full re-approval every time, which
+  is noisier). Verify manually against Google with (a) one signed-in account and (b) two.

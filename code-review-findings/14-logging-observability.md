@@ -40,7 +40,7 @@ correlation, metrics, and a couple of over-logging spots.
 - **Location:** `backend/server.rs:79-84`.
 - **Finding:** `info!("configs: {:#?}", &settings)` and an explicit `sql_url` log line. Secret is
   redacted, but this is verbose and risks leaking future secret fields. See
-  [04](04-secrets-sensitive-data.md) 4.1.
+  [04](04-scrts-sensitive-data.md) 4.1.
 - **Recommendation:** Log a curated subset.
 
 ---

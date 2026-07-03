@@ -56,7 +56,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 - **Risk:** Architectural ambiguity that will force a painful migration later; SSO-linking
   logic is coupled to the global-unique assumption.
 - **Decided:** the maintainer chose **real multi-tenancy with many-to-many memberships**
-  (see the [Stabilization Master Plan](stabilization-plan.md), Part 1). Under that model users are
+  (see [docs/design/authorization.md](../docs/design/authorization.md)). Under that model users are
   **global accounts** and the user↔tenant link moves to a `memberships` table — so the
   global `UNIQUE(email)` is actually *correct* (one account, many tenants) and this tension
   resolves without a composite key. The work is: drop the single `tenant_id` FK from `users`,

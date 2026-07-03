@@ -34,9 +34,11 @@ Severity legend: **Critical** (exploitable/data-loss/prod-breaking), **Important
 Cross-cutting plan:
 
 - **[Stabilization Master Plan](stabilization-plan.md) — start here.** The single plan for all
-  backend and frontend work: the settled architecture decisions, the target authorization
-  design (DB-driven roles, many-to-many memberships, generic ACL, projects/tasks reference
-  feature), and one staged timeline (Stages A–E) covering every finding.
+  backend and frontend work: the settled architecture decisions and one staged timeline
+  (Stages A–E) covering every finding.
+- [Authorization design](../docs/design/authorization.md) — the target design (DB-driven
+  roles, many-to-many memberships, generic ACL, projects/tasks reference feature); kept under
+  `docs/` as a durable reference that GitHub issues link to.
 
 ## Top issues (start here)
 

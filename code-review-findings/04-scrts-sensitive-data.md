@@ -1,5 +1,8 @@
 # 04 — Secrets & Sensitive Data
 
+> The `scrts` filename is intentional: `.gitignore` has a `*secret*` pattern, so spelling
+> it out would git-ignore this file. Don't "fix" the name.
+
 Handled well: no secrets committed, OAuth secret is masked in `Debug`/serialization, emails
 are hashed before logging, passwords are never logged. Findings are minor.
 

@@ -53,6 +53,12 @@ paths, constants extracted, clippy-clean. Findings are small.
   types/functions directly. It's applied inconsistently (some files follow it, some don't).
 - **Recommendation:** Pick one and enforce it (a lint/rustfmt setting won't catch this, so it's a
   review-discipline item). If the convention is real, sweep the violators; if not, relax the doc.
+- **Decided (2026-07-02):** reverse the documented convention — switch to direct type imports
+  (`use module::MyType;`) and drop the `module::MyType` qualification style. Rationale: it is
+  the dominant Rust ecosystem idiom and reduces per-file noise/token count. The work is:
+  (a) update the imports section of `AGENTS.md`; (b) sweep the backend files that still follow
+  the old style; (c) new code follows the new convention immediately. See also
+  [18 § 18.6](18-documentation-dx.md) — encode style conventions as tool rules where possible.
 
 ---
 
