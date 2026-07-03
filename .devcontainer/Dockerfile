@@ -48,6 +48,11 @@ ENV RUSTUP_HOME="/home/vscode/.rustup" \
     CARGO_HOME="/home/vscode/.cargo" \
     PATH="/home/vscode/.cargo/bin:/home/vscode/.local/bin:${PATH}"
 
+# Pre-install CLI tools as cached layers
+RUN mkdir -p /home/vscode/.local/bin \
+ && curl -fsSL https://antigravity.google/cli/install.sh | bash \
+ && curl -fsSL https://claude.ai/install.sh | bash
+
 
 
 # Install Semgrep using uv. The --mount=type=cache option is used to cache 
