@@ -9,6 +9,7 @@ use std::time::Duration;
 mod checks;
 mod database;
 mod docker;
+mod lintmd;
 mod status;
 mod stop;
 
@@ -61,6 +62,7 @@ fn main() {
         "ci-frontend" => {
             checks::ci_frontend().expect("failed to run CI frontend checks");
         },
+        "check-md-links" => lintmd::check_md_links(),
         "dev" => dev(),
         "openapi" => openapi(),
         "docker-build" => {
@@ -100,6 +102,7 @@ Available commands:
   setup-hooks      - Sets up workspace git hooks
   ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
   ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
+  check-md-links   - Validates relative markdown links and heading anchors across the repo
   dev              - Runs backend watch and frontend dev server concurrently
   openapi          - Generates OpenAPI spec and frontend TypeScript client
   stop             - Stops any running backend servers

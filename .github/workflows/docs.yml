@@ -1,0 +1,45 @@
+name: Docs Checks
+
+# Complements ci.yml, which ignores markdown/docs changes entirely:
+# this workflow runs only for them.
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "**.md"
+            - "docs/**"
+    pull_request:
+        branches: [main]
+        paths:
+            - "**.md"
+            - "docs/**"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    markdown-links:
+        name: Markdown links
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        env:
+            RUSTC_WRAPPER: "" # bypasses sccache
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Install system dependencies
+              run: sudo apt-get update && sudo apt-get install -y lld
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@1.96.0
+
+            - name: Cache Cargo dependencies
+              uses: Swatinem/rust-cache@v2
+
+            - name: Check markdown links
+              run: cargo xtask check-md-links

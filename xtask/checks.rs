@@ -273,11 +273,13 @@ pub fn pre_commit() -> std::io::Result<()> {
 
     let mut has_backend = false;
     let mut has_frontend = false;
+    let mut has_docs = false;
 
     if files.is_empty() {
         println!("No staged files found. Running all checks as fallback.");
         has_backend = true;
         has_frontend = true;
+        has_docs = true;
     } else {
         for file in &files {
             if file.starts_with("backend/")
@@ -291,6 +293,9 @@ pub fn pre_commit() -> std::io::Result<()> {
             }
             if file.starts_with("frontend/") || file == "openapi.json" {
                 has_frontend = true;
+            }
+            if file.ends_with(".md") {
+                has_docs = true;
             }
         }
     }
@@ -307,6 +312,12 @@ pub fn pre_commit() -> std::io::Result<()> {
         check_frontend_openapi_drift()?;
     } else {
         println!("No frontend changes detected. Skipping frontend formatting and client drift check.");
+    }
+
+    if has_docs {
+        crate::lintmd::check_md_links();
+    } else {
+        println!("No markdown changes detected. Skipping markdown link check.");
     }
 
     println!("All pre-commit checks passed!");
