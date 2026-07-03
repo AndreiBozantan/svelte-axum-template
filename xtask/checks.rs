@@ -315,7 +315,7 @@ pub fn pre_commit() -> std::io::Result<()> {
     }
 
     if has_docs {
-        crate::lintmd::check_md_links();
+        crate::lintmd::check_md_links()?;
     } else {
         println!("No markdown changes detected. Skipping markdown link check.");
     }

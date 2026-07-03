@@ -31,6 +31,7 @@
         "fuser",
         "jsonwebtoken",
         "libsqlite",
+        "lintmd",
         "mimalloc",
         "NOCASE",
         "noexec",

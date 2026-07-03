@@ -62,7 +62,7 @@ fn main() {
         "ci-frontend" => {
             checks::ci_frontend().expect("failed to run CI frontend checks");
         },
-        "check-md-links" => lintmd::check_md_links(),
+        "check-md-links" => lintmd::check_md_links().expect("failed to check markdown links"),
         "dev" => dev(),
         "openapi" => openapi(),
         "docker-build" => {

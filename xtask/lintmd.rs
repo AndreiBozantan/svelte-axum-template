@@ -10,9 +10,9 @@ use std::process::Command;
 /// repo's tracked markdown files. External `http(s)`/`mailto` links are ignored.
 /// Anchors follow the GitHub algorithm: lowercase, punctuation stripped, spaces to
 /// hyphens, `-N` suffix for duplicates.
-pub fn check_md_links() {
+pub fn check_md_links() -> std::io::Result<()> {
     println!("Checking markdown links...");
-    let md_files = git_ls_md_files();
+    let md_files = git_ls_md_files()?;
 
     let mut anchor_cache: HashMap<PathBuf, HashSet<String>> = HashMap::new();
     let mut errors = Vec::new();
@@ -46,6 +46,7 @@ pub fn check_md_links() {
     }
     if errors.is_empty() {
         println!("All markdown links ok ({} files checked).", md_files.len());
+        Ok(())
     } else {
         eprintln!("{} broken markdown link(s) found.", errors.len());
         std::process::exit(1);
@@ -54,20 +55,17 @@ pub fn check_md_links() {
 
 /// Lists tracked markdown files via `git ls-files`, which honors `.gitignore` and
 /// skips untracked/ignored paths (build output, vendored deps, local agent shims).
-fn git_ls_md_files() -> Vec<PathBuf> {
-    let output = Command::new("git").args(["ls-files", "-z", "*.md"]).output();
-    let Ok(output) = output else {
-        return Vec::new();
-    };
+fn git_ls_md_files() -> std::io::Result<Vec<PathBuf>> {
+    let output = Command::new("git").args(["ls-files", "-z", "*.md"]).output()?;
     if !output.status.success() {
-        return Vec::new();
+        return Err(std::io::Error::other("failed to run git ls-files"));
     }
-    output
+    Ok(output
         .stdout
         .split(|&b| b == 0)
         .filter(|entry| !entry.is_empty())
         .map(|entry| PathBuf::from(String::from_utf8_lossy(entry).into_owned()))
-        .collect()
+        .collect())
 }
 
 /// True for a line that opens or closes a fenced code block (```` ``` ```` or `~~~`).
