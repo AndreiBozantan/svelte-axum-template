@@ -28,12 +28,7 @@ const COMMANDS: &[XtaskCommand] = &[
     XtaskCommand {
         name: "status",
         description: "Displays project development status (branch, DB, services, tests, clippy, size)",
-        run: |args| {
-            let refresh =
-                args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
-            let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
-            status::status(refresh, refresh_silent);
-        },
+        run: status,
     },
     XtaskCommand {
         name: "release",
@@ -96,6 +91,11 @@ const COMMANDS: &[XtaskCommand] = &[
         name: "dev-init",
         description: "Installs frontend packages, initializes DB, and seeds admin user",
         run: |_| dev_init(),
+    },
+    XtaskCommand {
+        name: "create-admin",
+        description: "Creates/updates the admin user interactively",
+        run: create_admin,
     },
     XtaskCommand {
         name: "setup-hooks",
@@ -223,6 +223,24 @@ pub(crate) fn run_command(
     command.status()
 }
 
+fn status(args: &[String]) {
+    let refresh = args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
+    let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
+    self::status::status(refresh, refresh_silent);
+}
+
+fn create_admin(args: &[String]) {
+    let mut run_args = vec!["run", "--quiet", "--package", "app", "--", "create-admin"];
+    for arg in &args[2..] {
+        run_args.push(arg);
+    }
+    let status = run_command("cargo", &run_args, None);
+    if status.is_err() || !status.unwrap().success() {
+        eprintln!("Failed to create admin user.");
+        std::process::exit(1);
+    }
+}
+
 fn clean() {
     println!("Cleaning build artifacts and node_modules...");
     let targets = [
@@ -282,7 +300,7 @@ fn dev_init() {
     println!("Seeding default admin user...");
     let status = run_command(
         "cargo",
-        &["run", "--package", "app", "--", "create-admin", "--email", "a@b.cc"],
+        &["run", "--quiet", "--package", "app", "--", "create-admin"],
         None,
     );
     if status.is_err() || !status.unwrap().success() {

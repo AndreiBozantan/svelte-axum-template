@@ -70,18 +70,21 @@ async fn start_server() -> Result<(), Error> {
     crate::openapi::export().await.map_err(Error::OpenApiGenerationFailed)?;
 
     let settings = config::AppSettings::new()?;
+    let log_directives = get_log_directives(&settings);
     tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&settings.server.log_directives))
+        .with(tracing_subscriber::EnvFilter::new(&log_directives))
         .with(tracing_subscriber::fmt::layer().with_file(true).with_line_number(true))
         .init();
 
-    info!("starting server... 🚀 ");
-    info!("logging: {}", settings.server.log_directives);
-    info!("app_env: {}", settings.server.env);
-    info!("sql_url: {}", settings.database.url);
-    info!("cfg_dir: {}", settings.get_config_dir_str()?);
-    info!("address: http://{}", settings.get_server_address());
-    info!("configs: {:#?}", &settings);
+    if !cli::is_cli_command() {
+        info!("starting server... 🚀 ");
+        info!("logging: {}", settings.server.log_directives);
+        info!("app_env: {}", settings.server.env);
+        info!("sql_url: {}", settings.database.url);
+        info!("cfg_dir: {}", settings.get_config_dir_str()?);
+        info!("address: http://{}", settings.get_server_address());
+        info!("configs: {:#?}", &settings);
+    }
 
     let jwt_secret = jwt::get_jwt_secret()?;
     let ctx = common::Context::create(settings, &jwt_secret).await?;
@@ -105,6 +108,14 @@ async fn start_server() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn get_log_directives(settings: &config::AppSettings) -> String {
+    if cli::is_cli_command() {
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "warn".to_string())
+    } else {
+        settings.server.log_directives.clone()
+    }
 }
 
 fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
