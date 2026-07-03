@@ -131,52 +131,52 @@ No ordering constraints among these; none is invalidated by the Stage B refactor
 
 Shipped frontend bugs:
 
-- [x] Failed login leaves Sign In permanently disabled — [09 § 9.1](09-frontend-code-quality.md#91--login-error-leaves-the-submit-button-permanently-disabled) ([#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192))
-- [x] `Logout.svelte` renders `[object Object]`; logout result ignored — [09 § 9.2](09-frontend-code-quality.md#92--logoutsvelte-renders-the-whole-user-object-instead-of-the-email) ([#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193))
-- [x] Silent bootstrap failure leaves a blank page — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#194](https://github.com/AndreiBozantan/svelte-axum-template/issues/194))
+- [ ] Failed login leaves Sign In permanently disabled — [09 § 9.1](09-frontend-code-quality.md#91--login-error-leaves-the-submit-button-permanently-disabled) ([#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192))
+- [ ] `Logout.svelte` renders `[object Object]`; logout result ignored — [09 § 9.2](09-frontend-code-quality.md#92--logoutsvelte-renders-the-whole-user-object-instead-of-the-email) ([#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193))
+- [ ] Silent bootstrap failure leaves a blank page — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#194](https://github.com/AndreiBozantan/svelte-axum-template/issues/194))
 
 Security fixes that don't touch the auth model:
 
-- [x] Enforce `user.status` on login and refresh; revoke tokens on suspend —
+- [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
       [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195))
-- [x] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
+- [ ] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
       config flag — [01 § 1.3](01-authentication-session.md#13--login-rate-limiter-is-keyed-only-by-client-ip-not-by-account),
       [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196))
-- [x] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
+- [ ] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
       [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197))
-- [x] Request body limit + password/name max-length validation (hash-amplification DoS) —
+- [ ] Request body limit + password/name max-length validation (hash-amplification DoS) —
       [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198))
-- [x] Request timeout layer; timeout on the OAuth token exchange —
+- [ ] Request timeout layer; timeout on the OAuth token exchange —
       [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199))
-- [x] Graceful shutdown on SIGTERM (container rollouts) —
+- [ ] Graceful shutdown on SIGTERM (container rollouts) —
       [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200))
-- [x] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
+- [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
       and the trusted-proxy header config (from the item above) —
       [05 § 5.2](05-http-transport-security.md#52--https-enforcement--httphttps-redirect-is-undocumented-and-unimplemented-in-app); outline in [Design docs](#design-docs) ([#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201))
-- [x] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
+- [ ] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
       the authorize URL — [01 § 1.10](01-authentication-session.md#110--google-oauth-flow-skips-the-consent--account-chooser-screen) ([#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202))
 
 Configuration correctness:
 
-- [x] Environment selection: `env` only from the process environment; remove it from all TOML
+- [ ] Environment selection: `env` only from the process environment; remove it from all TOML
       layers; set it in Dockerfile/compose/xtask — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
       [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none) ([#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203))
-- [x] Fail-fast config validation at startup (esp. production) —
+- [ ] Fail-fast config validation at startup (esp. production) —
       [15 § 15.2](15-configuration-environment.md#152--no-fail-fast-validation-of-required-configuration-at-startup) ([#204](https://github.com/AndreiBozantan/svelte-axum-template/issues/204))
 
 Decisions that gate later work:
 
-- [x] Frontend routing: adopt `svelte-spa-router` or finish the custom router (click
+- [ ] Frontend routing: adopt `svelte-spa-router` or finish the custom router (click
       interception, shared `pathToPage()`, 404 route) — **before any new pages exist**;
       record the decision + rationale as the first section of a new `docs/design/frontend.md`
       ([Design docs](#design-docs)) — [09 § 9.4](09-frontend-code-quality.md#94--sidebar-navigation-does-full-page-reloads-spa-routing-only-half-exists) ([#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205))
 
 Tooling that protects every later commit:
 
-- [x] CI supply-chain gating: `cargo audit`/`cargo deny` + `npm audit` as PR gates; Semgrep on
+- [ ] CI supply-chain gating: `cargo audit`/`cargo deny` + `npm audit` as PR gates; Semgrep on
       PRs; Dependabot/Renovate — [06 § 6.1/6.2](06-dependency-supply-chain.md#61--no-dependency-vulnerability-scanning-runs-in-ci),
       [17 § 17.1](17-cicd.md#171--security-scanning-is-not-a-required-pr-gate) ([#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206))
-- [x] Enforce lint-level style rules through tooling (formatting is already gated): ESLint
+- [ ] Enforce lint-level style rules through tooling (formatting is already gated): ESLint
       (`typescript-eslint` + `eslint-plugin-svelte`) wired into hooks + CI, and a
       `[workspace.lints]` table in the root `Cargo.toml` — [18 § 18.6](18-documentation-dx.md#186--formatting-is-tooled-and-ci-gated-but-lint-level-style-rules-are-not) ([#207](https://github.com/AndreiBozantan/svelte-axum-template/issues/207))
 
@@ -196,47 +196,47 @@ half. **When creating GitHub issues from these items, link that design doc in th
 (and quote the relevant schema/queries, since the Implementation Plan half is deleted after this
 stage). Items are ordered so each lands as a small, individually green PR.
 
-- [x] Permission catalog: Rust enum of actions with stable string forms, validated on write. ([#208](https://github.com/AndreiBozantan/svelte-axum-template/issues/208))
-- [x] Identity/tenancy schema + seeds: drop `users.tenant_id`; add `tenant_memberships`,
+- [ ] Permission catalog: Rust enum of actions with stable string forms, validated on write. ([#208](https://github.com/AndreiBozantan/svelte-axum-template/issues/208))
+- [ ] Identity/tenancy schema + seeds: drop `users.tenant_id`; add `tenant_memberships`,
       `roles`, `role_permissions`; seed the immutable system roles (owner, admin, member,
       viewer, client_admin, client_member). The role↔tenant match (a membership's role is a
       system role or belongs to that tenant) is enforced in the service — no FK can express it. ([#209](https://github.com/AndreiBozantan/svelte-axum-template/issues/209))
-- [x] Client model schema + endpoints: `legal_entities` (+ `companies`/`persons` subtypes with
+- [ ] Client model schema + endpoints: `legal_entities` (+ `companies`/`persons` subtypes with
       the typed FK for mutual exclusivity) and the `legal_entity_users` link; entity CRUD gated
       by `entity:read`/`entity:write`, inserting supertype + subtype in one transaction. ([#210](https://github.com/AndreiBozantan/svelte-axum-template/issues/210))
-- [x] Registration/SSO flow: self-signup creates tenant + owner membership; adapt
+- [ ] Registration/SSO flow: self-signup creates tenant + owner membership; adapt
       `link_sso_user` to the new schema. ([#211](https://github.com/AndreiBozantan/svelte-axum-template/issues/211))
-- [x] Mailer abstraction (trait + dev console impl + one provider) — prerequisite for
+- [ ] Mailer abstraction (trait + dev console impl + one provider) — prerequisite for
       verification here and invites below — [01 § 1.9](01-authentication-session.md#19--no-password-change-password-reset-or-account-recovery-flow-exists) ([#212](https://github.com/AndreiBozantan/svelte-axum-template/issues/212))
-- [x] Email verification on registration + fix SSO auto-linking (account pre-hijacking) —
+- [ ] Email verification on registration + fix SSO auto-linking (account pre-hijacking) —
       [01 § 1.8](01-authentication-session.md#18--no-email-verification-on-registration--account-pre-hijacking-via-sso-auto-linking), [20 § 20.3](20-business-logic-correctness.md#203--sso-account-linking-auto-links-by-email-with-no-verification-step) ([#213](https://github.com/AndreiBozantan/svelte-axum-template/issues/213))
-- [x] User lifecycle: `onboarding → active → suspended/archived` transitions (invited users
+- [ ] User lifecycle: `onboarding → active → suspended/archived` transitions (invited users
       start in `onboarding` until first login) — [20 § 20.2](20-business-logic-correctness.md#202--registration-always-assigns-tenant_id--0-and-status--active-bypassing-onboarding) ([#214](https://github.com/AndreiBozantan/svelte-axum-template/issues/214))
-- [x] JWT claims: the token carries only `user_id` — drop `tenant_id` from the claims. **No
+- [ ] JWT claims: the token carries only `user_id` — drop `tenant_id` from the claims. **No
       active tenant and no `switch-tenant` endpoint**: every query returns the cross-tenant
       union (see the Authorization machinery item). ([#215](https://github.com/AndreiBozantan/svelte-axum-template/issues/215))
-- [x] Authorization machinery: `AuthContext` + `RequirePermission` extractors; request-scoped
+- [ ] Authorization machinery: `AuthContext` + `RequirePermission` extractors; request-scoped
       permission resolution; the `project_access` view + `authorize_resource` helper (single
       predicate, 404-on-denied per `conventions.md` §6); read routes stay open to members and
       rely on row scoping, mutations are permission-guarded. ([#216](https://github.com/AndreiBozantan/svelte-axum-template/issues/216))
-- [x] Role management endpoints: tenant-admin CRUD for custom roles + assignment; system roles
+- [ ] Role management endpoints: tenant-admin CRUD for custom roles + assignment; system roles
       immutable; validate that client roles are never granted the tenant-wide `project:read`;
       covered by tests (the cost of the DB-driven choice — budget for it). ([#217](https://github.com/AndreiBozantan/svelte-axum-template/issues/217))
-- [x] Invite flow: owner/admin invites an email with a role **and optional `legal_entity_id`**
+- [ ] Invite flow: owner/admin invites an email with a role **and optional `legal_entity_id`**
       (the client-assignment flow); single-use hashed token; accept creates the membership (plus
       the `legal_entity_users` link for client invites) in one transaction. ([#218](https://github.com/AndreiBozantan/svelte-axum-template/issues/218))
-- [x] Reference feature `projects` + `tasks` in `backend/app/`: full `_api/_db/_service` +
+- [ ] Reference feature `projects` + `tasks` in `backend/app/`: full `_api/_db/_service` +
       utoipa + regenerated client + **boundary tests** (staff with `project:read` sees all
       tenant projects and their tasks; a client sees only their client's projects and tasks, and
       across all tenants they belong to; cross-tenant access → 404) — replaces `sample`, which
       retires [07 § 7.4](07-code-structure-architecture.md#74--emptyplaceholder-artifacts) and the `/api/api/sample` path
       [11 § 11.1](11-api-design.md#111--apiapisample--duplicated-path-prefix-ships-in-the-spec-and-client). ([#219](https://github.com/AndreiBozantan/svelte-axum-template/issues/219))
-- [x] Rework `GET /api/users` into a tenant-scoped member listing gated by a member-management
+- [ ] Rework `GET /api/users` into a tenant-scoped member listing gated by a member-management
       permission (`member:invite`/`member:remove`) — closes [02 § 2.1](02-authorization-access-control.md#21--get-apiusers-discloses-every-user-in-the-shared-default-tenant). ([#220](https://github.com/AndreiBozantan/svelte-axum-template/issues/220))
-- [x] Expose the caller's permission set (and their tenant memberships, for the cross-tenant UI)
+- [ ] Expose the caller's permission set (and their tenant memberships, for the cross-tenant UI)
       in `UserInfo` so the frontend derives UI capabilities —
       [09 § 9.3](09-frontend-code-quality.md#93--isadmin-is-derived-from-userid--1-which-is-not-the-admin). ([#221](https://github.com/AndreiBozantan/svelte-axum-template/issues/221))
-- [x] Write `docs/design/authentication.md` capturing the auth design as extended by this
+- [ ] Write `docs/design/authentication.md` capturing the auth design as extended by this
       stage — token lifecycle, cookies, OAuth state, the single-use-token pattern, mailer,
       account lifecycle; content outline in [Design docs](#design-docs), verified starting
       material in [01 § 1.5/1.7](01-authentication-session.md#15--refresh-issues-a-new-token-before-validating-the-token-hash-matches) ([#222](https://github.com/AndreiBozantan/svelte-axum-template/issues/222))
@@ -245,139 +245,139 @@ stage). Items are ordered so each lands as a small, individually green PR.
 
 As each backend capability lands, the matching frontend work unblocks.
 
-- [x] Retire `isAdmin` (`user.id === 1`): capability helpers on `AppState` — `can(permission)`
+- [ ] Retire `isAdmin` (`user.id === 1`): capability helpers on `AppState` — `can(permission)`
       derived from the backend permission set; nav visibility and route guards use `can(...)`;
       document the capability model in `docs/design/frontend.md` —
       [09 § 9.3](09-frontend-code-quality.md#93--isadmin-is-derived-from-userid--1-which-is-not-the-admin) ([#223](https://github.com/AndreiBozantan/svelte-axum-template/issues/223))
-- [x] Align error codes across backend + frontend: frontend expects `not_authenticated`,
+- [ ] Align error codes across backend + frontend: frontend expects `not_authenticated`,
       backend emits `invalid_token`/`expired_token`; settle the canonical `code` set in
       `conventions.md` — [09 § 9.8](09-frontend-code-quality.md#98--frontend-expects-error-code-not_authenticated-backend-never-emits-it), [11 § 11.3](11-api-design.md#113--error-code-strings-dont-match-the-documented-contract),
       [18 § 18.1](18-documentation-dx.md#181--docs-and-code-disagree-in-several-places) ([#224](https://github.com/AndreiBozantan/svelte-axum-template/issues/224))
-- [x] Cross-tenant list views: with no active tenant, lists show a **tenant-name column** for
+- [ ] Cross-tenant list views: with no active tenant, lists show a **tenant-name column** for
       users who belong to multiple tenants (no tenant switcher). ([#225](https://github.com/AndreiBozantan/svelte-axum-template/issues/225))
-- [x] Invite UI (owner/admin invites an email + role + optional client legal entity) and an
+- [ ] Invite UI (owner/admin invites an email + role + optional client legal entity) and an
       invitation-accept page. ([#226](https://github.com/AndreiBozantan/svelte-axum-template/issues/226))
-- [x] Projects/tasks page consuming the generated client — the frontend half of the reference
+- [ ] Projects/tasks page consuming the generated client — the frontend half of the reference
       feature (staff see all tenant projects; clients see only their client's, across tenants). ([#227](https://github.com/AndreiBozantan/svelte-axum-template/issues/227))
 
 ## Stage D — Hardening & polish (surface is now stable)
 
 Backend resilience & operability:
 
-- [x] Argon2 hashing via `spawn_blocking` — [19 § 19.1](19-performance-scalability.md#191--argon2-hashing-runs-on-the-async-runtime-without-spawn_blocking) ([#228](https://github.com/AndreiBozantan/svelte-axum-template/issues/228))
-- [x] `PRAGMA synchronous = NORMAL` explicit; pool acquire timeout; document the SQLite
+- [ ] Argon2 hashing via `spawn_blocking` — [19 § 19.1](19-performance-scalability.md#191--argon2-hashing-runs-on-the-async-runtime-without-spawn_blocking) ([#228](https://github.com/AndreiBozantan/svelte-axum-template/issues/228))
+- [ ] `PRAGMA synchronous = NORMAL` explicit; pool acquire timeout; document the SQLite
       choices + backup strategy in `docs/design/operations.md` —
       [10 § 10.1/10.7](10-database-data-layer.md#101--synchronous-pragma-not-set-durability-under-wal-is-at-sqlite-default) ([#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229))
-- [x] `X-Request-ID` generation/propagation in the trace span — [14 § 14.1](14-logging-observability.md#141--no-request-id--correlation-id-threaded-through-logs) ([#230](https://github.com/AndreiBozantan/svelte-axum-template/issues/230))
-- [x] Supervise/log background cleanup-task exits — [13 § 13.4](13-error-handling-resilience.md#134--background-cleanup-tasks-have-no-restartpanic-handling) ([#231](https://github.com/AndreiBozantan/svelte-axum-template/issues/231))
-- [x] Container healthcheck; drop obsolete compose `version` key —
+- [ ] `X-Request-ID` generation/propagation in the trace span — [14 § 14.1](14-logging-observability.md#141--no-request-id--correlation-id-threaded-through-logs) ([#230](https://github.com/AndreiBozantan/svelte-axum-template/issues/230))
+- [ ] Supervise/log background cleanup-task exits — [13 § 13.4](13-error-handling-resilience.md#134--background-cleanup-tasks-have-no-restartpanic-handling) ([#231](https://github.com/AndreiBozantan/svelte-axum-template/issues/231))
+- [ ] Container healthcheck; drop obsolete compose `version` key —
       [16 § 16.2/16.3](16-containerization-deployment.md#162--no-healthcheck-in-the-dockerfile--compose) ([#232](https://github.com/AndreiBozantan/svelte-axum-template/issues/232))
-- [x] Response compression (`CompressionLayer`) — [19 § 19.6](19-performance-scalability.md#196--asset-serving-cacheetagcompression) ([#233](https://github.com/AndreiBozantan/svelte-axum-template/issues/233))
-- [x] Gate `/health?panic=true` to non-prod; consider `/ready` split; document the
+- [ ] Response compression (`CompressionLayer`) — [19 § 19.6](19-performance-scalability.md#196--asset-serving-cacheetagcompression) ([#233](https://github.com/AndreiBozantan/svelte-axum-template/issues/233))
+- [ ] Gate `/health?panic=true` to non-prod; consider `/ready` split; document the
       health/readiness semantics in `docs/design/operations.md` —
       [14 § 14.4](14-logging-observability.md#144--public-healthpanictrue-crash-hook-is-available-in-production), [13 § 13.5](13-error-handling-resilience.md#135--health-check-is-liveness-only-no-readiness-distinction) ([#234](https://github.com/AndreiBozantan/svelte-axum-template/issues/234))
 
 API contract coherence (code, docs, and client must agree):
 
-- [x] Pagination: implement the documented cursor shape or relax the convention — applies to
+- [ ] Pagination: implement the documented cursor shape or relax the convention — applies to
       the new member/project/task list endpoints — [11 § 11.2](11-api-design.md#112--get-apiusers-uses-offset-pagination-and-returns-total-contradicting-conventionsmd),
       [19 § 19.2](19-performance-scalability.md#192--list_users-runs-a-count-on-every-call) ([#235](https://github.com/AndreiBozantan/svelte-axum-template/issues/235))
-- [x] `#[serde(deny_unknown_fields)]` on request DTOs (or fix the doc) — [03 § 3.3](03-input-validation-injection.md#33--unknown-fields-in-request-bodies-are-silently-accepted-contradicts-documented-convention) ([#236](https://github.com/AndreiBozantan/svelte-axum-template/issues/236))
-- [x] `Retry-After` on 429 — [11 § 11.4](11-api-design.md#114--no-retry-after-header-on-429-despite-documented-convention) ([#237](https://github.com/AndreiBozantan/svelte-axum-template/issues/237))
-- [x] Reconcile `conventions.md` with reality; mark unimplemented sections — [18 § 18.1](18-documentation-dx.md#181--docs-and-code-disagree-in-several-places) ([#238](https://github.com/AndreiBozantan/svelte-axum-template/issues/238))
+- [ ] `#[serde(deny_unknown_fields)]` on request DTOs (or fix the doc) — [03 § 3.3](03-input-validation-injection.md#33--unknown-fields-in-request-bodies-are-silently-accepted-contradicts-documented-convention) ([#236](https://github.com/AndreiBozantan/svelte-axum-template/issues/236))
+- [ ] `Retry-After` on 429 — [11 § 11.4](11-api-design.md#114--no-retry-after-header-on-429-despite-documented-convention) ([#237](https://github.com/AndreiBozantan/svelte-axum-template/issues/237))
+- [ ] Reconcile `conventions.md` with reality; mark unimplemented sections — [18 § 18.1](18-documentation-dx.md#181--docs-and-code-disagree-in-several-places) ([#238](https://github.com/AndreiBozantan/svelte-axum-template/issues/238))
 
 Account management (nearly free once the Stage B mailer exists):
 
-- [x] Change-password (requires current password, revokes other sessions) and
+- [ ] Change-password (requires current password, revokes other sessions) and
       forgot/reset-password (single-use hashed token) — [01 § 1.9](01-authentication-session.md#19--no-password-change-password-reset-or-account-recovery-flow-exists) ([#239](https://github.com/AndreiBozantan/svelte-axum-template/issues/239))
-- [x] Account deletion/anonymization path (uses the `archived` status) — [10 § 10.6](10-database-data-layer.md#106--cascade-deletes-are-configured-anonymizationlifecycle-is-not) ([#240](https://github.com/AndreiBozantan/svelte-axum-template/issues/240))
-- [x] Account-lockout DoS trade-off: cap duration or add IP-scoped throttle — [01 § 1.4](01-authentication-session.md#14--account-lockout-enables-trivial-denial-of-service-against-a-known-account) ([#241](https://github.com/AndreiBozantan/svelte-axum-template/issues/241))
+- [ ] Account deletion/anonymization path (uses the `archived` status) — [10 § 10.6](10-database-data-layer.md#106--cascade-deletes-are-configured-anonymizationlifecycle-is-not) ([#240](https://github.com/AndreiBozantan/svelte-axum-template/issues/240))
+- [ ] Account-lockout DoS trade-off: cap duration or add IP-scoped throttle — [01 § 1.4](01-authentication-session.md#14--account-lockout-enables-trivial-denial-of-service-against-a-known-account) ([#241](https://github.com/AndreiBozantan/svelte-axum-template/issues/241))
 
 Frontend standards, UX & accessibility:
 
-- [x] `About.svelte` raw `fetch` → `api.health.health_check()` — [09 § 9.5](09-frontend-code-quality.md#95--aboutsvelte-calls-the-api-with-raw-fetch-bypassing-the-generated-client) ([#242](https://github.com/AndreiBozantan/svelte-axum-template/issues/242))
-- [x] `fetch.ts` `onError`: distinguish offline from server error, snake_case code, dev log —
+- [ ] `About.svelte` raw `fetch` → `api.health.health_check()` — [09 § 9.5](09-frontend-code-quality.md#95--aboutsvelte-calls-the-api-with-raw-fetch-bypassing-the-generated-client) ([#242](https://github.com/AndreiBozantan/svelte-axum-template/issues/242))
+- [ ] `fetch.ts` `onError`: distinguish offline from server error, snake_case code, dev log —
       [09 § 9.7](09-frontend-code-quality.md#97--fetchts-onerror-middleware-swallows-the-real-error-and-always-returns-500) ([#243](https://github.com/AndreiBozantan/svelte-axum-template/issues/243))
-- [x] Type `PageDefinition.component` as `Component` instead of `any` — [09 § 9.6](09-frontend-code-quality.md#96--pagedefinitioncomponent-typed-as-any) ([#244](https://github.com/AndreiBozantan/svelte-axum-template/issues/244))
-- [x] Logout confirm is hover-only (keyboard users bypass it); make click-toggled + Escape —
+- [ ] Type `PageDefinition.component` as `Component` instead of `any` — [09 § 9.6](09-frontend-code-quality.md#96--pagedefinitioncomponent-typed-as-any) ([#244](https://github.com/AndreiBozantan/svelte-axum-template/issues/244))
+- [ ] Logout confirm is hover-only (keyboard users bypass it); make click-toggled + Escape —
       [09 § 9.9](09-frontend-code-quality.md#99--logout-confirmation-is-mouse-only-and-keyboard-users-bypass-it-entirely) ([#245](https://github.com/AndreiBozantan/svelte-axum-template/issues/245))
-- [x] Settings toggles are non-functional placeholders; wire up or mark — [09 § 9.9](09-frontend-code-quality.md#99--logout-confirmation-is-mouse-only-and-keyboard-users-bypass-it-entirely) ([#246](https://github.com/AndreiBozantan/svelte-axum-template/issues/246))
-- [x] `auth-refresh-manager`: simplicity & safety pass — fix the stale-timer edge (gate
+- [ ] Settings toggles are non-functional placeholders; wire up or mark — [09 § 9.9](09-frontend-code-quality.md#99--logout-confirmation-is-mouse-only-and-keyboard-users-bypass-it-entirely) ([#246](https://github.com/AndreiBozantan/svelte-axum-template/issues/246))
+- [ ] `auth-refresh-manager`: simplicity & safety pass — fix the stale-timer edge (gate
       `focus`/`storage` rescheduling on `AppState.isLoggedIn`, clear timing keys on auth
       failure, [01 § 1.6](01-authentication-session.md#16--frontend-token-refresh-timing-state-is-stored-in-localstorage)); then simplify where possible without
       losing the tested behaviors ([09 § 9.11](09-frontend-code-quality.md#911--staterunes-usage-is-correct-verified),
       [12 § 12.4](12-testing.md#124--no-frontend-componente2e-tests-only-the-refresh-manager-is-covered) rate it the strongest frontend code — keep it that way);
       record the resulting contract in `docs/design/frontend.md` ([#247](https://github.com/AndreiBozantan/svelte-axum-template/issues/247))
 
-- [x] JWT key rotation (`kid` + multiple decode keys) — [04 § 4.3](04-scrts-sensitive-data.md#43--jwt-secret-file-good-handling-document-rotation) ([#269](https://github.com/AndreiBozantan/svelte-axum-template/issues/269))
+- [ ] JWT key rotation (`kid` + multiple decode keys) — [04 § 4.3](04-scrts-sensitive-data.md#43--jwt-secret-file-good-handling-document-rotation) ([#269](https://github.com/AndreiBozantan/svelte-axum-template/issues/269))
 
-- [x] Application metrics (`/metrics`, RED) — [14 § 14.2](14-logging-observability.md#142--no-application-metrics-exposed) ([#270](https://github.com/AndreiBozantan/svelte-axum-template/issues/270))
+- [ ] Application metrics (`/metrics`, RED) — [14 § 14.2](14-logging-observability.md#142--no-application-metrics-exposed) ([#270](https://github.com/AndreiBozantan/svelte-axum-template/issues/270))
 
-- [x] Idempotency keys for mutating endpoints — [11 § 11.5](11-api-design.md#115--no-idempotency-support-for-mutating-endpoints) ([#271](https://github.com/AndreiBozantan/svelte-axum-template/issues/271))
+- [ ] Idempotency keys for mutating endpoints — [11 § 11.5](11-api-design.md#115--no-idempotency-support-for-mutating-endpoints) ([#271](https://github.com/AndreiBozantan/svelte-axum-template/issues/271))
 
-- [x] Lazy-load page components / bundle splitting — [19 § 19.5](19-performance-scalability.md#195--frontend-bundle-no-code-splittinglazy-loading-small-app-so-low-impact) ([#272](https://github.com/AndreiBozantan/svelte-axum-template/issues/272))
+- [ ] Lazy-load page components / bundle splitting — [19 § 19.5](19-performance-scalability.md#195--frontend-bundle-no-code-splittinglazy-loading-small-app-so-low-impact) ([#272](https://github.com/AndreiBozantan/svelte-axum-template/issues/272))
 
 ## Stage E — Lock it in
 
 Tests (the authorization _boundary_ tests already shipped inside Stage B):
 
-- [x] Role/permission-resolution unit tests, incl. custom roles and system-role immutability —
+- [ ] Role/permission-resolution unit tests, incl. custom roles and system-role immutability —
       [02 § 2.2](02-authorization-access-control.md#22--no-roleauthorization-model-exists-admin-is-not-enforced-anywhere-on-the-backend) ([#248](https://github.com/AndreiBozantan/svelte-axum-template/issues/248))
-- [x] Make Google HTTP calls injectable; test the OAuth callback (CSRF mismatch, expired
+- [ ] Make Google HTTP calls injectable; test the OAuth callback (CSRF mismatch, expired
       state, happy path) — [12 § 12.2](12-testing.md#122--oauth-callback-flow-is-untested-end-to-end) ([#249](https://github.com/AndreiBozantan/svelte-axum-template/issues/249))
-- [x] Suspended-user login/refresh rejection tests — [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#250](https://github.com/AndreiBozantan/svelte-axum-template/issues/250))
-- [x] Pre-hijack scenario test (register → SSO link) — [01 § 1.8](01-authentication-session.md#18--no-email-verification-on-registration--account-pre-hijacking-via-sso-auto-linking) ([#251](https://github.com/AndreiBozantan/svelte-axum-template/issues/251))
-- [x] Component tests for Login and auth-redirect logic; remove `dummy.test.ts`; optional
+- [ ] Suspended-user login/refresh rejection tests — [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#250](https://github.com/AndreiBozantan/svelte-axum-template/issues/250))
+- [ ] Pre-hijack scenario test (register → SSO link) — [01 § 1.8](01-authentication-session.md#18--no-email-verification-on-registration--account-pre-hijacking-via-sso-auto-linking) ([#251](https://github.com/AndreiBozantan/svelte-axum-template/issues/251))
+- [ ] Component tests for Login and auth-redirect logic; remove `dummy.test.ts`; optional
       Playwright smoke test (login → protected page → logout) — [12 § 12.4](12-testing.md#124--no-frontend-componente2e-tests-only-the-refresh-manager-is-covered) ([#252](https://github.com/AndreiBozantan/svelte-axum-template/issues/252))
 
 Remaining CI/CD:
 
-- [x] Run `sqlx prepare --check` in CI — [17 § 17.2](17-cicd.md#172--sqlx-prepare---check-is-skipped-in-ci) ([#253](https://github.com/AndreiBozantan/svelte-axum-template/issues/253))
-- [x] License allow-list (`cargo deny check licenses`) — [06 § 6.5](06-dependency-supply-chain.md#65--license-compliance-not-tracked) ([#254](https://github.com/AndreiBozantan/svelte-axum-template/issues/254))
-- [x] Release workflow: tag → build → push image; rollback procedure documented in
+- [ ] Run `sqlx prepare --check` in CI — [17 § 17.2](17-cicd.md#172--sqlx-prepare---check-is-skipped-in-ci) ([#253](https://github.com/AndreiBozantan/svelte-axum-template/issues/253))
+- [ ] License allow-list (`cargo deny check licenses`) — [06 § 6.5](06-dependency-supply-chain.md#65--license-compliance-not-tracked) ([#254](https://github.com/AndreiBozantan/svelte-axum-template/issues/254))
+- [ ] Release workflow: tag → build → push image; rollback procedure documented in
       `docs/design/operations.md` — [17 § 17.3](17-cicd.md#173--no-cd--release-pipeline-versioning-or-rollback-automation) ([#255](https://github.com/AndreiBozantan/svelte-axum-template/issues/255))
 
 Backend hygiene (batch into few issues):
 
-- [x] Service-layer cleanups: drop the HTTP error variant from `auth::Error`; make repo/context
+- [ ] Service-layer cleanups: drop the HTTP error variant from `auth::Error`; make repo/context
       fields non-`pub`; stop api→repo reach-through — [07 § 7.1/7.2](07-code-structure-architecture.md#71--http-concerns-leak-into-the-domainservice-layer) ([#256](https://github.com/AndreiBozantan/svelte-axum-template/issues/256))
-- [x] `map_err` → `#[from]` sweep; comment or remove clippy allows; `#[cfg(test)]` for
+- [ ] `map_err` → `#[from]` sweep; comment or remove clippy allows; `#[cfg(test)]` for
       test-only code; avoid the `Row` clone — [08 § 8.1/8.3/8.4/8.5](08-rust-code-quality.md#81--map_err-used-where-from-conversions-are-the-project-standard) ([#257](https://github.com/AndreiBozantan/svelte-axum-template/issues/257))
-- [x] Curate startup config logging; stop logging CSRF hashes —
+- [ ] Curate startup config logging; stop logging CSRF hashes —
       [04 § 4.1/4.2](04-scrts-sensitive-data.md#41--full-settings-struct-including-db-url-is-logged-at-startup), [14 § 14.3](14-logging-observability.md#143--full-config-dump-at-startup-cross-listed) ([#258](https://github.com/AndreiBozantan/svelte-axum-template/issues/258))
-- [x] Pick one `updated_at` mechanism (trigger vs explicit) — [10 § 10.4](10-database-data-layer.md#104--updated_at-trigger-causes-double-writes--recursion-risk-and-returning-may-not-reflect-it) ([#259](https://github.com/AndreiBozantan/svelte-axum-template/issues/259))
-- [x] `xtask` overhaul: move the inline `dev`/`release`/`clean`/`dev_init` logic into modules,
+- [ ] Pick one `updated_at` mechanism (trigger vs explicit) — [10 § 10.4](10-database-data-layer.md#104--updated_at-trigger-causes-double-writes--recursion-risk-and-returning-may-not-reflect-it) ([#259](https://github.com/AndreiBozantan/svelte-axum-template/issues/259))
+- [ ] `xtask` overhaul: move the inline `dev`/`release`/`clean`/`dev_init` logic into modules,
       clean up the code, make the styling consistent with the backend, and add small shared
       abstractions (command-running, port-waiting, process supervision helpers) to reduce
       overall size — [07 § 7.3](07-code-structure-architecture.md#73--xtask-is-a-single-388-line-xtaskrs-plus-modules-mixed-responsibilities) ([#260](https://github.com/AndreiBozantan/svelte-axum-template/issues/260))
-- [x] Import-style switch (decided): AGENTS.md convention becomes `use module::MyType;`
+- [ ] Import-style switch (decided): AGENTS.md convention becomes `use module::MyType;`
       (direct type imports); update AGENTS.md and sweep the backend — new code follows the new
       convention from now on — [21 § 21.4](21-general-hygiene.md#214--inconsistent-import-style-vs-the-documented-convention) ([#261](https://github.com/AndreiBozantan/svelte-axum-template/issues/261))
-- [x] Write `docs/config.md`: TOML layering/precedence, key reference with defaults, env-only
+- [ ] Write `docs/config.md`: TOML layering/precedence, key reference with defaults, env-only
       environment selection ([Design docs](#design-docs)) —
       [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented) ([#262](https://github.com/AndreiBozantan/svelte-axum-template/issues/262))
-- [x] README architecture/testing sections; link the design docs from the README —
+- [ ] README architecture/testing sections; link the design docs from the README —
       [18 § 18.2/18.3](18-documentation-dx.md#182--almost-no-doc-comments-on-public-apis--complex-modules) ([#263](https://github.com/AndreiBozantan/svelte-axum-template/issues/263))
 
 Developer experience:
 
-- [x] Devcontainer: split generic project setup from personal setup (fish/gemini/claude
+- [ ] Devcontainer: split generic project setup from personal setup (fish/gemini/claude
       configs and volumes become clearly-named opt-in scripts; optional `setup-zsh` variant
       to prove the split) — [18 § 18.7](18-documentation-dx.md#187--devcontainer-bakes-one-developers-personal-setup-into-the-shared-config) ([#264](https://github.com/AndreiBozantan/svelte-axum-template/issues/264))
-- [x] Add a `create-feature` agent skill: scaffold a new bounded context from a DB schema
+- [ ] Add a `create-feature` agent skill: scaffold a new bounded context from a DB schema
       (migration → `_db`/`_service`/`_api` → authz wiring → utoipa → codegen → frontend →
       tests), using the Stage B projects/tasks feature as the exemplar — **after Stage B
       lands** — [18 § 18.8](18-documentation-dx.md#188--no-guideskill-for-scaffolding-a-new-feature-from-a-db-schema) ([#265](https://github.com/AndreiBozantan/svelte-axum-template/issues/265))
 
 Frontend hygiene (batch into one issue):
 
-- [x] Dead `/user_info.js` proxy; runtime Google Fonts import / unloaded Inter; hardcoded
+- [ ] Dead `/user_info.js` proxy; runtime Google Fonts import / unloaded Inter; hardcoded
       `v1.0.0-beta`; global `isLoading` misuse in SecureApi — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266))
-- [x] `console.*` calls in production code — [21 § 21.1](21-general-hygiene.md#211--consolelogconsoleerror-left-in-frontend-production-code) ([#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267))
-- [x] Commented-out code, dead `AppState.userId`, package name drift —
+- [ ] `console.*` calls in production code — [21 § 21.1](21-general-hygiene.md#211--consolelogconsoleerror-left-in-frontend-production-code) ([#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267))
+- [ ] Commented-out code, dead `AppState.userId`, package name drift —
       [21 § 21.2/21.3/21.5](21-general-hygiene.md#212--commented-out-code-blocks) ([#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268))
 
-- [x] Extract `auth-refresh-manager` as a standalone npm package (after the Stage D simplicity/safety pass proves the API surface is stable) ([#273](https://github.com/AndreiBozantan/svelte-axum-template/issues/273))
+- [ ] Extract `auth-refresh-manager` as a standalone npm package (after the Stage D simplicity/safety pass proves the API surface is stable) ([#273](https://github.com/AndreiBozantan/svelte-axum-template/issues/273))
 
 ## Deferred (document, revisit when needed)
 
