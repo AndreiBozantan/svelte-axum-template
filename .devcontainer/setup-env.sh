@@ -253,10 +253,8 @@ EOF
 # Ensure local bin directory exists
 mkdir -p /home/vscode/.local/bin
 
-echo "Installing/updating Antigravity CLI..."
-rm -f /home/vscode/.local/bin/agy
-curl -fsSL https://antigravity.google/cli/install.sh | bash
-
-echo "Installing/updating Claude CLI..."
-rm -f /home/vscode/.local/bin/claude
-curl -fsSL https://claude.ai/install.sh | bash
+echo "Checking for CLI updates in the background..."
+if curl -s --connect-timeout 2 google.com &>/dev/null; then
+    (agy update </dev/null &>/dev/null) &
+    (claude update </dev/null &>/dev/null) &
+fi
