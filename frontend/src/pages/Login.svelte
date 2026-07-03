@@ -8,7 +8,6 @@
     let email = $state('');
     let password = $state('');
     let errorMessage = $state('');
-    let isLoading = $state(false);
     let emailInput: HTMLInputElement | undefined = $state();
 
     onMount(async () => {
@@ -21,7 +20,6 @@
     async function handleLogin(e: Event): Promise<void> {
         e.preventDefault();
         errorMessage = '';
-        isLoading = true;
 
         const { data, error } = await api.auth.login({ email, password });
 
@@ -33,7 +31,6 @@
 
         AppState.setUser(data.user);
         AuthRefreshManager.instance.setupRefreshTimer(data.expires_in);
-        isLoading = false;
     }
 
     function handleGoogleLogin() {
@@ -87,13 +84,9 @@
                 />
             </div>
 
-            <button type="submit" class="btn-primary" disabled={isLoading}>
-                {#if isLoading}
-                    <span class="spinner"></span>
-                    Signing in...
-                {:else}
-                    Sign In
-                {/if}
+            <button type="submit" class="btn-primary" disabled={AppState.isLoading}>
+                <span class="spinner" class:visible={AppState.isLoading}></span>
+                {AppState.isLoading ? 'Signing in...' : 'Sign In'}
             </button>
         </form>
 
@@ -148,7 +141,7 @@
         color: #1a1a1a;
     }
     .subtitle {
-        color: #666;
+        color: #555;
         margin-bottom: 30px;
         font-size: 15px;
     }
@@ -257,12 +250,16 @@
         border: 1px solid #feb2b2;
     }
     .spinner {
+        display: none;
         width: 18px;
         height: 18px;
         border: 2px solid rgba(255, 255, 255, 0.3);
         border-top-color: white;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+    }
+    .spinner.visible {
+        display: inline-block;
     }
     @keyframes spin {
         to {

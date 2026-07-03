@@ -5,7 +5,6 @@
     let response = $state('');
 
     async function handleApiCheck(): Promise<void> {
-        AppState.startLoading();
         response = '';
         const { data, error } = await api.users.user_info();
         if (error) {
@@ -13,7 +12,6 @@
         } else {
             response = JSON.stringify(data, null, 2);
         }
-        AppState.stopLoading();
     }
 </script>
 
