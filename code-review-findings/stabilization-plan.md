@@ -1,8 +1,7 @@
 # Stabilization Master Plan
 
 The single plan for taking the codebase from "reviewed template" to "solid, production-ready
-platform to build an app on". It merges the former backend/frontend stabilization plans, the
-authorization design, and the execution-order doc into one timeline. The numbered findings
+platform to build an app on". The numbered findings
 files ([01](01-authentication-session.md)–[21](21-general-hygiene.md)) remain the evidence
 base: links point to the finding with full context and the recommended fix, and each checkbox
 can become one GitHub issue. Links carry section anchors (they open scrolled to the finding);
@@ -17,7 +16,7 @@ seen these planning docs, or an AI coding agent — without further clarificatio
 - **Title:** the checkbox text (without the links).
 - **Body:** copy the linked finding section(s) **verbatim** — they carry the file paths
   (Location), the problem (Finding), why it matters (Risk), and the fix (Recommendation).
-  For Stage B items, link the *design:* section(s) of
+  For Stage B items, link the _design:_ section(s) of
   [docs/design/authorization.md](../docs/design/authorization.md) — the design doc lives in
   the repo precisely so issues can reference it.
 - **Acceptance criteria:** state observable behavior, not implementation — e.g. "login as a
@@ -25,15 +24,18 @@ seen these planning docs, or an AI coding agent — without further clarificatio
   works", not "add a status check".
 - **Dependencies:** the stage ordering encodes them; if an item needs another to land first
   (e.g. anything consuming the mailer), name that issue in the body so it can be scheduled.
-- **Definition of done, for every issue:** `cargo clippy --workspace --all-targets` clean and
-  `cargo test` green; frontend checks/tests green when frontend files are touched;
-  `cargo xtask openapi` re-run whenever an endpoint or DTO changes; API behavior follows
-  `docs/api/conventions.md`; code style follows `AGENTS.md`.
+- **Definition of done, for every issue:**
+    - new code has corresponding automated tests;
+    - `cargo clippy --workspace --all-targets` clean;
+    - `cargo test` green;
+    - frontend checks/tests green when frontend files are touched;
+    - `cargo xtask openapi` re-run whenever an endpoint or DTO changes;
+    - API behavior follows `docs/api/conventions.md`; code style follows `AGENTS.md`.
 
 ## Guiding principles
 
 - **Quality and architecture first.** The app is small, not deployed, and has no users. The
-  goal is a clean, production-grade foundation — so prefer the *right* design over the
+  goal is a clean, production-grade foundation — so prefer the _right_ design over the
   backward-compatible one. Nothing in the current code is set in stone; refactors and rewrites
   are in scope wherever the existing organization falls short.
 - **Breaking changes are free right now.** Schema, API, JWT-claim, and config changes cost
@@ -51,8 +53,8 @@ These supersede the "pick a direction" recommendations in
 
 - **Tenancy: real multi-tenancy with many-to-many memberships.** Users are global accounts;
   `tenant_memberships` links user↔tenant with a role per tenant. `users.tenant_id` is dropped;
-  the global `UNIQUE(email)` becomes *correct* (resolving the 10.3 tension).
-- **Roles: DB-driven custom roles, tenant-scoped.** The permission *catalog* (the set of
+  the global `UNIQUE(email)` becomes _correct_ (resolving the 10.3 tension).
+- **Roles: DB-driven custom roles, tenant-scoped.** The permission _catalog_ (the set of
   checkable actions) stays a fixed Rust enum — only role→permission groupings live in the DB.
   System roles (owner/admin/member/client) are seeded and immutable.
 - **Entity access: generic ACL table (ReBAC-lite)** for restricted roles; broad roles see the
@@ -74,11 +76,11 @@ drifted-`conventions.md` finding [18 § 18.1](18-documentation-dx.md#181--docs-a
 One exists; four more are created by plan items in the stages where their content gets
 decided:
 
-- **[docs/design/authorization.md](../docs/design/authorization.md)** — *exists.* The three
+- **[docs/design/authorization.md](../docs/design/authorization.md)** — _exists._ The three
   authorization layers, resource-access resolution rule, data model, JWT claims, enforcement
   pattern. Backs the Stage B issues, and provides the shared authorization convention
   [02 § 2.4](02-authorization-access-control.md#24--idor-surface-is-currently-small-but-unguarded-by-design) asks for.
-- **`docs/design/authentication.md`** — *written in Stage B* (that stage rewrites
+- **`docs/design/authentication.md`** — _written in Stage B_ (that stage rewrites
   registration and adds the token flows). Contents: access/refresh token lifecycle (rotation,
   reuse/breach detection, concurrency grace period); cookie strategy (`__Host-`/`__Secure-`
   prefixes, HttpOnly, SameSite, why no token material in `localStorage`); the signed OAuth
@@ -88,32 +90,32 @@ decided:
   (login + refresh). Much of this exists today only as code comments
   ([18 § 18.2](18-documentation-dx.md#182--almost-no-doc-comments-on-public-apis--complex-modules)); the verified descriptions in
   [01 § 1.5/1.7](01-authentication-session.md#15--refresh-issues-a-new-token-before-validating-the-token-hash-matches) are ready starting material.
-- **`docs/design/operations.md`** — *started in Stage A, extended in Stage D/E.* Contents:
+- **`docs/design/operations.md`** — _started in Stage A, extended in Stage D/E._ Contents:
   the mandatory TLS-terminating proxy assumption and trusted-proxy header config;
   graceful-shutdown (SIGTERM) behavior; healthcheck/readiness semantics; SQLite operational
   choices (WAL, `synchronous=NORMAL`, pool timeouts), the backup strategy, and the accepted
   write-throughput ceiling with the Postgres migration path; pointer to the release/rollback
   workflow.
-- **`docs/design/frontend.md`** — *started in Stage A, extended in Stage C.* Contents: the
+- **`docs/design/frontend.md`** — _started in Stage A, extended in Stage C._ Contents: the
   routing decision and its rationale; the rune-based `AppState` pattern; the "generated API
   client only, never raw `fetch`" rule; the capability model (`can(permission)` derived from
   `UserInfo`); the auth-refresh-manager contract (cross-linked to `authentication.md`).
-- **`docs/config.md`** — *Stage E.* Reference rather than design: TOML layering and
+- **`docs/config.md`** — _Stage E._ Reference rather than design: TOML layering and
   precedence (`common` → per-env → git-ignored `local`), every key with its default, and the
   env-only environment selection from Stage A — [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented).
 
 ## How the authorization design resolves existing findings
 
-| Finding | Resolution |
-| :-- | :-- |
-| [02 § 2.1](02-authorization-access-control.md#21--get-apiusers-discloses-every-user-in-the-shared-default-tenant) (user enumeration) | `list_users` becomes a permission-gated, membership-scoped query |
-| [02 § 2.2](02-authorization-access-control.md#22--no-roleauthorization-model-exists-admin-is-not-enforced-anywhere-on-the-backend) (no role model) | the RBAC layer |
-| [02 § 2.4](02-authorization-access-control.md#24--idor-surface-is-currently-small-but-unguarded-by-design) (no ownership convention) | `authorize_resource` helper |
-| [10 § 10.3](10-database-data-layer.md#103--email-unique-globally-conflicts-with-the-multi-tenant-model) (email UNIQUE vs tenancy) | global users + memberships |
-| [20 § 20.1](20-business-logic-correctness.md#201--admin-identity-is-inconsistent-across-the-system) (admin identity) | role via membership; drop id-based guesses |
-| [20 § 20.2](20-business-logic-correctness.md#202--registration-always-assigns-tenant_id--0-and-status--active-bypassing-onboarding) (unused lifecycle) | signup → tenant + owner membership; invite → `onboarding` member |
-| [09 § 9.3](09-frontend-code-quality.md#93--isadmin-is-derived-from-userid--1-which-is-not-the-admin) (fake `isAdmin`) | real permissions from `/api/users/me` |
-| [07 § 7.4](07-code-structure-architecture.md#74--emptyplaceholder-artifacts), [11 § 11.1](11-api-design.md#111--apiapisample--duplicated-path-prefix-ships-in-the-spec-and-client) (`sample`, `/api/api`) | retired by the projects/tasks reference feature |
+| Finding                                                                                                                                                                                                   | Resolution                                                       |
+| :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
+| [02 § 2.1](02-authorization-access-control.md#21--get-apiusers-discloses-every-user-in-the-shared-default-tenant) (user enumeration)                                                                      | `list_users` becomes a permission-gated, membership-scoped query |
+| [02 § 2.2](02-authorization-access-control.md#22--no-roleauthorization-model-exists-admin-is-not-enforced-anywhere-on-the-backend) (no role model)                                                        | the RBAC layer                                                   |
+| [02 § 2.4](02-authorization-access-control.md#24--idor-surface-is-currently-small-but-unguarded-by-design) (no ownership convention)                                                                      | `authorize_resource` helper                                      |
+| [10 § 10.3](10-database-data-layer.md#103--email-unique-globally-conflicts-with-the-multi-tenant-model) (email UNIQUE vs tenancy)                                                                         | global users + memberships                                       |
+| [20 § 20.1](20-business-logic-correctness.md#201--admin-identity-is-inconsistent-across-the-system) (admin identity)                                                                                      | role via membership; drop id-based guesses                       |
+| [20 § 20.2](20-business-logic-correctness.md#202--registration-always-assigns-tenant_id--0-and-status--active-bypassing-onboarding) (unused lifecycle)                                                    | signup → tenant + owner membership; invite → `onboarding` member |
+| [09 § 9.3](09-frontend-code-quality.md#93--isadmin-is-derived-from-userid--1-which-is-not-the-admin) (fake `isAdmin`)                                                                                     | real permissions from `/api/users/me`                            |
+| [07 § 7.4](07-code-structure-architecture.md#74--emptyplaceholder-artifacts), [11 § 11.1](11-api-design.md#111--apiapisample--duplicated-path-prefix-ships-in-the-spec-and-client) (`sample`, `/api/api`) | retired by the projects/tasks reference feature                  |
 
 ---
 
@@ -189,7 +191,7 @@ invite acceptance) are wrapped in transactions **as they are written**, not retr
 
 The checklist items below are short summaries; their actual spec (schema, claims, enforcement
 pattern) is [docs/design/authorization.md](../docs/design/authorization.md). Each item carries
-a *design:* link to the section(s) that define it — put those links in the GitHub issue body
+a _design:_ link to the section(s) that define it — put those links in the GitHub issue body
 (and quote the key details if the assignee works without repo access).
 
 - [ ] Permission catalog: Rust enum of actions with stable string forms —
@@ -318,7 +320,7 @@ Frontend standards, UX & accessibility:
 
 ## Stage E — Lock it in
 
-Tests (the authorization *boundary* tests already shipped inside Stage B):
+Tests (the authorization _boundary_ tests already shipped inside Stage B):
 
 - [ ] Role/permission-resolution unit tests, incl. custom roles and system-role immutability —
       [02 § 2.2](02-authorization-access-control.md#22--no-roleauthorization-model-exists-admin-is-not-enforced-anywhere-on-the-backend)
