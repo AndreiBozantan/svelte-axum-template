@@ -8,6 +8,7 @@ errors.
 ---
 
 ## 13.1 — No timeout on inbound request handling or DB queries
+- **GitHub Issue:** [#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)
 
 - **Severity:** Important
 - **Location:** `backend/router.rs:56-73` (no `TimeoutLayer`); `backend/platform/shared/db.rs`
@@ -23,6 +24,7 @@ errors.
 ---
 
 ## 13.2 — OAuth token-exchange HTTP call has no explicit timeout
+- **GitHub Issue:** [#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/oauth/oauth_service.rs:267-276`
@@ -37,6 +39,7 @@ errors.
 ---
 
 ## 13.3 — Graceful shutdown only listens for Ctrl-C, not SIGTERM
+- **GitHub Issue:** [#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200)
 
 - **Severity:** Important (for container deployment)
 - **Location:** `backend/server.rs:158-163` (`shutdown_signal` awaits `tokio::signal::ctrl_c()`
@@ -52,6 +55,7 @@ errors.
 ---
 
 ## 13.4 — Background cleanup tasks have no restart/panic handling
+- **GitHub Issue:** [#231](https://github.com/AndreiBozantan/svelte-axum-template/issues/231)
 
 - **Severity:** Minor
 - **Location:** `backend/server.rs:110-138` (two `tokio::spawn` loops).
@@ -64,6 +68,7 @@ errors.
 ---
 
 ## 13.5 — Health check is liveness-only; no readiness distinction
+- **GitHub Issue:** [#234](https://github.com/AndreiBozantan/svelte-axum-template/issues/234)
 
 - **Severity:** Minor
 - **Location:** `backend/router.rs:107-137` (`/health` runs `SELECT 1`).

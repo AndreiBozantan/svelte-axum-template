@@ -6,6 +6,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.1 — `console.log`/`console.error` left in frontend production code
+- **GitHub Issue:** [#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/lib/auth-refresh-manager.ts:61,68,187,207,209` (`console.error`/
@@ -20,6 +21,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.2 — Commented-out code blocks
+- **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/App.svelte:11` (`// await new Promise(... setTimeout ... 900)`),
@@ -33,6 +35,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.3 — `AppState.userId` field is unused / dead
+- **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/lib/AppState.svelte.ts:24` (`userId = $state<number>(-1)`).
@@ -43,6 +46,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.4 — Inconsistent import style vs the documented convention
+- **GitHub Issue:** [#261](https://github.com/AndreiBozantan/svelte-axum-template/issues/261)
 
 - **Severity:** Minor
 - **Location:** `AGENTS.md` ("imports: `use module;` then qualify `module::MyType`; avoid
@@ -63,6 +67,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.5 — Minor naming/label inconsistencies
+- **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
 - **Location:** frontend package name `svelte-axum-project` (`package.json:2`) vs project name

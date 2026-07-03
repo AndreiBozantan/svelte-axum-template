@@ -22,6 +22,7 @@ assertions against real (in-memory SQLite) behavior. The gaps are in breadth, no
 ---
 
 ## 12.2 — OAuth callback flow is untested end-to-end
+- **GitHub Issue:** [#249](https://github.com/AndreiBozantan/svelte-axum-template/issues/249)
 
 - **Severity:** Important
 - **Location:** `auth_tests.rs` (backend/platform/identity/auth) tests `login_oauth` at the
@@ -50,6 +51,7 @@ assertions against real (in-memory SQLite) behavior. The gaps are in breadth, no
 ---
 
 ## 12.4 — No frontend component/E2E tests; only the refresh manager is covered
+- **GitHub Issue:** [#252](https://github.com/AndreiBozantan/svelte-axum-template/issues/252)
 
 - **Severity:** Minor
 - **Location:** `frontend/test/auth-refresh-manager.test.ts` (thorough, 437 lines),

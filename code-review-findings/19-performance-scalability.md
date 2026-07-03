@@ -6,6 +6,7 @@ ceiling is inherent to single-file SQLite; the main code smell is Argon2 on the 
 ---
 
 ## 19.1 — Argon2 hashing runs on the async runtime without `spawn_blocking`
+- **GitHub Issue:** [#228](https://github.com/AndreiBozantan/svelte-axum-template/issues/228)
 
 - **Severity:** Important
 - **Location:** `backend/platform/shared/crypto.rs:23-42` (`hash_password`/`verify_password`),
@@ -23,6 +24,7 @@ ceiling is inherent to single-file SQLite; the main code smell is Argon2 on the 
 ---
 
 ## 19.2 — `list_users` runs a `COUNT(*)` on every call
+- **GitHub Issue:** [#235](https://github.com/AndreiBozantan/svelte-axum-template/issues/235)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/users/users_db.rs:259-264`.
@@ -37,6 +39,7 @@ ceiling is inherent to single-file SQLite; the main code smell is Argon2 on the 
 ---
 
 ## 19.3 — Rate-limiter key maps grow unbounded between cleanup ticks
+- **GitHub Issue:** [#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/shared/rate_limiter.rs` (governor keyed by client-IP string),
@@ -66,6 +69,7 @@ ceiling is inherent to single-file SQLite; the main code smell is Argon2 on the 
 ---
 
 ## 19.5 — Frontend bundle: no code-splitting/lazy loading; small app so low impact
+- **GitHub Issue:** [#272](https://github.com/AndreiBozantan/svelte-axum-template/issues/272)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/AppPages.svelte.ts` (all pages imported eagerly), `vite.config.ts`.
@@ -79,6 +83,7 @@ ceiling is inherent to single-file SQLite; the main code smell is Argon2 on the 
 ---
 
 ## 19.6 — Asset serving (cache/ETag/compression)
+- **GitHub Issue:** [#233](https://github.com/AndreiBozantan/svelte-axum-template/issues/233)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/shared/assets.rs:37-91`.

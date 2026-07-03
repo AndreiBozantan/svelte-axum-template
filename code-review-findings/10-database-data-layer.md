@@ -7,6 +7,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.1 — `synchronous` pragma not set; durability under WAL is at SQLite default
+- **GitHub Issue:** [#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229)
 
 - **Severity:** Important
 - **Location:** `backend/platform/shared/db.rs:8-35`.
@@ -43,6 +44,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.3 — `email UNIQUE` globally conflicts with the multi-tenant model
+- **GitHub Issue:** [#209](https://github.com/AndreiBozantan/svelte-axum-template/issues/209)
 
 - **Severity:** Important
 - **Location:** `migrations/01_initial_schema.sql:38-40` (`UNIQUE(email)`,
@@ -66,6 +68,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.4 — `updated_at` trigger causes double writes / recursion risk; and `RETURNING` may not reflect it
+- **GitHub Issue:** [#259](https://github.com/AndreiBozantan/svelte-axum-template/issues/259)
 
 - **Severity:** Minor
 - **Location:** `migrations/01_initial_schema.sql:10-15,44-50` (AFTER UPDATE triggers that
@@ -98,6 +101,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.6 — Cascade deletes are configured; anonymization/lifecycle is not
+- **GitHub Issue:** [#240](https://github.com/AndreiBozantan/svelte-axum-template/issues/240)
 
 - **Severity:** Minor
 - **Location:** `migrations/01_initial_schema.sql:41,64` (`ON DELETE CASCADE` on
@@ -114,6 +118,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.7 — Connection pool sizing and backup strategy
+- **GitHub Issue:** [#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229)
 
 - **Severity:** Minor
 - **Location:** `db.rs:18-21`, `config.rs:48-58` (max 5 / min 2 connections).

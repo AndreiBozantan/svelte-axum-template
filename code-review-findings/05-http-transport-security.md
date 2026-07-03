@@ -6,6 +6,7 @@ entirely missing** and TLS/HSTS is assumed to be handled by an unspecified proxy
 ---
 
 ## 5.1 — No security headers (CSP, X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy, Permissions-Policy)
+- **GitHub Issue:** [#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197)
 
 - **Severity:** Important
 - **Location:** `backend/router.rs:56-73` — layers applied are trace + catch-panic +
@@ -27,6 +28,7 @@ entirely missing** and TLS/HSTS is assumed to be handled by an unspecified proxy
 ---
 
 ## 5.2 — HTTPS enforcement / HTTP→HTTPS redirect is undocumented and unimplemented in-app
+- **GitHub Issue:** [#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201)
 
 - **Severity:** Important
 - **Location:** `backend/server.rs:92-104` binds plain TCP; `data/configs.production.toml`
@@ -45,6 +47,7 @@ entirely missing** and TLS/HSTS is assumed to be handled by an unspecified proxy
 ---
 
 ## 5.3 — Global rate-limit key can be spoofed via forwarding headers
+- **GitHub Issue:** [#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)
 
 - **Severity:** Important (cross-listed with 01.3)
 - **Location:** `backend/platform/shared/rate_limiter.rs:83-105`.

@@ -7,6 +7,7 @@ and the list endpoint violates the project's own pagination convention.
 ---
 
 ## 11.1 — `/api/api/sample` — duplicated path prefix ships in the spec and client
+- **GitHub Issue:** [#219](https://github.com/AndreiBozantan/svelte-axum-template/issues/219)
 
 - **Severity:** Important
 - **Location:** `backend/app/sample/sample_api.rs:18-24` (`#[utoipa::path(... path = "/api/sample")]`
@@ -24,6 +25,7 @@ and the list endpoint violates the project's own pagination convention.
 ---
 
 ## 11.2 — `GET /api/users` uses offset pagination and returns `total`, contradicting `conventions.md`
+- **GitHub Issue:** [#235](https://github.com/AndreiBozantan/svelte-axum-template/issues/235)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/users/users_api.rs:36-92`,
@@ -41,6 +43,7 @@ and the list endpoint violates the project's own pagination convention.
 ---
 
 ## 11.3 — Error `code` strings don't match the documented contract
+- **GitHub Issue:** [#224](https://github.com/AndreiBozantan/svelte-axum-template/issues/224)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/shared/api.rs:82-90` (`invalid_token`),
@@ -58,6 +61,7 @@ and the list endpoint violates the project's own pagination convention.
 ---
 
 ## 11.4 — No `Retry-After` header on 429 despite documented convention
+- **GitHub Issue:** [#237](https://github.com/AndreiBozantan/svelte-axum-template/issues/237)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/shared/rate_limiter.rs:79-81` (`custom_error_handler` returns
@@ -69,6 +73,7 @@ and the list endpoint violates the project's own pagination convention.
 ---
 
 ## 11.5 — No idempotency support for mutating endpoints
+- **GitHub Issue:** [#271](https://github.com/AndreiBozantan/svelte-axum-template/issues/271)
 
 - **Severity:** Minor (acknowledged as deferred)
 - **Location:** `conventions.md:193-197` (§10 marks idempotency keys as "not implemented today").

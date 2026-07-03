@@ -6,6 +6,7 @@ scanning in CI and no update automation.
 ---
 
 ## 6.1 — No dependency vulnerability scanning runs in CI
+- **GitHub Issue:** [#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206)
 
 - **Severity:** Important
 - **Location:** `.github/workflows/ci.yml` (no `cargo audit`/`cargo deny`/`npm audit`);
@@ -23,6 +24,7 @@ scanning in CI and no update automation.
 ---
 
 ## 6.2 — No automated dependency updates (Dependabot/Renovate)
+- **GitHub Issue:** [#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206)
 
 - **Severity:** Minor
 - **Location:** no `.github/dependabot.yml`, no Renovate config (confirmed absent).
@@ -57,6 +59,7 @@ scanning in CI and no update automation.
 ---
 
 ## 6.5 — License compliance not tracked
+- **GitHub Issue:** [#254](https://github.com/AndreiBozantan/svelte-axum-template/issues/254)
 
 - **Severity:** Minor
 - **Finding:** No license allow-list is enforced (e.g. `cargo deny check licenses`). For a

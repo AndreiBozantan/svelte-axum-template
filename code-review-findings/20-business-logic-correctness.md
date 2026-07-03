@@ -26,6 +26,7 @@ identity/tenant assumptions and unenforced domain invariants.
 ---
 
 ## 20.2 — Registration always assigns `tenant_id = 0` and `status = Active`, bypassing onboarding
+- **GitHub Issue:** [#214](https://github.com/AndreiBozantan/svelte-axum-template/issues/214)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/auth/auth_service.rs:101-122` (`register`),
@@ -44,6 +45,7 @@ identity/tenant assumptions and unenforced domain invariants.
 ---
 
 ## 20.3 — SSO account linking auto-links by email with no verification step
+- **GitHub Issue:** [#213](https://github.com/AndreiBozantan/svelte-axum-template/issues/213)
 
 - **Severity:** Important
 - **Location:** `backend/platform/identity/users/users_db.rs:277-316` (`link_sso_user`

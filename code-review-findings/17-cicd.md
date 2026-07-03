@@ -7,6 +7,7 @@ CD/release automation.
 ---
 
 ## 17.1 — Security scanning is not a required PR gate
+- **GitHub Issue:** [#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206)
 
 - **Severity:** Important (cross-listed with 06.1)
 - **Location:** `.github/workflows/semgrep.yml:3-11` (manual + weekly only; push/PR triggers
@@ -19,6 +20,7 @@ CD/release automation.
 ---
 
 ## 17.2 — `sqlx prepare --check` is skipped in CI
+- **GitHub Issue:** [#253](https://github.com/AndreiBozantan/svelte-axum-template/issues/253)
 
 - **Severity:** Minor
 - **Location:** `xtask/checks.rs:245-257` (`ci_backend` comment: sqlx check "intentionally
@@ -35,6 +37,7 @@ CD/release automation.
 ---
 
 ## 17.3 — No CD / release pipeline, versioning, or rollback automation
+- **GitHub Issue:** [#255](https://github.com/AndreiBozantan/svelte-axum-template/issues/255)
 
 - **Severity:** Important
 - **Location:** `.github/workflows/` (only `ci.yml` and `semgrep.yml`); no release/publish/deploy

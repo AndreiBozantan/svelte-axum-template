@@ -7,6 +7,7 @@ the crate root. Findings are localized.
 ---
 
 ## 8.1 — `map_err` used where `From` conversions are the project standard
+- **GitHub Issue:** [#257](https://github.com/AndreiBozantan/svelte-axum-template/issues/257)
 
 - **Severity:** Minor (project-standard breach per `AGENTS.md` / review-backend §1)
 - **Location:** `backend/cli.rs:111-113,142-144,182-184` (`map_err(|e| Error::MigrationRunFailed { source: e })`),
@@ -41,6 +42,7 @@ the crate root. Findings are localized.
 ---
 
 ## 8.3 — `#[allow(dead_code)]` on DB row structs and several domain fields
+- **GitHub Issue:** [#257](https://github.com/AndreiBozantan/svelte-axum-template/issues/257)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/users/users_db.rs:20` (`Row`),
@@ -57,6 +59,7 @@ the crate root. Findings are localized.
 ---
 
 ## 8.4 — `Row` → domain conversions clone the whole row for the auth record
+- **GitHub Issue:** [#257](https://github.com/AndreiBozantan/svelte-axum-template/issues/257)
 
 - **Severity:** Minor (performance/style)
 - **Location:** `backend/platform/identity/users/users_db.rs:76-86`
@@ -70,6 +73,7 @@ the crate root. Findings are localized.
 ---
 
 ## 8.5 — `#[allow(clippy::unit_arg)]` / `unnecessary_wraps` / `unused_async` sprinkled
+- **GitHub Issue:** [#257](https://github.com/AndreiBozantan/svelte-axum-template/issues/257)
 
 - **Severity:** Minor
 - **Location:** `backend/cli.rs:76`, `backend/cli.rs:117`, `backend/router.rs:107`,

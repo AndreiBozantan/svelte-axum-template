@@ -7,6 +7,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.1 — Suspended/archived users can still authenticate and refresh
+- **GitHub Issue:** [#250](https://github.com/AndreiBozantan/svelte-axum-template/issues/250)
 
 - **Severity:** Important
 - **Location:** `backend/platform/identity/auth/auth_service.rs:124-167` (`login`),
@@ -43,6 +44,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.3 — Login rate limiter is keyed only by client IP, not by account
+- **GitHub Issue:** [#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)
 
 - **Severity:** Important
 - **Location:** `backend/platform/shared/rate_limiter.rs:83-105`
@@ -63,6 +65,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.4 — Account lockout enables trivial denial-of-service against a known account
+- **GitHub Issue:** [#241](https://github.com/AndreiBozantan/svelte-axum-template/issues/241)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/auth/auth_service.rs:334-352`
@@ -80,6 +83,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.5 — `refresh` issues a new token before validating the token hash matches
+- **GitHub Issue:** [#222](https://github.com/AndreiBozantan/svelte-axum-template/issues/222)
 
 - **Severity:** Minor (correct today, but fragile ordering)
 - **Location:** `backend/platform/identity/auth/auth_service.rs:224-276`.
@@ -98,6 +102,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.6 — Frontend token-refresh timing state is stored in `localStorage`
+- **GitHub Issue:** [#247](https://github.com/AndreiBozantan/svelte-axum-template/issues/247)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/lib/auth-refresh-manager.ts:99-131,217-233`.
@@ -115,6 +120,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.7 — OAuth state-cookie design is sound; verify one edge
+- **GitHub Issue:** [#222](https://github.com/AndreiBozantan/svelte-axum-template/issues/222)
 
 - **Severity:** Minor (informational)
 - **Location:** `backend/platform/identity/oauth/oauth_service.rs:96-128,244-317`.
@@ -128,6 +134,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.8 — No email verification on registration → account pre-hijacking via SSO auto-linking
+- **GitHub Issue:** [#251](https://github.com/AndreiBozantan/svelte-axum-template/issues/251)
 
 - **Severity:** Important (escalates to Critical the moment real users exist)
 - **Location:** `backend/platform/identity/auth/auth_service.rs:101-122` (`register` creates
@@ -160,6 +167,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.9 — No password change, password reset, or account recovery flow exists
+- **GitHub Issue:** [#239](https://github.com/AndreiBozantan/svelte-axum-template/issues/239)
 
 - **Severity:** Important (missing core capability for a production template)
 - **Location:** `backend/platform/identity/auth/auth_api.rs` (routes: login, logout, refresh,
@@ -182,6 +190,7 @@ plus a couple of real correctness gaps — and two structural gaps added on seco
 ---
 
 ## 1.10 — Google OAuth flow skips the consent / account-chooser screen
+- **GitHub Issue:** [#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/oauth/oauth_service.rs:220-241`

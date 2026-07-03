@@ -7,6 +7,7 @@ overrides that to `development`, and there is no fail-fast validation of require
 ---
 
 ## 15.1 — Committed `configs.common.toml` forces `env = "development"`
+- **GitHub Issue:** [#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203)
 
 - **Severity:** Critical
 - **Location:** `data/configs.common.toml:1-5` (`env = "development"`, `log_directives =
@@ -38,6 +39,7 @@ overrides that to `development`, and there is no fail-fast validation of require
 ---
 
 ## 15.2 — No fail-fast validation of required configuration at startup
+- **GitHub Issue:** [#204](https://github.com/AndreiBozantan/svelte-axum-template/issues/204)
 
 - **Severity:** Important
 - **Location:** `backend/platform/shared/config.rs:150-201` (`AppSettings::new` just deserializes
@@ -69,6 +71,7 @@ overrides that to `development`, and there is no fail-fast validation of require
 ---
 
 ## 15.4 — Not all config keys are documented
+- **GitHub Issue:** [#262](https://github.com/AndreiBozantan/svelte-axum-template/issues/262)
 
 - **Severity:** Minor
 - **Location:** `README.md:38-45`, `docs/` (no complete config reference); config structs in

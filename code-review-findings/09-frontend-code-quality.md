@@ -8,6 +8,7 @@ building app features on top of this template.
 ---
 
 ## 9.1 — Login error leaves the submit button permanently disabled
+- **GitHub Issue:** [#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192)
 
 - **Severity:** Important (user-facing bug on the most common error path)
 - **Location:** `frontend/src/pages/Login.svelte:21-37` (`handleLogin`).
@@ -26,6 +27,7 @@ building app features on top of this template.
 ---
 
 ## 9.2 — `Logout.svelte` renders the whole user object instead of the email
+- **GitHub Issue:** [#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193)
 
 - **Severity:** Important (visible bug)
 - **Location:** `frontend/src/pages/Logout.svelte:14-18`.
@@ -41,6 +43,7 @@ building app features on top of this template.
 ---
 
 ## 9.3 — `isAdmin` is derived from `user.id === 1`, which is not the admin
+- **GitHub Issue:** [#223](https://github.com/AndreiBozantan/svelte-axum-template/issues/223)
 
 - **Severity:** Important (incorrect privilege display)
 - **Location:** `frontend/src/lib/AppState.svelte.ts:26`
@@ -59,6 +62,7 @@ building app features on top of this template.
 ---
 
 ## 9.4 — Sidebar navigation does full page reloads; SPA routing only half-exists
+- **GitHub Issue:** [#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205)
 
 - **Severity:** Important (architecture; the template's routing pattern is what apps will copy)
 - **Location:** `frontend/src/AppSidebar.svelte:121-150` (`<a href={getPagePath(item.id)}>`
@@ -88,6 +92,7 @@ building app features on top of this template.
 ---
 
 ## 9.5 — `About.svelte` calls the API with raw `fetch`, bypassing the generated client
+- **GitHub Issue:** [#242](https://github.com/AndreiBozantan/svelte-axum-template/issues/242)
 
 - **Severity:** Important (project-standards breach in template code)
 - **Location:** `frontend/src/pages/About.svelte:9` (`await fetch('/api/health')`);
@@ -105,6 +110,7 @@ building app features on top of this template.
 ---
 
 ## 9.6 — `PageDefinition.component` typed as `any`
+- **GitHub Issue:** [#244](https://github.com/AndreiBozantan/svelte-axum-template/issues/244)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/AppPages.svelte.ts:23` (`component: any`);
@@ -118,6 +124,7 @@ building app features on top of this template.
 ---
 
 ## 9.7 — `fetch.ts` `onError` middleware swallows the real error and always returns 500
+- **GitHub Issue:** [#243](https://github.com/AndreiBozantan/svelte-axum-template/issues/243)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/lib/fetch.ts:10-23`.
@@ -134,6 +141,7 @@ building app features on top of this template.
 ---
 
 ## 9.8 — Frontend expects error code `not_authenticated`, backend never emits it
+- **GitHub Issue:** [#224](https://github.com/AndreiBozantan/svelte-axum-template/issues/224)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/main.ts:31` (`error.code !== 'not_authenticated'`); backend
@@ -149,6 +157,7 @@ building app features on top of this template.
 ---
 
 ## 9.9 — Logout confirmation is mouse-only, and keyboard users bypass it entirely
+- **GitHub Issue:** [#246](https://github.com/AndreiBozantan/svelte-axum-template/issues/246)
 
 - **Severity:** Minor (accessibility / UX consistency)
 - **Location:** `frontend/src/AppSidebar.svelte:59-94` (global `mousemove`/`click` effect),
@@ -169,6 +178,7 @@ building app features on top of this template.
 ---
 
 ## 9.10 — Small issues: dead proxy entry, unloaded font, hardcoded version, global loading flag, silent bootstrap failure
+- **GitHub Issue:** [#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266)
 
 - **Severity:** Minor (grouped hygiene)
 - **Location / Finding:**
@@ -192,6 +202,7 @@ building app features on top of this template.
 ---
 
 ## 9.11 — State/runes usage is correct; verified
+- **GitHub Issue:** [#247](https://github.com/AndreiBozantan/svelte-axum-template/issues/247)
 
 - **Severity:** Informational
 - **Location:** `frontend/src/lib/AppState.svelte.ts`, page components.

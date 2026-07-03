@@ -7,6 +7,7 @@ Findings are about a couple of leaks and premature structure.
 ---
 
 ## 7.1 — HTTP concerns leak into the domain/service layer
+- **GitHub Issue:** [#256](https://github.com/AndreiBozantan/svelte-axum-template/issues/256)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/auth/auth_service.rs:50-51`
@@ -21,6 +22,7 @@ Findings are about a couple of leaks and premature structure.
 ---
 
 ## 7.2 — `users::Service` and `auth::Service` both hold a `db::Repository`, but services also expose `context.db`
+- **GitHub Issue:** [#256](https://github.com/AndreiBozantan/svelte-axum-template/issues/256)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/users/users_service.rs:106-119` (`pub users`,
@@ -42,6 +44,7 @@ Findings are about a couple of leaks and premature structure.
 ---
 
 ## 7.3 — `xtask` is a single 388-line `xtask.rs` plus modules; mixed responsibilities
+- **GitHub Issue:** [#260](https://github.com/AndreiBozantan/svelte-axum-template/issues/260)
 
 - **Severity:** Minor
 - **Location:** `xtask/xtask.rs` (command dispatch + `dev`/`release`/`clean` logic inline),
@@ -60,6 +63,7 @@ Findings are about a couple of leaks and premature structure.
 ---
 
 ## 7.4 — Empty/placeholder artifacts
+- **GitHub Issue:** [#219](https://github.com/AndreiBozantan/svelte-axum-template/issues/219)
 
 - **Severity:** Minor
 - **Location:** `backend/test/app/sample/sample_tests.rs` (empty file, 1 blank line);

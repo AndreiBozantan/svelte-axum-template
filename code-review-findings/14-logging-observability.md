@@ -7,6 +7,7 @@ correlation, metrics, and a couple of over-logging spots.
 ---
 
 ## 14.1 — No request-ID / correlation ID threaded through logs
+- **GitHub Issue:** [#230](https://github.com/AndreiBozantan/svelte-axum-template/issues/230)
 
 - **Severity:** Important
 - **Location:** `backend/router.rs:56-69` (`TraceLayer` builds a span with method/uri/ip/ua but
@@ -22,6 +23,7 @@ correlation, metrics, and a couple of over-logging spots.
 ---
 
 ## 14.2 — No application metrics exposed
+- **GitHub Issue:** [#270](https://github.com/AndreiBozantan/svelte-axum-template/issues/270)
 
 - **Severity:** Important
 - **Location:** whole backend — no `/metrics`, no request/latency/error counters.
@@ -35,6 +37,7 @@ correlation, metrics, and a couple of over-logging spots.
 ---
 
 ## 14.3 — Full config dump at startup (cross-listed)
+- **GitHub Issue:** [#258](https://github.com/AndreiBozantan/svelte-axum-template/issues/258)
 
 - **Severity:** Minor
 - **Location:** `backend/server.rs:79-84`.
@@ -46,6 +49,7 @@ correlation, metrics, and a couple of over-logging spots.
 ---
 
 ## 14.4 — Public `/health?panic=true` crash hook is available in production
+- **GitHub Issue:** [#234](https://github.com/AndreiBozantan/svelte-axum-template/issues/234)
 
 - **Severity:** Minor
 - **Location:** `backend/router.rs:101-143` (`HealthCheckQuery { panic }` → `healthy_panic()`).

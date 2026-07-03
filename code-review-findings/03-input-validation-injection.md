@@ -6,6 +6,7 @@ Strong here overall: all SQL is parameterized via `sqlx::query!`, the frontend r
 ---
 
 ## 3.1 — No request body size limit; JSON payloads are unbounded
+- **GitHub Issue:** [#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)
 
 - **Severity:** Important
 - **Location:** `backend/router.rs:23-73` (no `DefaultBodyLimit` / body cap layer),
@@ -24,6 +25,7 @@ Strong here overall: all SQL is parameterized via `sqlx::query!`, the frontend r
 ---
 
 ## 3.2 — Register accepts unbounded/unvalidated `first_name` / `last_name`
+- **GitHub Issue:** [#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/auth/auth_api.rs:37-47` (`RegisterRequest`).
@@ -37,6 +39,7 @@ Strong here overall: all SQL is parameterized via `sqlx::query!`, the frontend r
 ---
 
 ## 3.3 — Unknown fields in request bodies are silently accepted (contradicts documented convention)
+- **GitHub Issue:** [#236](https://github.com/AndreiBozantan/svelte-axum-template/issues/236)
 
 - **Severity:** Minor
 - **Location:** `docs/api/conventions.md:188` states unknown fields are rejected via

@@ -6,6 +6,7 @@ pinned base images by digest, and a hardened compose file. Findings are refineme
 ---
 
 ## 16.1 — `configs.production.toml` selection depends on env var, but the image sets none
+- **GitHub Issue:** [#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203)
 
 - **Severity:** Important (ties to 15.1)
 - **Location:** `Dockerfile:75-98` (no `ENV APP__SERVER__ENV=production`), `docker-compose.yml`
@@ -26,6 +27,7 @@ pinned base images by digest, and a hardened compose file. Findings are refineme
 ---
 
 ## 16.2 — No `HEALTHCHECK` in the Dockerfile / compose
+- **GitHub Issue:** [#232](https://github.com/AndreiBozantan/svelte-axum-template/issues/232)
 
 - **Severity:** Minor
 - **Location:** `Dockerfile` (no `HEALTHCHECK`), `docker-compose.yml` (no `healthcheck:`).
@@ -39,6 +41,7 @@ pinned base images by digest, and a hardened compose file. Findings are refineme
 ---
 
 ## 16.3 — `docker-compose.yml` uses obsolete `version` key and is otherwise dev-oriented
+- **GitHub Issue:** [#232](https://github.com/AndreiBozantan/svelte-axum-template/issues/232)
 
 - **Severity:** Minor
 - **Location:** `docker-compose.yml:1` (`version: "3.8"`), ports bound to `127.0.0.1:8080`.

@@ -6,6 +6,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.1 — Docs and code disagree in several places
+- **GitHub Issue:** [#238](https://github.com/AndreiBozantan/svelte-axum-template/issues/238)
 
 - **Severity:** Important
 - **Location:** `docs/api/conventions.md` vs code:
@@ -24,6 +25,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.2 — Almost no doc comments on public APIs / complex modules
+- **GitHub Issue:** [#263](https://github.com/AndreiBozantan/svelte-axum-template/issues/263)
 
 - **Severity:** Minor
 - **Location:** `main.rs:5` (`#![allow(missing_docs)]`), most `pub fn`/`pub struct` across the
@@ -38,6 +40,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.3 — README is thin on architecture and testing
+- **GitHub Issue:** [#263](https://github.com/AndreiBozantan/svelte-axum-template/issues/263)
 
 - **Severity:** Minor
 - **Location:** `README.md`.
@@ -75,6 +78,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.6 — Formatting is tooled and CI-gated, but lint-level style rules are not
+- **GitHub Issue:** [#207](https://github.com/AndreiBozantan/svelte-axum-template/issues/207)
 
 - **Severity:** Minor
 - **Location:** Present and enforced: `.editorconfig`, `rustfmt.toml`, `frontend/.prettierrc`
@@ -101,6 +105,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.7 — Devcontainer bakes one developer's personal setup into the shared config
+- **GitHub Issue:** [#264](https://github.com/AndreiBozantan/svelte-axum-template/issues/264)
 
 - **Severity:** Minor
 - **Location:** `.devcontainer/setup-env.sh` (~260 lines writing a personal fish config,
@@ -125,6 +130,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
 ---
 
 ## 18.8 — No guide/skill for scaffolding a new feature from a DB schema
+- **GitHub Issue:** [#265](https://github.com/AndreiBozantan/svelte-axum-template/issues/265)
 
 - **Severity:** Minor
 - **Location:** `.agents/skills/` (contains only `review-backend`, `review-frontend`,

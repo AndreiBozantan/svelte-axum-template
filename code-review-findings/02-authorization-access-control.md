@@ -14,6 +14,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 ---
 
 ## 2.1 — `GET /api/users` discloses every user in the shared default tenant
+- **GitHub Issue:** [#220](https://github.com/AndreiBozantan/svelte-axum-template/issues/220)
 
 - **Severity:** Critical
 - **Location:** `backend/platform/identity/users/users_api.rs:60-92` (`list_users`),
@@ -46,6 +47,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 ---
 
 ## 2.2 — No role/authorization model exists; "admin" is not enforced anywhere on the backend
+- **GitHub Issue:** [#248](https://github.com/AndreiBozantan/svelte-axum-template/issues/248)
 
 - **Severity:** Critical
 - **Location:** whole `backend/platform/identity`; `migrations/01_initial_schema.sql`
@@ -84,6 +86,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 ---
 
 ## 2.4 — IDOR surface is currently small but unguarded by design
+- **GitHub Issue:** [#216](https://github.com/AndreiBozantan/svelte-axum-template/issues/216)
 
 - **Severity:** Minor (forward-looking)
 - **Location:** `users_db.rs` queries are consistently `WHERE ... AND tenant_id = ?`.

@@ -9,6 +9,7 @@ are hashed before logging, passwords are never logged. Findings are minor.
 ---
 
 ## 4.1 — Full settings struct (including DB URL) is logged at startup
+- **GitHub Issue:** [#258](https://github.com/AndreiBozantan/svelte-axum-template/issues/258)
 
 - **Severity:** Minor
 - **Location:** `backend/server.rs:79-84` — `info!("configs: {:#?}", &settings)` plus
@@ -24,6 +25,7 @@ are hashed before logging, passwords are never logged. Findings are minor.
 ---
 
 ## 4.2 — CSRF token hashes are logged on mismatch
+- **GitHub Issue:** [#258](https://github.com/AndreiBozantan/svelte-axum-template/issues/258)
 
 - **Severity:** Minor
 - **Location:** `backend/platform/identity/oauth/oauth_service.rs:257-264`
@@ -39,6 +41,7 @@ are hashed before logging, passwords are never logged. Findings are minor.
 ---
 
 ## 4.3 — JWT secret file: good handling; document rotation
+- **GitHub Issue:** [#269](https://github.com/AndreiBozantan/svelte-axum-template/issues/269)
 
 - **Severity:** Minor (informational)
 - **Location:** `backend/platform/shared/jwt.rs:169-220`.
