@@ -13,104 +13,201 @@ mod lintmd;
 mod status;
 mod stop;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let task = args.get(1).map(String::as_str).unwrap_or("help");
+struct XtaskCommand {
+    name: &'static str,
+    description: &'static str,
+    run: fn(args: &[String]),
+}
 
-    match task {
-        "clean" => clean(),
-        "status" => {
+const COMMANDS: &[XtaskCommand] = &[
+    XtaskCommand {
+        name: "clean",
+        description: "Deletes build files, target, .sqlx, and node_modules",
+        run: |_| clean(),
+    },
+    XtaskCommand {
+        name: "status",
+        description: "Displays project development status (branch, DB, services, tests, clippy, size)",
+        run: |args| {
             let refresh =
                 args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
             let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
             status::status(refresh, refresh_silent);
         },
-        "release" => release(),
-        "lint-security" => {
+    },
+    XtaskCommand {
+        name: "release",
+        description: "Builds the frontend and backend in release mode",
+        run: |_| release(),
+    },
+    XtaskCommand {
+        name: "lint-security",
+        description: "Runs semgrep security scan",
+        run: |_| {
             lint_security().expect("failed to run semgrep");
         },
-        "db-create" => {
+    },
+    XtaskCommand {
+        name: "db-init",
+        description: "Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries",
+        run: |_| database::db_init(),
+    },
+    XtaskCommand {
+        name: "db-create",
+        description: "Creates the SQLite database",
+        run: |_| {
             database::db_create().expect("failed to create database");
         },
-        "db-migrate" => {
+    },
+    XtaskCommand {
+        name: "db-migrate",
+        description: "Runs database migrations",
+        run: |_| {
             database::db_migrate().expect("failed to run migrations");
         },
-        "db-prepare" => {
+    },
+    XtaskCommand {
+        name: "db-prepare",
+        description: "Prepares SQLx offline metadata (.sqlx/)",
+        run: |_| {
             database::db_prepare().expect("failed to prepare sqlx queries");
         },
-        "db-prepare-check" => {
+    },
+    XtaskCommand {
+        name: "db-prepare-check",
+        description: "Checks if SQLx offline metadata (.sqlx/) is up to date",
+        run: |_| {
             database::db_prepare_check().expect("failed to check sqlx queries");
         },
-        "db-drop" => {
+    },
+    XtaskCommand {
+        name: "db-drop",
+        description: "Drops the SQLite database",
+        run: |_| {
             database::db_drop().expect("failed to drop database");
         },
-        "db-init" => database::db_init(),
-        "db-reset" => database::db_reset(),
-        "dev-init" => dev_init(),
-        "setup-hooks" => {
+    },
+    XtaskCommand {
+        name: "db-reset",
+        description: "Drops database and re-initializes it",
+        run: |_| database::db_reset(),
+    },
+    XtaskCommand {
+        name: "dev-init",
+        description: "Installs frontend packages, initializes DB, and seeds admin user",
+        run: |_| dev_init(),
+    },
+    XtaskCommand {
+        name: "setup-hooks",
+        description: "Sets up workspace git hooks",
+        run: |_| {
             checks::setup_hooks().expect("failed to set up git hooks");
         },
-        "pre-commit" => {
+    },
+    XtaskCommand {
+        name: "pre-commit",
+        description: "Runs pre-commit checks (formatting, clippy, sqlx, svelte-check, prettier)",
+        run: |_| {
             checks::pre_commit().expect("failed to run pre-commit checks");
         },
-        "pre-push" => {
+    },
+    XtaskCommand {
+        name: "pre-push",
+        description: "Runs pre-push checks (backend/frontend tests)",
+        run: |_| {
             checks::pre_push().expect("failed to run pre-push checks");
         },
-        "ci-backend" => {
+    },
+    XtaskCommand {
+        name: "ci-backend",
+        description: "Runs all backend CI checks (fmt, clippy, sqlx, tests)",
+        run: |_| {
             checks::ci_backend().expect("failed to run CI backend checks");
         },
-        "ci-frontend" => {
+    },
+    XtaskCommand {
+        name: "ci-frontend",
+        description: "Runs all frontend CI checks (prettier, svelte-check, tests, build)",
+        run: |_| {
             checks::ci_frontend().expect("failed to run CI frontend checks");
         },
-        "check-md-links" => lintmd::check_md_links().expect("failed to check markdown links"),
-        "dev" => dev(),
-        "openapi" => openapi(),
-        "docker-build" => {
+    },
+    XtaskCommand {
+        name: "check-md-links",
+        description: "Validates relative markdown links and heading anchors across the repo",
+        run: |_| lintmd::check_md_links().expect("failed to check markdown links"),
+    },
+    XtaskCommand {
+        name: "dev",
+        description: "Runs backend watch and frontend dev server concurrently",
+        run: |_| dev(),
+    },
+    XtaskCommand {
+        name: "openapi",
+        description: "Generates OpenAPI spec and frontend TypeScript client",
+        run: |_| openapi(),
+    },
+    XtaskCommand {
+        name: "stop",
+        description: "Stops any running backend servers",
+        run: |_| stop::stop(),
+    },
+    XtaskCommand {
+        name: "docker-build",
+        description: "Builds the production Docker image (svelaxum:release)",
+        run: |_| {
             docker::docker_build().expect("failed to build docker image");
         },
-        "docker-run" => {
+    },
+    XtaskCommand {
+        name: "docker-run",
+        description: "Runs the production Docker container locally",
+        run: |_| {
             docker::docker_run().expect("failed to run docker container");
         },
-        "docker-down" => {
+    },
+    XtaskCommand {
+        name: "docker-down",
+        description: "Stops and removes the production Docker container",
+        run: |_| {
             docker::docker_down().expect("failed to stop docker container");
         },
-        "docker-debug" => {
+    },
+    XtaskCommand {
+        name: "docker-debug",
+        description: "Runs a debug container mounting the data volume",
+        run: |_| {
             docker::docker_debug().expect("failed to run docker debug container");
         },
-        "stop" => stop::stop(),
-        _ => print_help(),
+    },
+];
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    let task_name = args.get(1).map(String::as_str).unwrap_or("help");
+
+    if task_name == "help" || task_name == "--help" || task_name == "-h" {
+        print_help();
+        return;
+    }
+
+    if let Some(cmd) = COMMANDS.iter().find(|c| c.name == task_name) {
+        (cmd.run)(&args);
+    } else {
+        eprintln!("Unknown command: {}", task_name);
+        println!();
+        print_help();
+        std::process::exit(1);
     }
 }
 
 fn print_help() {
-    println!(
-        r#"Svelaxum Xtask Runner
-
-Available commands:
-  clean            - Deletes build files, target, .sqlx, and node_modules
-  status           - Displays project development status (branch, DB, services, tests, clippy, size)
-  release          - Builds the frontend and backend in release mode
-  lint-security    - Runs semgrep security scan
-  db-init          - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries
-  db-create        - Creates the SQLite database
-  db-migrate       - Runs database migrations
-  db-prepare       - Prepares SQLx offline metadata (.sqlx/)
-  db-prepare-check - Checks if SQLx offline metadata (.sqlx/) is up to date
-  db-drop          - Drops the SQLite database
-  db-reset         - Drops database and re-initializes it
-  dev-init         - Installs frontend packages, initializes DB, and seeds admin user
-  setup-hooks      - Sets up workspace git hooks
-  ci-backend       - Runs all backend CI checks (fmt, clippy, sqlx, tests)
-  ci-frontend      - Runs all frontend CI checks (prettier, svelte-check, tests, build)
-  check-md-links   - Validates relative markdown links and heading anchors across the repo
-  dev              - Runs backend watch and frontend dev server concurrently
-  openapi          - Generates OpenAPI spec and frontend TypeScript client
-  stop             - Stops any running backend servers
-  docker-build     - Builds the production Docker image (svelaxum:release)
-  docker-run       - Runs the production Docker container locally
-  docker-down      - Stops and removes the production Docker container
-  docker-debug     - Runs a debug container mounting the data volume"#
-    );
+    println!("Svelaxum Xtask Runner\n");
+    println!("Available commands:");
+    let max_len = COMMANDS.iter().map(|c| c.name.len()).max().unwrap_or(0);
+    for cmd in COMMANDS {
+        println!("  {:width$} - {}", cmd.name, cmd.description, width = max_len);
+    }
 }
 
 pub(crate) fn run_command(
