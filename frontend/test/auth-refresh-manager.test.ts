@@ -2,7 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock openapi-fetch — importing api.ts triggers module-level createClient()
 vi.mock('openapi-fetch', () => ({
-    default: () => ({ use: vi.fn() }),
+    default: () => ({
+        use: vi.fn(),
+        GET: vi.fn(),
+        POST: vi.fn(),
+        PUT: vi.fn(),
+        DELETE: vi.fn(),
+        PATCH: vi.fn(),
+        OPTIONS: vi.fn(),
+        HEAD: vi.fn(),
+        TRACE: vi.fn(),
+    }),
 }));
 
 import { createAuthMiddleware } from '$lib/fetch';
