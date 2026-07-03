@@ -238,3 +238,13 @@ async fn bootstrap_admin_from_env(ctx: &common::ArcContext) -> Result<(), Error>
     println!("✅ Admin user credentials updated successfully.");
     Ok(())
 }
+
+#[must_use]
+pub fn is_cli_command() -> bool {
+    use clap::Parser;
+    if let Ok(cli) = Cli::try_parse() {
+        cli.command.is_some()
+    } else {
+        std::env::args().len() > 1
+    }
+}

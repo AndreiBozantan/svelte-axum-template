@@ -230,7 +230,7 @@ fn status(args: &[String]) {
 }
 
 fn create_admin(args: &[String]) {
-    let mut run_args = vec!["run", "--package", "app", "--", "create-admin"];
+    let mut run_args = vec!["run", "--quiet", "--package", "app", "--", "create-admin"];
     for arg in &args[2..] {
         run_args.push(arg);
     }
@@ -298,7 +298,11 @@ fn dev_init() {
 
     // Seed admin user
     println!("Seeding default admin user...");
-    let status = run_command("cargo", &["run", "--package", "app", "--", "create-admin"], None);
+    let status = run_command(
+        "cargo",
+        &["run", "--quiet", "--package", "app", "--", "create-admin"],
+        None,
+    );
     if status.is_err() || !status.unwrap().success() {
         eprintln!("Failed to seed admin user.");
         std::process::exit(1);
