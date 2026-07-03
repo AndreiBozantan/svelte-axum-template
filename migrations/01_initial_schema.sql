@@ -50,7 +50,7 @@ BEGIN
 END;
 -- create a default system user (id=0) for internal operations, associated with the system tenant (tenant_id=1)
 INSERT OR IGNORE INTO users (id, tenant_id, created_at, updated_at, status, email, first_name, last_name)
-VALUES (0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'sa@app.com', 'super', 'admin');
+VALUES (0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'active', 'admin@system.local', 'super', 'admin');
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

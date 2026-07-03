@@ -60,7 +60,7 @@ enum CliCommand {
     },
     CreateAdmin {
         #[arg(short, long)]
-        email: String,
+        email: Option<String>,
     },
     Deploy,
 }
@@ -147,9 +147,27 @@ async fn migrate_action_run(ctx: &common::ArcContext) -> Result<(), Error> {
 }
 
 async fn create_admin(
-    email: String,
+    email: Option<String>,
     ctx: &common::ArcContext,
 ) -> Result<(), Error> {
+    let email = match email {
+        Some(ref e) if !e.trim().is_empty() => e.trim().to_string(),
+        _ => {
+            print!("Enter email for admin user [default: admin@system.local]: ");
+            io::stdout().flush()?;
+            let mut email_input = String::new();
+            io::stdin().read_line(&mut email_input)?;
+            let trimmed = email_input.trim();
+            if trimmed.is_empty() {
+                "admin@system.local".to_string()
+            } else {
+                trimmed.to_string()
+            }
+        },
+    };
+
+    let parsed_email = common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address".to_string()))?;
+
     print!("Enter password for admin user '{email}': ");
     io::stdout().flush()?;
 
@@ -159,7 +177,6 @@ async fn create_admin(
     }
 
     let password_hash = crypto::hash_password(password.trim())?;
-    let parsed_email = common::Email::parse(&email).ok_or_else(|| Error::Other("invalid email address".to_string()))?;
 
     users::db::Repository
         .update_admin_credentials(
