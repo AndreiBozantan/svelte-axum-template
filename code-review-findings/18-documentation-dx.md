@@ -87,7 +87,7 @@ architecture docs (`AGENTS.md`, `conventions.md`, `codegen.md`). Findings are ga
   leakage, or Svelte a11y template issues), and the backend runs clippy with its default lint
   set only — there is no central `[workspace.lints.rust]`/`[workspace.lints.clippy]` table
   encoding the project's style choices. Conventions like import style
-  ([21 § 21.4](21-general-hygiene.md)) exist only as `AGENTS.md` prose that no tool checks.
+  ([21 § 21.4](21-general-hygiene.md#214--inconsistent-import-style-vs-the-documented-convention)) exist only as `AGENTS.md` prose that no tool checks.
 - **Risk:** Style rules that only live in docs are applied inconsistently (21.4 is the
   evidence) and burn review time on nits a tool should catch, for humans and AI agents alike.
 - **Recommendation:** (a) Add ESLint with `typescript-eslint` and `eslint-plugin-svelte`

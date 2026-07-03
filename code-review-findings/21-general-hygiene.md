@@ -58,7 +58,7 @@ paths, constants extracted, clippy-clean. Findings are small.
   the dominant Rust ecosystem idiom and reduces per-file noise/token count. The work is:
   (a) update the imports section of `AGENTS.md`; (b) sweep the backend files that still follow
   the old style; (c) new code follows the new convention immediately. See also
-  [18 § 18.6](18-documentation-dx.md) — encode style conventions as tool rules where possible.
+  [18 § 18.6](18-documentation-dx.md#186--formatting-is-tooled-and-ci-gated-but-lint-level-style-rules-are-not) — encode style conventions as tool rules where possible.
 
 ---
 
