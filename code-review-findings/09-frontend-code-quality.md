@@ -7,42 +7,8 @@ building app features on top of this template.
 
 ---
 
-## 9.1 — Login error leaves the submit button permanently disabled
-- **GitHub Issue:** [#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192)
-
-- **Severity:** Important (user-facing bug on the most common error path)
-- **Location:** `frontend/src/pages/Login.svelte:21-37` (`handleLogin`).
-- **Finding:** `isLoading` is set to `true` at the start of `handleLogin`, but the error
-  branch `return`s before `isLoading = false` is reached. After any failed login (e.g. a
-  wrong password — the most common case), the error message is shown but the Sign In button
-  stays disabled with the "Signing in..." spinner forever. The user cannot retry without
-  reloading the page.
-- **Risk:** Broken retry on the app's front door; every user who ever mistypes a password
-  hits it.
-- **Recommendation:** Reset the flag on all paths — either `try { ... } finally { isLoading
-  = false; }`, or set `isLoading = false` before the early `return`. A component test
-  (submit → error → button enabled again) would lock this in; see
-  [12](12-testing.md) 12.4.
-
----
-
-## 9.2 — `Logout.svelte` renders the whole user object instead of the email
-- **GitHub Issue:** [#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193)
-
-- **Severity:** Important (visible bug)
-- **Location:** `frontend/src/pages/Logout.svelte:14-18`.
-- **Finding:** `You are still logged in as {AppState.user}.` interpolates the `UserInfo`
-  object, which renders as `[object Object]`. Should be `{AppState.user?.email}`. Also, this
-  branch is nearly unreachable because `onMount` logs out immediately, but if logout fails the
-  user sees the broken string — and the `api.auth.logout()` result is ignored, so a failed
-  logout still calls `AppState.setUser(null)` and shows "You are now logged out" while the
-  session cookies may still be live.
-- **Recommendation:** Use `{AppState.user?.email}`, check the logout result, and show an
-  error state when the call fails instead of unconditionally clearing local state.
-
----
-
 ## 9.3 — `isAdmin` is derived from `user.id === 1`, which is not the admin
+
 - **GitHub Issue:** [#223](https://github.com/AndreiBozantan/svelte-axum-template/issues/223)
 
 - **Severity:** Important (incorrect privilege display)
@@ -62,6 +28,7 @@ building app features on top of this template.
 ---
 
 ## 9.4 — Sidebar navigation does full page reloads; SPA routing only half-exists
+
 - **GitHub Issue:** [#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205)
 
 - **Severity:** Important (architecture; the template's routing pattern is what apps will copy)
@@ -92,6 +59,7 @@ building app features on top of this template.
 ---
 
 ## 9.5 — `About.svelte` calls the API with raw `fetch`, bypassing the generated client
+
 - **GitHub Issue:** [#242](https://github.com/AndreiBozantan/svelte-axum-template/issues/242)
 
 - **Severity:** Important (project-standards breach in template code)
@@ -110,6 +78,7 @@ building app features on top of this template.
 ---
 
 ## 9.6 — `PageDefinition.component` typed as `any`
+
 - **GitHub Issue:** [#244](https://github.com/AndreiBozantan/svelte-axum-template/issues/244)
 
 - **Severity:** Minor
@@ -124,6 +93,7 @@ building app features on top of this template.
 ---
 
 ## 9.7 — `fetch.ts` `onError` middleware swallows the real error and always returns 500
+
 - **GitHub Issue:** [#243](https://github.com/AndreiBozantan/svelte-axum-template/issues/243)
 
 - **Severity:** Minor
@@ -141,6 +111,7 @@ building app features on top of this template.
 ---
 
 ## 9.8 — Frontend expects error code `not_authenticated`, backend never emits it
+
 - **GitHub Issue:** [#224](https://github.com/AndreiBozantan/svelte-axum-template/issues/224)
 
 - **Severity:** Minor
@@ -157,6 +128,7 @@ building app features on top of this template.
 ---
 
 ## 9.9 — Logout confirmation is mouse-only, and keyboard users bypass it entirely
+
 - **GitHub Issue:** [#246](https://github.com/AndreiBozantan/svelte-axum-template/issues/246)
 
 - **Severity:** Minor (accessibility / UX consistency)
@@ -178,30 +150,32 @@ building app features on top of this template.
 ---
 
 ## 9.10 — Small issues: dead proxy entry, unloaded font, hardcoded version, global loading flag, silent bootstrap failure
+
 - **GitHub Issue:** [#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266)
 
 - **Severity:** Minor (grouped hygiene)
 - **Location / Finding:**
-  - `frontend/vite.config.ts:35-38` — dev proxy forwards `/user_info.js` to the backend, but
-    nothing in the repo references that path (leftover from an older template). Delete it.
-  - `frontend/src/AppSidebar.svelte:191` — `@import url('https://fonts.googleapis.com/...')`
-    fetches the Dancing Script font from Google at runtime (third-party request, breaks
-    offline/air-gapped use); meanwhile `App.svelte:76` lists `'Inter'` first in the body
-    font stack but Inter is never loaded, so the app silently falls back to system fonts.
-    Self-host the logo font (or inline it) and either load Inter or drop it from the stack.
-  - `frontend/src/pages/About.svelte:52` — version is hardcoded as `v1.0.0-beta`; the
-    package version is `0.8.0`. Inject it at build time (`define` in `vite.config.ts` from
-    `package.json`) instead of hardcoding.
-  - `frontend/src/pages/SecureApi.svelte:8-16` — a page-local API call drives the **global**
-    `AppState.isLoading` flag (which also animates the sidebar logo). Use a local
-    `let loading = $state(false)`; reserve the global flag for app bootstrap.
-  - `frontend/src/main.ts:51-53` — if `bootstrap()` throws, the error is logged and the app
-    is never mounted: the user gets a permanently blank page. Mount the app (or render a
-    minimal error screen) even when the user-info fetch fails unexpectedly.
+    - `frontend/vite.config.ts:35-38` — dev proxy forwards `/user_info.js` to the backend, but
+      nothing in the repo references that path (leftover from an older template). Delete it.
+    - `frontend/src/AppSidebar.svelte:191` — `@import url('https://fonts.googleapis.com/...')`
+      fetches the Dancing Script font from Google at runtime (third-party request, breaks
+      offline/air-gapped use); meanwhile `App.svelte:76` lists `'Inter'` first in the body
+      font stack but Inter is never loaded, so the app silently falls back to system fonts.
+      Self-host the logo font (or inline it) and either load Inter or drop it from the stack.
+    - `frontend/src/pages/About.svelte:52` — version is hardcoded as `v1.0.0-beta`; the
+      package version is `0.8.0`. Inject it at build time (`define` in `vite.config.ts` from
+      `package.json`) instead of hardcoding.
+    - `frontend/src/pages/SecureApi.svelte:8-16` — a page-local API call drives the **global**
+      `AppState.isLoading` flag (which also animates the sidebar logo). Use a local
+      `let loading = $state(false)`; reserve the global flag for app bootstrap.
+    - `frontend/src/main.ts:51-53` — if `bootstrap()` throws, the error is logged and the app
+      is never mounted: the user gets a permanently blank page. Mount the app (or render a
+      minimal error screen) even when the user-info fetch fails unexpectedly.
 
 ---
 
 ## 9.11 — State/runes usage is correct; verified
+
 - **GitHub Issue:** [#247](https://github.com/AndreiBozantan/svelte-axum-template/issues/247)
 
 - **Severity:** Informational
