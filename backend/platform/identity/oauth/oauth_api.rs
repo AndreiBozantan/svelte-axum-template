@@ -50,7 +50,9 @@ impl From<oauth::Error> for api::Error {
         ("redirect_url" = Option<String>, Query, description = "Client redirect URL after login")
     ),
     responses(
-        (status = 303, description = "Redirect to Google authorization page")
+        (status = 303, description = "Redirect to Google authorization page"),
+        (status = 400, description = "Bad Request", body = api::Error),
+        (status = 500, description = "Internal Server Error", body = api::Error)
     )
 )]
 async fn google_auth_init(
@@ -86,7 +88,10 @@ async fn google_auth_init(
         ("state" = String, Query, description = "CSRF state token")
     ),
     responses(
-        (status = 303, description = "Redirect to client final landing URL")
+        (status = 303, description = "Redirect to client final landing URL"),
+        (status = 400, description = "Bad Request", body = api::Error),
+        (status = 401, description = "Unauthorized", body = api::Error),
+        (status = 500, description = "Internal Server Error", body = api::Error)
     )
 )]
 async fn google_auth_callback(

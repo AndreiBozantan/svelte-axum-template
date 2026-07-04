@@ -131,8 +131,6 @@ No ordering constraints among these; none is invalidated by the Stage B refactor
 
 Shipped frontend bugs:
 
-- [ ] Failed login leaves Sign In permanently disabled — [09 § 9.1](09-frontend-code-quality.md#91--login-error-leaves-the-submit-button-permanently-disabled) ([#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192))
-- [ ] `Logout.svelte` renders `[object Object]`; logout result ignored — [09 § 9.2](09-frontend-code-quality.md#92--logoutsvelte-renders-the-whole-user-object-instead-of-the-email) ([#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193))
 - [ ] Silent bootstrap failure leaves a blank page — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#194](https://github.com/AndreiBozantan/svelte-axum-template/issues/194))
 
 Security fixes that don't touch the auth model:

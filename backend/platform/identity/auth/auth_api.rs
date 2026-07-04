@@ -138,7 +138,9 @@ async fn login(
     post,
     path = "/auth/logout",
     responses(
-        (status = 204, description = "Logout successful")
+        (status = 204, description = "Logout successful"),
+        (status = 401, description = "Unauthorized", body = api::Error),
+        (status = 500, description = "Internal Server Error", body = api::Error)
     )
 )]
 async fn logout(
