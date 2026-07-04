@@ -38,12 +38,10 @@
     });
 
     function navigateToLogin() {
-        history.pushState(null, '', '/login');
         AppState.setActivePage('login');
     }
 
     function navigateToHome() {
-        history.pushState(null, '', '/');
         AppState.setActivePage('welcome');
     }
 </script>

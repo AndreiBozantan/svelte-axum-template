@@ -17,7 +17,7 @@
         let initialPage = 'welcome';
         if (path === '/') initialPage = 'welcome';
         else if (path.startsWith('/')) initialPage = path.slice(1);
-        AppState.setActivePage(initialPage);
+        AppState.setActivePage(initialPage, false);
 
         // Listen to browser back/forward
         window.addEventListener('popstate', () => {
@@ -25,7 +25,7 @@
             let page = 'welcome';
             if (currentPath === '/') page = 'welcome';
             else page = currentPath.slice(1);
-            AppState.setActivePage(page);
+            AppState.setActivePage(page, false);
         });
     });
 
@@ -39,14 +39,12 @@
             if (!isAuthPage) {
                 AppState.setIntendedPage(AppState.activePage); // only store real destinations
             }
-            history.pushState(null, '', '/login');
             AppState.setActivePage('login');
         }
 
         // If just logged in and on Login page, go to Welcome
         if (AppState.isLoggedIn && AppState.activePage === 'login') {
             const target = AppState.intendedPage || 'welcome';
-            history.pushState(null, '', '/' + (target === 'welcome' ? '' : target));
             AppState.setActivePage(target);
             AppState.setIntendedPage(null);
         }
