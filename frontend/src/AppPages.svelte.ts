@@ -29,7 +29,7 @@ export type PageDefinition = {
 
 export const Pages: PageDefinition[] = [
     {
-        id: 'welcome',
+        id: '',
         label: 'home',
         component: Welcome,
         public: false,

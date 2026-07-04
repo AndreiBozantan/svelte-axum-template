@@ -13,7 +13,7 @@
     let logoutButton = $state<HTMLElement | null>(null);
 
     function getPagePath(id: string) {
-        return id === 'welcome' ? '/' : `/${id}`;
+        return `/${id}`;
     }
 
     function topItems(): PageDefinition[] {

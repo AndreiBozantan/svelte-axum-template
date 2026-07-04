@@ -42,7 +42,7 @@
     }
 
     function navigateToHome() {
-        AppState.setActivePage('welcome');
+        AppState.setActivePage('');
     }
 </script>
 

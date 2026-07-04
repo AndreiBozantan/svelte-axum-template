@@ -14,10 +14,11 @@ class AppStateDef {
     }
 
     activePage = $state<string>('about'); // Default to 'about'
-    setActivePage(id: string, updateHistory = true) {
+    setActivePage(route: string, updateHistory = true) {
+        const id = route.startsWith('/') ? route.slice(1) : route;
         this.activePage = id;
         if (updateHistory) {
-            const path = id === 'welcome' ? '/' : `/${id}`;
+            const path = `/${id}`;
             if (window.location.pathname !== path) {
                 history.pushState(null, '', path);
             }

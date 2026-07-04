@@ -12,28 +12,20 @@
 
         AppState.stopLoading();
 
-        // Set initial page from URL
-        const path = window.location.pathname;
-        let initialPage = 'welcome';
-        if (path === '/') initialPage = 'welcome';
-        else if (path.startsWith('/')) initialPage = path.slice(1);
-        AppState.setActivePage(initialPage, false);
+        // set initial page from URL
+        AppState.setActivePage(window.location.pathname, false);
 
-        // Listen to browser back/forward
+        // listen to browser back/forward
         window.addEventListener('popstate', () => {
-            const currentPath = window.location.pathname;
-            let page = 'welcome';
-            if (currentPath === '/') page = 'welcome';
-            else page = currentPath.slice(1);
-            AppState.setActivePage(page, false);
+            AppState.setActivePage(window.location.pathname, false);
         });
     });
 
-    // Auto-redirect logic
+    // auto-redirect logic
     $effect(() => {
         const active = getActivePage();
 
-        // If logged out and on a protected page, redirect to login
+        // if logged out and on a protected page, redirect to login
         if (active && !active.public && !AppState.isLoggedIn) {
             const isAuthPage = ['logout', 'login'].includes(AppState.activePage);
             if (!isAuthPage) {
@@ -42,9 +34,9 @@
             AppState.setActivePage('login');
         }
 
-        // If just logged in and on Login page, go to Welcome
+        // if just logged in and on Login page, go to Welcome
         if (AppState.isLoggedIn && AppState.activePage === 'login') {
-            const target = AppState.intendedPage || 'welcome';
+            const target = AppState.intendedPage || '';
             AppState.setActivePage(target);
             AppState.setIntendedPage(null);
         }
