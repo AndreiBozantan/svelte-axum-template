@@ -1,7 +1,6 @@
 <script lang="ts">
     import { AppState } from '$lib/AppState.svelte';
     import { api } from '$lib/api';
-    import type { ApiError } from '$lib/api';
     import { onMount } from 'svelte';
     import { Fa } from 'svelte-fa';
     import {
@@ -12,25 +11,27 @@
         faRedo,
     } from '@fortawesome/free-solid-svg-icons';
 
-    let hasAttempted = $state(false);
+    let isLoggingOut = $state(true);
     let errorMessage = $state('');
 
     async function handleLogout() {
         if (!AppState.isLoggedIn) {
-            hasAttempted = true;
+            isLoggingOut = false;
             return;
         }
 
+        // reset states at the start of the attempt
+        isLoggingOut = true;
         errorMessage = '';
-        const { error } = await api.auth.logout();
 
-        if (error) {
-            const apiError = error as ApiError;
-            errorMessage = apiError.message || 'An unexpected error occurred during logout.';
+        const res = await api.auth.logout();
+        if (res.error) {
+            errorMessage = res.error.message || 'An unexpected error occurred during logout.';
         } else {
             AppState.setUser(null);
         }
-        hasAttempted = true;
+
+        isLoggingOut = false;
     }
 
     onMount(() => {
@@ -48,7 +49,7 @@
 
 <div class="logout-page">
     <div class="card">
-        {#if AppState.isLoading || !hasAttempted}
+        {#if isLoggingOut}
             <div class="status-container">
                 <div class="spinner-wrapper">
                     <span class="spinner"></span>
