@@ -151,12 +151,8 @@ async fn logout(
     let response = axum::http::Response::builder()
         .status(http::StatusCode::NO_CONTENT)
         .body(axum::body::Body::empty())?;
-    Ok(cookies::add_auth_cookies(
-        &service.context.settings.jwt,
-        response,
-        None,
-        None,
-    )?)
+    let response = cookies::add_auth_cookies(&service.context.settings.jwt, response, None, None)?;
+    Ok(response)
 }
 
 #[utoipa::path(
