@@ -63,13 +63,7 @@
     :global(body) {
         margin: 0;
         padding: 0;
-        font-family:
-            'Inter',
-            -apple-system,
-            BlinkMacSystemFont,
-            'Segoe UI',
-            Roboto,
-            sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background-color: #fffaf5;
         color: #1e293b;
     }

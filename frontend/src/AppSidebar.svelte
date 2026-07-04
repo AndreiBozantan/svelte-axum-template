@@ -186,7 +186,13 @@
 </aside>
 
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+    @font-face {
+        font-family: 'Dancing Script';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/DancingScript-Bold.ttf') format('truetype');
+    }
 
     /* Global utility for the hidden attribute */
     [hidden] {

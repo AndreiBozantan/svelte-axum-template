@@ -49,7 +49,7 @@
 
                 <div class="item-row">
                     <div class="info-label">Version</div>
-                    <div class="info-value">v1.0.0-beta</div>
+                    <div class="info-value">v{__APP_VERSION__}</div>
                 </div>
 
                 <div class="item-row">

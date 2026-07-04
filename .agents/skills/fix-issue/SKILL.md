@@ -1,15 +1,15 @@
 ---
 name: fix-issue
-description: Fixes a bug, implements a missing feature, or implements one slice of a larger feature, starting from a GitHub issue link or number. Trigger when the user gives a GitHub issue URL/reference and asks to fix, implement, resolve, or work on it.
+description: Fixes a bug, implements a missing feature, or implements one slice of a larger feature, starting from a GitHub issue link, number, or direct text description. Trigger when the user gives a GitHub issue URL/reference/description and asks to fix, implement, resolve, or work on it.
 ---
 
 # Fix a GitHub Issue
 
-Given a link (or `#number`) to a GitHub issue, resolve it end-to-end: understand the ask, verify it still applies, plan the change, implement it in small reviewable steps, and leave it ready for the user to test and commit.
+Given a link, `#number`, or direct text description of a GitHub issue, resolve it end-to-end: understand the ask, verify it still applies, plan the change, implement it in small reviewable steps, and leave it ready for the user to test and commit.
 
 ## Process
 
-1. **Fetch the issue.** `gh issue view <ref> --json number,title,body,labels,comments,state` — `<ref>` accepts a full URL or a bare number when run inside this repo. Read title, body, and comments; comments often carry scope clarifications made after filing. If `gh` isn't authenticated, ask the user to paste the issue text instead of guessing its contents.
+1. **Fetch or accept the issue.** If the user provided the issue details or description directly, use that information. Otherwise, fetch the issue using `gh issue view <ref> --json number,title,body,labels,comments,state` — where `<ref>` accepts a full URL or a bare number when run inside this repo. Read title, body, and comments; comments often carry scope clarifications made after filing. If `gh` isn't authenticated, ask the user to paste the issue text instead of guessing its contents.
 
 2. **Pull in linked context.** Per `code-review-findings/stabilization-plan.md`'s issue-authoring convention, issue bodies here are usually copied verbatim from a `code-review-findings/NN-*.md` finding and may point at a `docs/design/*.md` doc for the concrete spec — e.g. Stage B issues link `docs/design/authorization.md`'s `# Implementation Plan` section for schema/DDL/queries. Follow every link and file reference in the body before writing code. If the issue is one of the plan's numbered checkboxes, that entry is also useful context (dependencies, ordering, "Definition of done").
 
@@ -33,5 +33,5 @@ Given a link (or `#number`) to a GitHub issue, resolve it end-to-end: understand
 
 ## Notes
 
-- Accepted issue references: full URL (`https://github.com/OWNER/REPO/issues/N`), `#N`, or bare `N` resolved against the current repo.
+- Accepted issue references: full URL (`https://github.com/OWNER/REPO/issues/N`), `#N`, bare `N` resolved against the current repo, or a direct description/text of the issue.
 - "Fix" can mean a bug fix, a whole feature, or one slice of a larger staged feature (e.g. a single Stage B checklist item) — infer scope from the issue body and its acceptance criteria, not from the word "fix".
