@@ -34,7 +34,7 @@
             AppState.setActivePage('login');
         }
 
-        // if just logged in and on Login page, go to Welcome
+        // if just logged in and on Login page, go to Home
         if (AppState.isLoggedIn && AppState.activePage === 'login') {
             const target = AppState.intendedPage || '';
             AppState.setActivePage(target);
