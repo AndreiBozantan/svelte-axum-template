@@ -13,7 +13,7 @@
     let logoutButton = $state<HTMLElement | null>(null);
 
     function getPagePath(id: string) {
-        return id === 'welcome' ? '/' : `/${id}`;
+        return `/${id}`;
     }
 
     function topItems(): PageDefinition[] {
@@ -38,7 +38,6 @@
         setTimeout(() => {
             isConfirmAnimating = false;
             showLogoutConfirm = false;
-            history.pushState(null, '', '/logout');
             AppState.setActivePage('logout');
         }, 150);
     }
@@ -51,7 +50,6 @@
                 isConfirmAnimating = false;
             }, 150);
         } else {
-            history.pushState(null, '', '/logout');
             AppState.setActivePage('logout');
         }
     }
