@@ -129,10 +129,6 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
-Shipped frontend bugs:
-
-- [ ] Silent bootstrap failure leaves a blank page — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#194](https://github.com/AndreiBozantan/svelte-axum-template/issues/194))
-
 Security fixes that don't touch the auth model:
 
 - [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
@@ -369,8 +365,6 @@ Developer experience:
 
 Frontend hygiene (batch into one issue):
 
-- [ ] Dead `/user_info.js` proxy; runtime Google Fonts import / unloaded Inter; hardcoded
-      `v1.0.0-beta`; global `isLoading` misuse in SecureApi — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266))
 - [ ] `console.*` calls in production code — [21 § 21.1](21-general-hygiene.md#211--consolelogconsoleerror-left-in-frontend-production-code) ([#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267))
 - [ ] Commented-out code, dead `AppState.userId`, package name drift —
       [21 § 21.2/21.3/21.5](21-general-hygiene.md#212--commented-out-code-blocks) ([#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268))

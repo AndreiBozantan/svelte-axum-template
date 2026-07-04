@@ -149,31 +149,6 @@ building app features on top of this template.
 
 ---
 
-## 9.10 — Small issues: dead proxy entry, unloaded font, hardcoded version, global loading flag, silent bootstrap failure
-
-- **GitHub Issue:** [#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266)
-
-- **Severity:** Minor (grouped hygiene)
-- **Location / Finding:**
-    - `frontend/vite.config.ts:35-38` — dev proxy forwards `/user_info.js` to the backend, but
-      nothing in the repo references that path (leftover from an older template). Delete it.
-    - `frontend/src/AppSidebar.svelte:191` — `@import url('https://fonts.googleapis.com/...')`
-      fetches the Dancing Script font from Google at runtime (third-party request, breaks
-      offline/air-gapped use); meanwhile `App.svelte:76` lists `'Inter'` first in the body
-      font stack but Inter is never loaded, so the app silently falls back to system fonts.
-      Self-host the logo font (or inline it) and either load Inter or drop it from the stack.
-    - `frontend/src/pages/About.svelte:52` — version is hardcoded as `v1.0.0-beta`; the
-      package version is `0.8.0`. Inject it at build time (`define` in `vite.config.ts` from
-      `package.json`) instead of hardcoding.
-    - `frontend/src/pages/SecureApi.svelte:8-16` — a page-local API call drives the **global**
-      `AppState.isLoading` flag (which also animates the sidebar logo). Use a local
-      `let loading = $state(false)`; reserve the global flag for app bootstrap.
-    - `frontend/src/main.ts:51-53` — if `bootstrap()` throws, the error is logged and the app
-      is never mounted: the user gets a permanently blank page. Mount the app (or render a
-      minimal error screen) even when the user-info fetch fails unexpectedly.
-
----
-
 ## 9.11 — State/runes usage is correct; verified
 
 - **GitHub Issue:** [#247](https://github.com/AndreiBozantan/svelte-axum-template/issues/247)
