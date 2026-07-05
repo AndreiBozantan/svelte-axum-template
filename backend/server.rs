@@ -169,7 +169,9 @@ async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
 async fn shutdown_signal() {
     let ctrl_c = async {
         if let Err(err) = tokio::signal::ctrl_c().await {
+            // a failed handler must not complete the future: that would shut the server down
             error!(error = %err, "failed to install Ctrl+C handler");
+            std::future::pending::<()>().await;
         }
     };
 
