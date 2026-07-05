@@ -217,13 +217,14 @@ impl Service {
 
         let client = create_google_client(&self.context.settings.oauth)?;
         let (pkce_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
-        let (auth_url, csrf_token) = client
+        let (mut auth_url, csrf_token) = client
             .authorize_url(oauth2::CsrfToken::new_random)
             .set_pkce_challenge(pkce_challenge)
             .add_scope(oauth2::Scope::new("openid".to_string()))
             .add_scope(oauth2::Scope::new("email".to_string()))
             .add_scope(oauth2::Scope::new("profile".to_string()))
             .url();
+        auth_url.query_pairs_mut().append_pair("prompt", "select_account");
 
         let now = Utc::now().timestamp();
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);

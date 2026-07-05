@@ -778,3 +778,29 @@ async fn refresh_token_cleanup_task_deletes_expired() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_begin_google_flow_adds_prompt() -> TestResult {
+    let settings = crate::platform::config::AppSettings {
+        oauth: crate::platform::config::OAuthSettings {
+            google_client_id: "mock-client-id".to_string(),
+            google_client_secret: "mock-client-secret".to_string(),
+            google_redirect_uri: "http://localhost/callback".to_string(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let ctx = crate::platform::common::Context::create(settings, "test__secret__key__for__jwt__testing").await?;
+
+    let auth_service = crate::platform::identity::auth::Service::new(
+        crate::platform::identity::users::db::Repository,
+        crate::platform::identity::tokens::db::Repository,
+        ctx.clone(),
+    );
+    let oauth_service = crate::platform::identity::oauth::Service::new(ctx, auth_service);
+
+    let (url, _state) = oauth_service.begin_google_flow(None)?;
+    assert!(url.to_string().contains("prompt=select_account"));
+
+    Ok(())
+}
