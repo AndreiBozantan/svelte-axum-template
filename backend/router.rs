@@ -76,6 +76,10 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
         .layer(axum::middleware::from_fn(security_headers_middleware))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
+        .layer(tower_http::timeout::TimeoutLayer::with_status_code(
+            axum::http::StatusCode::REQUEST_TIMEOUT,
+            std::time::Duration::from_secs(30),
+        ))
         .with_state(context)
 }
 

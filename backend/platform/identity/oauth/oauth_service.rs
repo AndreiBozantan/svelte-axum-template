@@ -265,7 +265,9 @@ impl Service {
         }
 
         let client = create_google_client(&self.context.settings.oauth)?;
-        let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
+        let oauth_client = oauth2::reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()?;
 
         let pkce_verifier = oauth2::PkceCodeVerifier::new(token_data.claims.pkce_verifier);
 
