@@ -143,3 +143,26 @@ async fn test_panic_handling() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_security_headers() -> TestResult {
+    let server = create_test_server().await?;
+
+    let response = server.get("/api/health").await;
+    response.assert_status(StatusCode::OK);
+
+    response.assert_header(axum::http::header::X_CONTENT_TYPE_OPTIONS, "nosniff");
+    response.assert_header(axum::http::header::X_FRAME_OPTIONS, "DENY");
+    response.assert_header(axum::http::header::REFERRER_POLICY, "strict-origin-when-cross-origin");
+    response.assert_header(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';"
+    );
+    response.assert_header(
+        axum::http::header::STRICT_TRANSPORT_SECURITY,
+        "max-age=31536000; includeSubDomains",
+    );
+    response.assert_header("permissions-policy", "geolocation=(), microphone=(), camera=()");
+
+    Ok(())
+}
