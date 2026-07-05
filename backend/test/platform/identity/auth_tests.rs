@@ -429,7 +429,10 @@ async fn register_invalid_password() -> TestResult {
     response.assert_status(StatusCode::BAD_REQUEST);
     let r: Value = response.json();
     assert_eq!(r["code"], "validation_failed");
-    assert_eq!(r["details"]["password"][0], "password must be at least 8 characters");
+    assert_eq!(
+        r["details"]["password"][0],
+        "password must be between 8 and 72 characters"
+    );
     Ok(())
 }
 

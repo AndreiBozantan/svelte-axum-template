@@ -244,6 +244,7 @@ where
 pub struct Json<T>(pub T);
 
 impl<T> Json<T> {
+    #[allow(dead_code)]
     pub fn data(self) -> T {
         self.0
     }
