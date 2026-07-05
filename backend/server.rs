@@ -167,8 +167,32 @@ async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
 }
 
 async fn shutdown_signal() {
-    match tokio::signal::ctrl_c().await {
-        Ok(()) => info!("graceful shutdown initiated"),
-        Err(error) => error!(%error, "error during shutdown"),
+    let ctrl_c = async {
+        if let Err(err) = tokio::signal::ctrl_c().await {
+            error!(error = %err, "failed to install Ctrl+C handler");
+        }
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            },
+            Err(err) => {
+                error!(error = %err, "failed to install SIGTERM handler");
+                std::future::pending::<()>().await;
+            },
+        }
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        () = ctrl_c => {},
+        () = terminate => {},
     }
+
+    info!("graceful shutdown initiated");
 }
