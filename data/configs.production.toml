@@ -4,6 +4,7 @@ host = "0.0.0.0"
 port = 3000
 log_directives = "info,tower_http=warn,axum=warn"
 env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
+trusted_proxy = false
 
 [database]
 url = "sqlite:data/db.sqlite"

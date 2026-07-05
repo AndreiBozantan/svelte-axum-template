@@ -121,6 +121,9 @@ pub struct ServerSettings {
 
     #[serde(default)]
     pub env_vars_prefix: String,
+
+    #[serde(default)]
+    pub trusted_proxy: bool,
 }
 
 impl Default for ServerSettings {
@@ -131,6 +134,7 @@ impl Default for ServerSettings {
             port: 3000,
             log_directives: "info,tower_http=info,axum=info".to_string(),
             env_vars_prefix: "APP".to_string(),
+            trusted_proxy: false,
         }
     }
 }
