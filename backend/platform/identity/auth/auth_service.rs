@@ -159,6 +159,10 @@ impl Service {
             .reset_failed_login_count(&self.context.db, record.user.tenant_id, record.user.id)
             .await?;
 
+        if record.user.status != users::UserStatus::Active {
+            return Err(Error::InvalidCredentials);
+        }
+
         if crypto::needs_rehash(password_hash)? {
             self.update_password_hash(record.user.tenant_id, record.user.id, &command.password)
                 .await;
@@ -177,6 +181,9 @@ impl Service {
             sso_id: command.sso_id,
         };
         let user = self.users.link_sso_user(&self.context.db, cmd).await?;
+        if user.status != users::UserStatus::Active {
+            return Err(Error::InvalidCredentials);
+        }
         self.users
             .reset_failed_login_count(&self.context.db, user.tenant_id, user.id)
             .await?;
@@ -253,6 +260,9 @@ impl Service {
             .users
             .find_by_id(&self.context.db, tenant_id, stored_token.user_id)
             .await?;
+        if user.status != users::UserStatus::Active {
+            return Err(Error::InvalidToken);
+        }
         let access_token = generate_access_token(&self.context, &user)?;
         let refresh_token = generate_refresh_token(&self.context, &user)?;
         let refresh_token_hash = crypto::get_hash_as_hex(&refresh_token.value);

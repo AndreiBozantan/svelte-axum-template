@@ -115,3 +115,45 @@ async fn oauth_user_password_login_failure() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn suspended_user_login_and_refresh_failure() -> TestResult {
+    let ctx = common::Context::create_test_context().await?;
+    let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, ctx.clone());
+
+    let email = common::Email::parse("suspended@example.com").ok_or_else(api::Error::invalid_credentials)?;
+    let user = auth_service
+        .register(
+            email.clone(),
+            "super_secure_pass_123".to_string(),
+            Some("Suspended".to_string()),
+            Some("User".to_string()),
+        )
+        .await?;
+
+    // Initial login should succeed when user is active
+    let login_cmd = auth::LoginCommand {
+        email: email.clone(),
+        password: "super_secure_pass_123".to_string(),
+    };
+    let auth_res = auth_service.login(login_cmd.clone()).await?;
+    assert_eq!(auth_res.user.id, user.id);
+
+    // Now suspend the user in the database
+    sqlx::query("UPDATE users SET status = 'suspended' WHERE id = ?")
+        .bind(user.id.0)
+        .execute(&ctx.db)
+        .await?;
+
+    // Subsequent login should fail
+    let login_err = auth_service.login(login_cmd).await;
+    assert!(login_err.is_err());
+    assert!(matches!(login_err, Err(auth::Error::InvalidCredentials)));
+
+    // Refresh should fail
+    let refresh_err = auth_service.refresh(&auth_res.refresh_token.value).await;
+    assert!(refresh_err.is_err());
+    assert!(matches!(refresh_err, Err(auth::Error::InvalidToken)));
+
+    Ok(())
+}
