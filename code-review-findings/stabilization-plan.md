@@ -129,16 +129,9 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
-### Stage A Pull Requests (Recommended Merge Order)
-The following PRs have been created and stacked to avoid merge conflicts. Please review and merge them in this exact order:
-1. **[PR #284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284)**: `feat(auth): enforce user status check on login and refresh`
-2. **[PR #285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285)**: `feat(security): implement configurable trusted proxy verification for rate limiting`
-3. **[PR #286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286)**: `feat(security): add security response headers middleware layer`
-4. **[PR #287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287)**: `feat(security): enforce global request body limit and body length constraints`
-5. **[PR #288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288)**: `feat(reliability): add global inbound request timeout and Google OAuth client timeout`
-6. **[PR #289](https://github.com/AndreiBozantan/svelte-axum-template/pull/289)**: `feat(ops): handle SIGTERM for graceful shutdown in container environments`
-7. **[PR #290](https://github.com/AndreiBozantan/svelte-axum-template/pull/290)**: `docs: start operations design document detailing TLS proxy and graceful shutdown`
-8. **[PR #291](https://github.com/AndreiBozantan/svelte-axum-template/pull/291)**: `feat(oauth): add prompt=select_account query parameter to Google authorize URL`
+The first eight items shipped as stacked PRs — branches, merge order, and review notes are
+tracked in [stabilization-plan-stage-a-prs.md](stabilization-plan-stage-a-prs.md); each item
+below also links its PR.
 
 Security fixes that don't touch the auth model:
 
