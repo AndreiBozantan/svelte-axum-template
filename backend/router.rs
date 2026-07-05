@@ -74,12 +74,11 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
             }),
         )
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
+        // the timeout layer sits inside the security-headers layer so that
+        // timeout responses also carry the security headers
+        .layer(axum::middleware::from_fn(timeout_middleware))
         .layer(axum::middleware::from_fn(security_headers_middleware))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
-        .layer(tower_http::timeout::TimeoutLayer::with_status_code(
-            axum::http::StatusCode::REQUEST_TIMEOUT,
-            std::time::Duration::from_secs(30),
-        ))
         .with_state(context)
 }
 
@@ -186,6 +185,17 @@ fn extract_user_agent(req: &Request<Body>) -> Option<String> {
         .get("user-agent")
         .and_then(|ua| ua.to_str().ok())
         .map(std::string::ToString::to_string)
+}
+
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+async fn timeout_middleware(
+    req: Request<Body>,
+    next: axum::middleware::Next,
+) -> Response {
+    tokio::time::timeout(REQUEST_TIMEOUT, next.run(req))
+        .await
+        .unwrap_or_else(|_| api::Error::request_timeout().into_response())
 }
 
 async fn security_headers_middleware(
