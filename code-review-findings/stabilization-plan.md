@@ -136,6 +136,9 @@ The following PRs have been created and stacked to avoid merge conflicts. Please
 3. **[PR #286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286)**: `feat(security): add security response headers middleware layer`
 4. **[PR #287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287)**: `feat(security): enforce global request body limit and body length constraints`
 5. **[PR #288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288)**: `feat(reliability): add global inbound request timeout and Google OAuth client timeout`
+6. **[PR #289](https://github.com/AndreiBozantan/svelte-axum-template/pull/289)**: `feat(ops): handle SIGTERM for graceful shutdown in container environments`
+7. **[PR #290](https://github.com/AndreiBozantan/svelte-axum-template/pull/290)**: `docs: start operations design document detailing TLS proxy and graceful shutdown`
+8. **[PR #291](https://github.com/AndreiBozantan/svelte-axum-template/pull/291)**: `feat(oauth): add prompt=select_account query parameter to Google authorize URL`
 
 Security fixes that don't touch the auth model:
 
@@ -151,12 +154,12 @@ Security fixes that don't touch the auth model:
 - [ ] Request timeout layer; timeout on the OAuth token exchange —
       [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)) **(PR: [#288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288))**
 - [ ] Graceful shutdown on SIGTERM (container rollouts) —
-      [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200))
+      [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200)) **(PR: [#289](https://github.com/AndreiBozantan/svelte-axum-template/pull/289))**
 - [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
       and the trusted-proxy header config (from the item above) —
-      [05 § 5.2](05-http-transport-security.md#52--https-enforcement--httphttps-redirect-is-undocumented-and-unimplemented-in-app); outline in [Design docs](#design-docs) ([#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201))
+      [05 § 5.2](05-http-transport-security.md#52--https-enforcement--httphttps-redirect-is-undocumented-and-unimplemented-in-app); outline in [Design docs](#design-docs) ([#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201)) **(PR: [#290](https://github.com/AndreiBozantan/svelte-axum-template/pull/290))**
 - [ ] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
-      the authorize URL — [01 § 1.10](01-authentication-session.md#110--google-oauth-flow-skips-the-consent--account-chooser-screen) ([#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202))
+      the authorize URL — [01 § 1.10](01-authentication-session.md#110--google-oauth-flow-skips-the-consent--account-chooser-screen) ([#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202)) **(PR: [#291](https://github.com/AndreiBozantan/svelte-axum-template/pull/291))**
 
 Configuration correctness:
 
