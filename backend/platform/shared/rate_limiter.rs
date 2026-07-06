@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use axum::http::Request;
 use axum::response::IntoResponse;
@@ -28,7 +27,6 @@ impl tower_governor::key_extractor::KeyExtractor for ClientIpExtractor {
 
 pub static GLOBAL_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>> = OnceLock::new();
 pub static LOGIN_LIMITER_CONFIG: OnceLock<Arc<GovernorConfig<ClientIpExtractor, NoOpMiddleware>>> = OnceLock::new();
-pub static TRUSTED_PROXY: AtomicBool = AtomicBool::new(false);
 
 pub fn add_global_rate_limiting<S>(
     router: utoipax::router::OpenApiRouter<S>,
@@ -84,20 +82,18 @@ pub fn custom_error_handler(_err: GovernorError) -> Response {
 
 #[must_use]
 pub fn extract_client_ip<B>(req: &Request<B>) -> String {
-    if TRUSTED_PROXY.load(Ordering::Relaxed) {
-        // check common proxy headers
-        if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
-            && let Ok(value) = forwarded_for.to_str()
-            && let Some(ip) = value.split(',').next()
-        {
-            return ip.trim().to_string();
-        }
+    // check common proxy headers
+    if let Some(forwarded_for) = req.headers().get("x-forwarded-for")
+        && let Ok(value) = forwarded_for.to_str()
+        && let Some(ip) = value.split(',').next()
+    {
+        return ip.trim().to_string();
+    }
 
-        if let Some(real_ip) = req.headers().get("x-real-ip")
-            && let Ok(value) = real_ip.to_str()
-        {
-            return value.to_string();
-        }
+    if let Some(real_ip) = req.headers().get("x-real-ip")
+        && let Ok(value) = real_ip.to_str()
+    {
+        return value.to_string();
     }
 
     // fallback to Axum's SocketAddr ConnectInfo

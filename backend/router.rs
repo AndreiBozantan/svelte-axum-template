@@ -27,11 +27,6 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
     use crate::platform::identity::tokens;
     use crate::platform::identity::users;
 
-    rate_limiter::TRUSTED_PROXY.store(
-        context.settings.server.trusted_proxy,
-        std::sync::atomic::Ordering::Relaxed,
-    );
-
     let auth_service = auth::Service::new(users::db::Repository, tokens::db::Repository, context.clone());
     let oauth_service = oauth::Service::new(context.clone(), auth_service.clone());
     let users_service = users::Service::new(users::db::Repository, context.clone());
