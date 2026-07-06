@@ -1,7 +1,8 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 use axum::http::Request;
 use axum::response::IntoResponse;
