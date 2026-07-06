@@ -166,3 +166,46 @@ async fn test_security_headers() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_request_validation() -> TestResult {
+    let server = create_test_server().await?;
+
+    // test password too short in registration (should be 400 Bad Request)
+    let response = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "valid@example.com",
+            "password": "short", // < 8 characters
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response.assert_status(StatusCode::BAD_REQUEST);
+    let body: Value = response.json();
+    assert_eq!(body["code"], "validation_failed");
+
+    // test password too long in registration (should be 400 Bad Request)
+    let response_long = server
+        .post("/api/auth/register")
+        .json(&json!({
+            "email": "valid@example.com",
+            "password": "a".repeat(73), // > 72 characters
+            "first_name": "Test",
+            "last_name": "User"
+        }))
+        .await;
+    response_long.assert_status(StatusCode::BAD_REQUEST);
+
+    // test password too long in login (should be 400 Bad Request)
+    let response_login = server
+        .post("/api/auth/login")
+        .json(&json!({
+            "email": "valid@example.com",
+            "password": "a".repeat(73), // > 72 characters
+        }))
+        .await;
+    response_login.assert_status(StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
