@@ -243,13 +243,6 @@ where
 /// deserialization/parsing errors and return them as a structured `api::Error`.
 pub struct Json<T>(pub T);
 
-impl<T> Json<T> {
-    #[allow(dead_code)]
-    pub fn data(self) -> T {
-        self.0
-    }
-}
-
 impl<T> From<T> for Json<T> {
     fn from(value: T) -> Self {
         Self(value)
