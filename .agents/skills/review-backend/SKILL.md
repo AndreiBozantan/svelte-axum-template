@@ -44,7 +44,7 @@ Early Returns: Use early returns and `?` propagation to avoid nested `if let` / 
 
 Type complexity: Avoid deeply nested generics or trait bounds unless justified. Prefer newtype wrappers over raw primitives for domain IDs.
 
-Nesting depth: Prefer early returns and ?-propagation over deeply nested if let / match chains. Logic buried 3+ levels in is hard to read and usually means errors aren't being surfaced properly.
+Nesting depth: Logic buried 3+ levels in is hard to read and usually means errors aren't being surfaced properly.
 
 ## 4. Style
 

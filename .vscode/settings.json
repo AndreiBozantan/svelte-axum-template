@@ -37,6 +37,7 @@
         "libsqlite",
         "lintmd",
         "mimalloc",
+        "newtype",
         "NOCASE",
         "noexec",
         "nologin",
