@@ -14,19 +14,35 @@ use crate::platform::rate_limiter::extract_client_ip;
 
 #[test]
 fn test_extract_client_ip() -> Result<(), axum::http::Error> {
-    // test X-Forwarded-For header
+    use std::sync::atomic::Ordering;
+
+    // By default, trusted_proxy is false
+    crate::platform::rate_limiter::TRUSTED_PROXY.store(false, Ordering::Relaxed);
+
+    // test headers ignored when trusted_proxy is false
     let req1 = Request::builder()
         .header("x-forwarded-for", "203.0.113.195, 70.41.3.18, 150.172.238.178")
         .body(())?;
-    assert_eq!(extract_client_ip(&req1), "203.0.113.195");
+    assert_eq!(extract_client_ip(&req1), "unknown");
 
-    // test X-Real-IP header
     let req2 = Request::builder().header("x-real-ip", "203.0.113.196").body(())?;
-    assert_eq!(extract_client_ip(&req2), "203.0.113.196");
+    assert_eq!(extract_client_ip(&req2), "unknown");
+
+    // Enable trusted proxy
+    crate::platform::rate_limiter::TRUSTED_PROXY.store(true, Ordering::Relaxed);
+
+    // test headers honored when trusted_proxy is true
+    let req3 = Request::builder()
+        .header("x-forwarded-for", "203.0.113.195, 70.41.3.18, 150.172.238.178")
+        .body(())?;
+    assert_eq!(extract_client_ip(&req3), "203.0.113.195");
+
+    let req4 = Request::builder().header("x-real-ip", "203.0.113.196").body(())?;
+    assert_eq!(extract_client_ip(&req4), "203.0.113.196");
 
     // test fallback
-    let req3 = Request::builder().body(())?;
-    assert_eq!(extract_client_ip(&req3), "unknown");
+    let req5 = Request::builder().body(())?;
+    assert_eq!(extract_client_ip(&req5), "unknown");
     Ok(())
 }
 
