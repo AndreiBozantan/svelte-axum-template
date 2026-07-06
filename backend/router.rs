@@ -74,6 +74,7 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
             }),
         )
         .layer(tower_http::catch_panic::CatchPanicLayer::custom(CustomPanicHandler))
+        .layer(axum::middleware::from_fn(security_headers_middleware))
         .with_state(context)
 }
 
@@ -180,4 +181,41 @@ fn extract_user_agent(req: &Request<Body>) -> Option<String> {
         .get("user-agent")
         .and_then(|ua| ua.to_str().ok())
         .map(std::string::ToString::to_string)
+}
+
+async fn security_headers_middleware(
+    req: Request<Body>,
+    next: axum::middleware::Next,
+) -> Response {
+    let mut res = next.run(req).await;
+    let headers = res.headers_mut();
+
+    headers.insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        axum::http::HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
+        axum::http::header::X_FRAME_OPTIONS,
+        axum::http::HeaderValue::from_static("DENY"),
+    );
+    headers.insert(
+        axum::http::header::REFERRER_POLICY,
+        axum::http::HeaderValue::from_static("strict-origin-when-cross-origin"),
+    );
+    headers.insert(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        axum::http::HeaderValue::from_static(
+            "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';",
+        ),
+    );
+    headers.insert(
+        axum::http::header::STRICT_TRANSPORT_SECURITY,
+        axum::http::HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    );
+    headers.insert(
+        axum::http::header::HeaderName::from_static("permissions-policy"),
+        axum::http::HeaderValue::from_static("geolocation=(), microphone=(), camera=()"),
+    );
+
+    res
 }
