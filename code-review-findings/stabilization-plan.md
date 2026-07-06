@@ -129,19 +129,27 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
+### Stage A Pull Requests (Recommended Merge Order)
+The following PRs have been created and stacked to avoid merge conflicts. Please review and merge them in this exact order:
+1. **[PR #284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284)**: `feat(auth): enforce user status check on login and refresh`
+2. **[PR #285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285)**: `feat(security): implement configurable trusted proxy verification for rate limiting`
+3. **[PR #286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286)**: `feat(security): add security response headers middleware layer`
+4. **[PR #287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287)**: `feat(security): enforce global request body limit and body length constraints`
+5. **[PR #288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288)**: `feat(reliability): add global inbound request timeout and Google OAuth client timeout`
+
 Security fixes that don't touch the auth model:
 
 - [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
-      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195))
+      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195)) **(PR: [#284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284))**
 - [ ] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
       config flag — [01 § 1.3](01-authentication-session.md#13--login-rate-limiter-is-keyed-only-by-client-ip-not-by-account),
-      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196))
+      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)) **(PR: [#285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285))**
 - [ ] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
-      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197))
+      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197)) **(PR: [#286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286))**
 - [ ] Request body limit + password/name max-length validation (hash-amplification DoS) —
-      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198))
+      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)) **(PR: [#287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287))**
 - [ ] Request timeout layer; timeout on the OAuth token exchange —
-      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199))
+      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)) **(PR: [#288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288))**
 - [ ] Graceful shutdown on SIGTERM (container rollouts) —
       [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200))
 - [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption

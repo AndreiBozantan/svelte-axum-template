@@ -110,6 +110,16 @@ impl Error {
     }
 
     #[must_use]
+    pub fn request_timeout() -> Self {
+        Self::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "request_timeout",
+            "The request took too long to process. Please try again later.",
+            None,
+        )
+    }
+
+    #[must_use]
     pub fn validation_failed(
         field: &str,
         message: &str,
