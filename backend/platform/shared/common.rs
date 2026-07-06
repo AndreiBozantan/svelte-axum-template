@@ -82,9 +82,7 @@ impl Context {
     ) -> Result<ArcContext, ContextCreationError> {
         let db = db::create_context(&settings.database).await?;
         let jwt = jwt::create_context(&settings.jwt, jwt_secret);
-        let http_client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
+        let http_client = create_http_client(&settings.http_client)?;
         let context = Self {
             db,
             jwt,
@@ -132,4 +130,16 @@ impl Context {
 
         Ok(context)
     }
+}
+
+fn create_http_client(settings: &config::HttpClientSettings) -> Result<reqwest::Client, reqwest::Error> {
+    let mut builder = reqwest::Client::builder().redirect(reqwest::redirect::Policy::none());
+    // a configured value of 0 means "no timeout"
+    if settings.timeout_seconds > 0 {
+        builder = builder.timeout(std::time::Duration::from_secs(settings.timeout_seconds));
+    }
+    if settings.connect_timeout_seconds > 0 {
+        builder = builder.connect_timeout(std::time::Duration::from_secs(settings.connect_timeout_seconds));
+    }
+    builder.build()
 }

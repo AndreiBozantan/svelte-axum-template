@@ -30,6 +30,11 @@ google_redirect_uri = "http://localhost:3000/api/oauth/google/callback"
 # Session timeout for OAuth flow (in minutes)
 session_timeout_minutes = 10
 
+# Outbound HTTP client (used for OAuth token exchange and provider userinfo calls)
+[http_client]
+timeout_seconds = 10         # total request budget: connect + TLS + response body; 0 = no timeout
+connect_timeout_seconds = 5  # fail fast when the remote is unreachable; 0 = no timeout
+
 # The rate limiter is backed by the GCRA (Generic Cell Rate Algorithm) token bucket.
 # - rate: The number of requests allowed over the configured period.
 # - period_in_seconds: The duration in seconds of the measurement period.
