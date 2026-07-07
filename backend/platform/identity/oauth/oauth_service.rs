@@ -168,12 +168,6 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
     Ok(())
 }
 
-pub fn check_oauth_config(config: &config::OAuthSettings) {
-    if let Err(error) = validate_google_config(config) {
-        warn!(error = error.to_string(), provider = "google", "incomplete_config");
-    }
-}
-
 fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;

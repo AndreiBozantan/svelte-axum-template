@@ -98,8 +98,6 @@ async fn start_server() -> Result<(), Error> {
         let service = router.into_make_service_with_connect_info::<SocketAddr>();
         let listener = tokio::net::TcpListener::bind(addr).await?;
 
-        crate::platform::identity::oauth::check_oauth_config(&ctx.settings.oauth);
-
         start_background_cleanup_tasks(&ctx);
 
         axum::serve(listener, service)

@@ -115,6 +115,7 @@ mod test {
 
         mod shared {
             mod auth_tests;
+            mod config_tests;
             mod crypto_tests;
             mod jwt_tests;
             mod rate_limiter_tests;
