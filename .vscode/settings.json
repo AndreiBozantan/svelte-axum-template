@@ -73,6 +73,7 @@
         "utoipax",
         "vitest",
         "xdbpr",
+        "xmenu",
         "xtask"
     ],
     "editor.formatOnSave": true,

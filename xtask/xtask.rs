@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io::{self, IsTerminal};
 use std::path::Path;
 use std::process::{Command, ExitStatus};
 
@@ -11,19 +12,20 @@ mod docs;
 mod info;
 mod make;
 mod run;
+mod xmenu;
 
-struct XtaskCommand {
-    name: &'static str,
-    description: &'static str,
-    run: fn(args: &[String]),
+pub(crate) struct XtaskCommand {
+    pub(crate) name: &'static str,
+    pub(crate) description: &'static str,
+    pub(crate) run: fn(args: &[String]),
 }
 
-struct SubcommandInfo {
-    name: &'static str,
-    subcommands: &'static [&'static str],
+pub(crate) struct SubcommandInfo {
+    pub(crate) name: &'static str,
+    pub(crate) subcommands: &'static [&'static str],
 }
 
-const SUBCOMMANDS: &[SubcommandInfo] = &[
+pub(crate) const SUBCOMMANDS: &[SubcommandInfo] = &[
     SubcommandInfo {
         name: "dev",
         subcommands: &["run", "stop", "info", "init", "create-admin"],
@@ -46,7 +48,7 @@ const SUBCOMMANDS: &[SubcommandInfo] = &[
     },
 ];
 
-const COMMANDS: &[XtaskCommand] = &[
+pub(crate) const COMMANDS: &[XtaskCommand] = &[
     XtaskCommand {
         name: "dev",
         description: "Local dev environment/servers control [run | stop | info | init | create-admin]",
@@ -97,7 +99,15 @@ const COMMANDS: &[XtaskCommand] = &[
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let task_name = args.get(1).map(String::as_str).unwrap_or("help");
+    let task_name = args.get(1).map(String::as_str);
+
+    if task_name.is_none() && io::stdin().is_terminal() && io::stdout().is_terminal() {
+        ensure_fish_completions();
+        xmenu::run_interactive_menu();
+        return;
+    }
+
+    let task_name = task_name.unwrap_or("help");
 
     if task_name == "help" || task_name == "--help" || task_name == "-h" {
         print_help();
