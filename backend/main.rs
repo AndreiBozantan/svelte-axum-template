@@ -38,10 +38,6 @@ mod platform {
             #[path = "auth_service.rs"]
             mod service;
 
-            #[cfg(test)]
-            #[path = "auth_tests.rs"]
-            mod tests;
-
             pub use service::*;
         }
 
@@ -108,14 +104,15 @@ mod test {
 
     mod platform {
         mod identity {
-            mod auth_tests;
-            mod users_tests;
+            mod auth_api_tests;
+            mod auth_service_tests;
+            mod users_api_tests;
             mod validate_redirect_path_tests;
         }
 
         mod shared {
-            mod auth_tests;
             mod config_tests;
+            mod cookie_tests;
             mod crypto_tests;
             mod jwt_tests;
             mod rate_limiter_tests;
