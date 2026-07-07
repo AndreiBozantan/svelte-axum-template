@@ -28,6 +28,8 @@ This means: whenever frontend changes should be reflected in the backend server 
 
 `cargo xtask make clean` removes all build artifacts including `node_modules`; run `cargo xtask dev init` again afterwards.
 
+`cargo xtask make format` auto-formats both the backend Rust files (using `cargo fmt --all`) and the frontend files (using Prettier).
+
 # Backend
 
 - Located in `./backend`, organized using DDD-style bounded contexts (see `AGENTS.md` for the layout).

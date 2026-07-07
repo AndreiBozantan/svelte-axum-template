@@ -31,7 +31,7 @@ pub(crate) const SUBCOMMANDS: &[SubcommandInfo] = &[
     },
     SubcommandInfo {
         name: "make",
-        subcommands: &["all", "backend", "frontend", "release", "clean", "openapi"],
+        subcommands: &["all", "backend", "frontend", "release", "clean", "openapi", "format"],
     },
     SubcommandInfo {
         name: "check",
@@ -55,7 +55,7 @@ pub(crate) const COMMANDS: &[XtaskCommand] = &[
     },
     XtaskCommand {
         name: "make",
-        description: "Builds backend and frontend targets [all | backend | frontend | release | clean | openapi]",
+        description: "Builds/formats backend and frontend targets [all | backend | frontend | release | clean | openapi | format]",
         run: make::run,
     },
     XtaskCommand {

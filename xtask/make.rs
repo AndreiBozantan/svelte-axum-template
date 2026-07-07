@@ -113,6 +113,20 @@ pub fn release() {
     println!("Release build completed successfully!");
 }
 
+pub fn format() {
+    println!("Formatting Rust codebase (cargo fmt)...");
+    let status = run_command("cargo", &["fmt", "--all"], None);
+    if status.is_err() || !status.unwrap().success() {
+        eprintln!("Rust formatting failed.");
+    }
+
+    println!("Formatting frontend codebase (Prettier)...");
+    let status = run_command("npm", &["run", "format"], Some("frontend"));
+    if status.is_err() || !status.unwrap().success() {
+        eprintln!("Frontend formatting failed.");
+    }
+}
+
 pub fn run(args: &[String]) {
     let subcommand = args.get(2).map(String::as_str).unwrap_or("all");
     match subcommand {
@@ -145,6 +159,9 @@ pub fn run(args: &[String]) {
         "openapi" => {
             openapi();
         },
+        "format" => {
+            format();
+        },
         "all" => {
             println!("Building frontend and backend in debug mode...");
             println!("Building frontend...");
@@ -172,6 +189,7 @@ pub fn run(args: &[String]) {
             println!("  cargo xtask make release  - Builds frontend and backend in release mode");
             println!("  cargo xtask make clean    - Deletes build files, target, .sqlx, and node_modules");
             println!("  cargo xtask make openapi  - Generates OpenAPI spec and frontend client");
+            println!("  cargo xtask make format   - Auto-formats backend (cargo fmt) and frontend (prettier)");
             println!("\nError: Please specify a valid make action.");
             std::process::exit(1);
         },

@@ -79,7 +79,7 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 # GIT HOOKS
 
 - configured in `.githooks/` and installed via `cargo xtask setup-hooks`, also executed with `cargo xtask dev init`
-- `pre-commit`: backend: formatting, clippy, sqlx; frontend: svelte-check, prettier
+- `pre-commit`: backend: formatting, clippy, sqlx; frontend: svelte-check, prettier. Run `cargo xtask make format` to automatically format all files.
 - `pre-push`: backend (`cargo test`) and/or frontend (`vitest`) tests based on what directories have changed
 
 # CUSTOM AGENT SKILLS
