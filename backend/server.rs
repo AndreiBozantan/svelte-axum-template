@@ -119,33 +119,79 @@ fn get_log_directives(settings: &config::AppSettings) -> String {
 }
 
 fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
-    // expired refresh tokens cleanup task
     let db = ctx.db.clone();
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
+    tokio::spawn(async move {
         loop {
-            ticker.tick().await;
-            perform_refresh_tokens_cleanup(&db).await;
+            let db_clone = db.clone();
+
+            let handle = tokio::spawn(run_refresh_tokens_loop(db_clone));
+
+            match handle.await {
+                Ok(_) => {
+                    error!("Task-ul de curățare token-uri a ieșit neașteptat din buclă. Se încearcă repornirea...");
+                },
+                Err(join_err) => {
+                    if join_err.is_panic() {
+                        error!(
+                            "CRITICAL: Task-ul de curățare token-uri a suferit un PANIC! Se încearcă recuperarea și repornirea..."
+                        );
+                    } else {
+                        error!(error = %join_err, "Task-ul de curățare token-uri a fost anulat/oprit forțat. Se încearcă repornirea...");
+                    }
+                },
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
     });
 
-    // expired rate limiter keys cleanup task
     tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
         loop {
-            ticker.tick().await;
-            if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
-                config.limiter().retain_recent();
+            let handle = tokio::spawn(run_rate_limiter_loop());
+
+            match handle.await {
+                Ok(_) => {
+                    error!("Task-ul de rate limiter a ieșit neașteptat din buclă. Se încearcă repornirea...");
+                },
+                Err(join_err) => {
+                    if join_err.is_panic() {
+                        error!(
+                            "CRITICAL: Task-ul de rate limiter a suferit un PANIC! Se încearcă recuperarea și repornirea..."
+                        );
+                    } else {
+                        error!(error = %join_err, "Task-ul de rate limiter a fost anulat/oprit forțat. Se încearcă repornirea...");
+                    }
+                },
             }
-            if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
-                config.limiter().retain_recent();
-            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
     });
+}
+async fn run_refresh_tokens_loop(db: crate::platform::db::Context) {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        perform_refresh_tokens_cleanup(&db).await;
+    }
+}
+
+async fn run_rate_limiter_loop() {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+        if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+    }
 }
 
 async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
