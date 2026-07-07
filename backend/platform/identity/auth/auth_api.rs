@@ -36,13 +36,23 @@ pub fn router(service: auth::Service) -> utoipax::router::OpenApiRouter<common::
 
 #[derive(Deserialize, validator::Validate, utoipa::ToSchema)]
 pub struct RegisterRequest {
-    #[validate(email(message = "invalid email address"))]
-    #[schema(example = "alice@example.com", format = "email")]
+    #[validate(
+        email(message = "invalid email address"),
+        length(max = 254, message = "email address must be 254 characters or less")
+    )]
+    #[schema(example = "alice@example.com", format = "email", max_length = 254)]
     pub email: String,
-    #[validate(length(min = 8, message = "password must be at least 8 characters"))]
-    #[schema(min_length = 8)]
+
+    #[validate(length(min = 8, max = 72, message = "password must be between 8 and 72 characters"))]
+    #[schema(min_length = 8, max_length = 72)]
     pub password: String,
+
+    #[validate(length(max = 100, message = "first name must be 100 characters or less"))]
+    #[schema(max_length = 100)]
     pub first_name: Option<String>,
+
+    #[validate(length(max = 100, message = "last name must be 100 characters or less"))]
+    #[schema(max_length = 100)]
     pub last_name: Option<String>,
 }
 
@@ -51,10 +61,17 @@ pub struct RegisterResponse {
     pub user: users::api::UserInfo,
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Deserialize, validator::Validate, utoipa::ToSchema)]
 pub struct LoginRequest {
-    #[schema(example = "alice@example.com", format = "email")]
+    #[validate(
+        email(message = "invalid email address"),
+        length(max = 254, message = "email address must be 254 characters or less")
+    )]
+    #[schema(example = "alice@example.com", format = "email", max_length = 254)]
     pub email: String,
+
+    #[validate(length(min = 8, max = 72, message = "password must be between 8 and 72 characters"))]
+    #[schema(min_length = 8, max_length = 72)]
     pub password: String,
 }
 
@@ -100,12 +117,13 @@ async fn register(
     request_body = LoginRequest,
     responses(
         (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 400, description = "Validation failed", body = api::Error),
         (status = 401, description = "Invalid credentials", body = api::Error)
     )
 )]
 async fn login(
     State(service): State<auth::Service>,
-    request: api::Json<LoginRequest>,
+    request: api::ValidatedJson<LoginRequest>,
 ) -> Result<impl IntoResponse, api::Error> {
     let request = request.data();
     let email_hash = crypto::get_hash_as_hex(&request.email);
@@ -138,7 +156,9 @@ async fn login(
     post,
     path = "/auth/logout",
     responses(
-        (status = 204, description = "Logout successful")
+        (status = 204, description = "Logout successful"),
+        (status = 401, description = "Unauthorized", body = api::Error),
+        (status = 500, description = "Internal Server Error", body = api::Error)
     )
 )]
 async fn logout(
@@ -151,12 +171,8 @@ async fn logout(
     let response = axum::http::Response::builder()
         .status(http::StatusCode::NO_CONTENT)
         .body(axum::body::Body::empty())?;
-    Ok(cookies::add_auth_cookies(
-        &service.context.settings.jwt,
-        response,
-        None,
-        None,
-    )?)
+    let response = cookies::add_auth_cookies(&service.context.settings.jwt, response, None, None)?;
+    Ok(response)
 }
 
 #[utoipa::path(

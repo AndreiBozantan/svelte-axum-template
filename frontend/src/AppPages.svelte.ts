@@ -1,5 +1,5 @@
 import About from './pages/About.svelte';
-import Welcome from './pages/Welcome.svelte';
+import Home from './pages/Home.svelte';
 import LogIn from './pages/Login.svelte';
 import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
@@ -29,9 +29,9 @@ export type PageDefinition = {
 
 export const Pages: PageDefinition[] = [
     {
-        id: 'welcome',
+        id: '',
         label: 'home',
-        component: Welcome,
+        component: Home,
         public: false,
         icon: faHome,
         navPosition: 'top',

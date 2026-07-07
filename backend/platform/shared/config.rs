@@ -24,7 +24,30 @@ pub struct AppSettings {
     pub oauth: OAuthSettings,
 
     #[serde(default)]
+    pub http_client: HttpClientSettings,
+
+    #[serde(default)]
     pub rate_limiter: AppRateLimiterSettings,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HttpClientSettings {
+    /// Total request timeout in seconds (connect + TLS + response body).
+    #[serde(default)]
+    pub timeout_seconds: u64,
+
+    /// Connection establishment timeout in seconds.
+    #[serde(default)]
+    pub connect_timeout_seconds: u64,
+}
+
+impl Default for HttpClientSettings {
+    fn default() -> Self {
+        Self {
+            timeout_seconds: 10,
+            connect_timeout_seconds: 5,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -121,6 +144,9 @@ pub struct ServerSettings {
 
     #[serde(default)]
     pub env_vars_prefix: String,
+
+    #[serde(default)]
+    pub trusted_proxy: bool,
 }
 
 impl Default for ServerSettings {
@@ -131,6 +157,7 @@ impl Default for ServerSettings {
             port: 3000,
             log_directives: "info,tower_http=info,axum=info".to_string(),
             env_vars_prefix: "APP".to_string(),
+            trusted_proxy: false,
         }
     }
 }

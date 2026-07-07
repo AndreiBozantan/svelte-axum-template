@@ -13,7 +13,7 @@
     let logoutButton = $state<HTMLElement | null>(null);
 
     function getPagePath(id: string) {
-        return id === 'welcome' ? '/' : `/${id}`;
+        return `/${id}`;
     }
 
     function topItems(): PageDefinition[] {
@@ -38,7 +38,6 @@
         setTimeout(() => {
             isConfirmAnimating = false;
             showLogoutConfirm = false;
-            history.pushState(null, '', '/logout');
             AppState.setActivePage('logout');
         }, 150);
     }
@@ -51,7 +50,6 @@
                 isConfirmAnimating = false;
             }, 150);
         } else {
-            history.pushState(null, '', '/logout');
             AppState.setActivePage('logout');
         }
     }
@@ -188,7 +186,13 @@
 </aside>
 
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+    @font-face {
+        font-family: 'Dancing Script';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/DancingScript-Bold.ttf') format('truetype');
+    }
 
     /* Global utility for the hidden attribute */
     [hidden] {

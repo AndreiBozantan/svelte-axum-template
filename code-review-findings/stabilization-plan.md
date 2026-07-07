@@ -129,25 +129,27 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
-Shipped frontend bugs:
-
-- [ ] Failed login leaves Sign In permanently disabled — [09 § 9.1](09-frontend-code-quality.md#91--login-error-leaves-the-submit-button-permanently-disabled) ([#192](https://github.com/AndreiBozantan/svelte-axum-template/issues/192))
-- [ ] `Logout.svelte` renders `[object Object]`; logout result ignored — [09 § 9.2](09-frontend-code-quality.md#92--logoutsvelte-renders-the-whole-user-object-instead-of-the-email) ([#193](https://github.com/AndreiBozantan/svelte-axum-template/issues/193))
-- [ ] Silent bootstrap failure leaves a blank page — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#194](https://github.com/AndreiBozantan/svelte-axum-template/issues/194))
+### Stage A Pull Requests (Recommended Merge Order)
+The following PRs have been created and stacked to avoid merge conflicts. Please review and merge them in this exact order:
+1. **[PR #284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284)**: `feat(auth): enforce user status check on login and refresh`
+2. **[PR #285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285)**: `feat(security): implement configurable trusted proxy verification for rate limiting`
+3. **[PR #286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286)**: `feat(security): add security response headers middleware layer`
+4. **[PR #287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287)**: `feat(security): enforce global request body limit and body length constraints`
+5. **[PR #288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288)**: `feat(reliability): add global inbound request timeout and Google OAuth client timeout`
 
 Security fixes that don't touch the auth model:
 
 - [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
-      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195))
+      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195)) **(PR: [#284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284))**
 - [ ] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
       config flag — [01 § 1.3](01-authentication-session.md#13--login-rate-limiter-is-keyed-only-by-client-ip-not-by-account),
-      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196))
+      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)) **(PR: [#285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285))**
 - [ ] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
-      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197))
+      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197)) **(PR: [#286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286))**
 - [ ] Request body limit + password/name max-length validation (hash-amplification DoS) —
-      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198))
+      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)) **(PR: [#287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287))**
 - [ ] Request timeout layer; timeout on the OAuth token exchange —
-      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199))
+      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)) **(PR: [#288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288))**
 - [ ] Graceful shutdown on SIGTERM (container rollouts) —
       [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200))
 - [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
@@ -371,8 +373,6 @@ Developer experience:
 
 Frontend hygiene (batch into one issue):
 
-- [ ] Dead `/user_info.js` proxy; runtime Google Fonts import / unloaded Inter; hardcoded
-      `v1.0.0-beta`; global `isLoading` misuse in SecureApi — [09 § 9.10](09-frontend-code-quality.md#910--small-issues-dead-proxy-entry-unloaded-font-hardcoded-version-global-loading-flag-silent-bootstrap-failure) ([#266](https://github.com/AndreiBozantan/svelte-axum-template/issues/266))
 - [ ] `console.*` calls in production code — [21 § 21.1](21-general-hygiene.md#211--consolelogconsoleerror-left-in-frontend-production-code) ([#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267))
 - [ ] Commented-out code, dead `AppState.userId`, package name drift —
       [21 § 21.2/21.3/21.5](21-general-hygiene.md#212--commented-out-code-blocks) ([#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268))

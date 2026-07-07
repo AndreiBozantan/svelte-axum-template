@@ -14,8 +14,15 @@ class AppStateDef {
     }
 
     activePage = $state<string>('about'); // Default to 'about'
-    setActivePage(id: string) {
+    setActivePage(route: string, updateHistory = true) {
+        const id = route.startsWith('/') ? route.slice(1) : route;
         this.activePage = id;
+        if (updateHistory) {
+            const path = `/${id}`;
+            if (window.location.pathname !== path) {
+                history.pushState(null, '', path);
+            }
+        }
     }
 
     intendedPage = $state<string | null>(null);

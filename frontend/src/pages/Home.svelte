@@ -6,7 +6,7 @@
     <div class="content-container">
         <!-- Page Header Group -->
         <div class="page-header-block">
-            <h1 class="page-main-header">welcome</h1>
+            <h1 class="page-main-header">home</h1>
             <p class="header-desc">
                 You are successfully logged in as <strong>{AppState.user?.email}</strong>.
             </p>

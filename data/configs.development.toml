@@ -4,6 +4,7 @@ host = "127.0.0.1"
 port = 3000
 log_directives = "debug,tower_http=debug,axum=debug"
 env_vars_prefix = "APP" # customizable prefix used for the environment variables that override the values provided in the config file
+trusted_proxy = false
 
 [database]
 url = "sqlite:data/db.sqlite"
@@ -25,3 +26,8 @@ refresh_token_expiry_days = 32
 google_client_id = ""      # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_client_secret = ""  # ⚠️ LEAVE EMPTY - set in configs.local.toml or via environment variable
 google_redirect_uri = "http://localhost:3000/api/oauth/google/callback"
+
+# Outbound HTTP client (used for OAuth token exchange and provider userinfo calls)
+[http_client]
+timeout_seconds = 10         # total request budget: connect + TLS + response body; 0 = no timeout
+connect_timeout_seconds = 5  # fail fast when the remote is unreachable; 0 = no timeout

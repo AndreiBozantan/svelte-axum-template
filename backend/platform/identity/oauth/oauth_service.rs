@@ -217,13 +217,14 @@ impl Service {
 
         let client = create_google_client(&self.context.settings.oauth)?;
         let (pkce_challenge, pkce_verifier) = oauth2::PkceCodeChallenge::new_random_sha256();
-        let (auth_url, csrf_token) = client
+        let (mut auth_url, csrf_token) = client
             .authorize_url(oauth2::CsrfToken::new_random)
             .set_pkce_challenge(pkce_challenge)
             .add_scope(oauth2::Scope::new("openid".to_string()))
             .add_scope(oauth2::Scope::new("email".to_string()))
             .add_scope(oauth2::Scope::new("profile".to_string()))
             .url();
+        auth_url.query_pairs_mut().append_pair("prompt", "select_account");
 
         let now = Utc::now().timestamp();
         let timeout_minutes = i64::from(self.context.settings.oauth.session_timeout_minutes);
@@ -265,7 +266,19 @@ impl Service {
         }
 
         let client = create_google_client(&self.context.settings.oauth)?;
-        let oauth_client = oauth2::reqwest::ClientBuilder::new().build()?;
+        let http_client_settings = &self.context.settings.http_client;
+        let mut oauth_client_builder = oauth2::reqwest::ClientBuilder::new();
+        // a configured value of 0 means "no timeout"
+        if http_client_settings.timeout_seconds > 0 {
+            oauth_client_builder =
+                oauth_client_builder.timeout(std::time::Duration::from_secs(http_client_settings.timeout_seconds));
+        }
+        if http_client_settings.connect_timeout_seconds > 0 {
+            oauth_client_builder = oauth_client_builder.connect_timeout(std::time::Duration::from_secs(
+                http_client_settings.connect_timeout_seconds,
+            ));
+        }
+        let oauth_client = oauth_client_builder.build()?;
 
         let pkce_verifier = oauth2::PkceCodeVerifier::new(token_data.claims.pkce_verifier);
 
@@ -281,7 +294,6 @@ impl Service {
             .http_client
             .get("https://www.googleapis.com/oauth2/v2/userinfo")
             .bearer_auth(access_token)
-            .timeout(std::time::Duration::from_secs(10))
             .send()
             .await?
             .error_for_status()?;

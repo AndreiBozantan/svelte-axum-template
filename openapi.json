@@ -55,6 +55,16 @@
               }
             }
           },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Invalid credentials",
             "content": {
@@ -74,6 +84,26 @@
         "responses": {
           "204": {
             "description": "Logout successful"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -206,6 +236,26 @@
         "responses": {
           "303": {
             "description": "Redirect to Google authorization page"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -236,6 +286,36 @@
         "responses": {
           "303": {
             "description": "Redirect to client final landing URL"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -420,10 +500,13 @@
           "email": {
             "type": "string",
             "format": "email",
-            "example": "alice@example.com"
+            "example": "alice@example.com",
+            "maxLength": 254
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 72,
+            "minLength": 8
           }
         }
       },
@@ -471,22 +554,26 @@
           "email": {
             "type": "string",
             "format": "email",
-            "example": "alice@example.com"
+            "example": "alice@example.com",
+            "maxLength": 254
           },
           "first_name": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 100
           },
           "last_name": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 100
           },
           "password": {
             "type": "string",
+            "maxLength": 72,
             "minLength": 8
           }
         }
