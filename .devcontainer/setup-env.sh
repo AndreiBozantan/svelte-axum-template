@@ -42,6 +42,7 @@ abbr -a cf "cargo -q fmt --workspace"
 
 # Cargo Xtask shortcuts
 abbr -a x "cargo -q xtask"
+abbr -a xh "cargo -q xtask help"
 abbr -a xd "cargo -q xtask dev"
 abbr -a xm "cargo -q xtask make"
 abbr -a xma "cargo -q xtask make openapi"

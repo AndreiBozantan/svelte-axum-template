@@ -5,12 +5,7 @@ use crate::{COMMANDS, SUBCOMMANDS, SubcommandInfo, XtaskCommand};
 
 pub(crate) fn run_interactive_menu() {
     let mut main_selected = 0;
-    let visible_commands: Vec<&XtaskCommand> = COMMANDS
-        .iter()
-        .filter(|c| {
-            c.name != "pre-commit" && c.name != "pre-push" && c.name != "setup-hooks" && c.name != "completions"
-        })
-        .collect();
+    let visible_commands: Vec<&XtaskCommand> = COMMANDS.iter().collect();
 
     let mut guard = RawModeGuard::enable();
 

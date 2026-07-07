@@ -401,6 +401,12 @@ pub fn run(args: &[String]) {
         "sqlx" => {
             sqlx::check_sqlx_queries().expect("failed to check sqlx queries");
         },
+        "commit" => {
+            pre_commit().expect("failed to run pre-commit checks");
+        },
+        "push" => {
+            pre_push().expect("failed to run pre-push checks");
+        },
         "all" => {
             println!("Running all verification checks...");
             backend().expect("failed to run backend checks");
@@ -418,6 +424,8 @@ pub fn run(args: &[String]) {
             println!("  cargo xtask check security - Runs semgrep security scan");
             println!("  cargo xtask check docs     - Validates markdown relative links and heading anchors");
             println!("  cargo xtask check sqlx     - Checks if SQLx offline metadata is up to date (alias)");
+            println!("  cargo xtask check commit   - Runs pre-commit formatting and OpenAPI drift checks");
+            println!("  cargo xtask check push     - Runs intelligent pre-push checks (lints, tests, and drift)");
             println!("\nError: Please specify a valid check target.");
             std::process::exit(1);
         },
