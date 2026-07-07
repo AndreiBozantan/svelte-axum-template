@@ -128,7 +128,7 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
             let handle = tokio::spawn(run_refresh_tokens_loop(db_clone));
 
             match handle.await {
-                Ok(_) => {
+                Ok(()) => {
                     error!("Task-ul de curățare token-uri a ieșit neașteptat din buclă. Se încearcă repornirea...");
                 },
                 Err(join_err) => {
@@ -151,7 +151,7 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
             let handle = tokio::spawn(run_rate_limiter_loop());
 
             match handle.await {
-                Ok(_) => {
+                Ok(()) => {
                     error!("Task-ul de rate limiter a ieșit neașteptat din buclă. Se încearcă repornirea...");
                 },
                 Err(join_err) => {
