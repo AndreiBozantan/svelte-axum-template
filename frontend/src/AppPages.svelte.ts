@@ -5,6 +5,7 @@ import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import { AppState } from '$lib/AppState.svelte';
+import { wrap } from 'svelte-spa-router/wrap';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
     faSignOutAlt,
@@ -83,3 +84,32 @@ export const Pages: PageDefinition[] = [
         visible: () => AppState.isLoggedIn,
     },
 ];
+
+export const routes: Record<string, any> = {
+    '/': wrap({
+        component: Home,
+        conditions: [() => AppState.isLoggedIn],
+    }),
+    '/secure': wrap({
+        component: SecureApi,
+        conditions: [() => AppState.isLoggedIn],
+    }),
+    '/about': About,
+    '/settings': wrap({
+        component: Settings,
+        conditions: [() => AppState.isLoggedIn],
+    }),
+    '/login': wrap({
+        component: LogIn,
+        conditions: [() => !AppState.isLoggedIn],
+    }),
+    '/logout': wrap({
+        component: LogOut,
+        conditions: [() => AppState.isLoggedIn],
+    }),
+    // Ruta de fallback (404 / catch-all), trimitem la Home dacă e logat, sau la About dacă e public
+    '*': wrap({
+        component: Home,
+        conditions: [() => AppState.isLoggedIn],
+    }),
+};
