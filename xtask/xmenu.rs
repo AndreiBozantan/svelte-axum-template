@@ -99,14 +99,13 @@ fn assign_shortcuts(options: &[String]) -> Vec<char> {
     // The first option is always '[ Back ]', which gets '\x1b' (Escape)
     shortcuts.push('\x1b');
 
-    for opt in options.iter().skip(1) {
-        // clean up option name for finding characters
-        // e.g. "dev (default)" -> check "dev"
-        let clean_name = if let Some(idx) = opt.find(" (default)") {
-            &opt[..idx]
-        } else {
-            opt.as_str()
-        };
+    // The default option does not get a shortcut, push a space placeholder
+    if options.len() > 1 {
+        shortcuts.push(' ');
+    }
+
+    for opt in options.iter().skip(2) {
+        let clean_name = opt.as_str();
 
         let mut found = false;
         for c in clean_name.chars() {
@@ -145,7 +144,7 @@ fn run_sub_menu(
     sub_info: &SubcommandInfo,
     guard: RawModeGuard,
 ) -> Result<RawModeGuard, ()> {
-    let mut selected = 0;
+    let mut selected = 1; // Default item is pre-selected by default
 
     let mut options = vec!["[ Back ]".to_string(), format!("{} (default)", cmd.name)];
     for sub in sub_info.subcommands {
@@ -318,7 +317,7 @@ fn parse_key_from_bytes(bytes: &[u8]) -> Key {
         },
         b => {
             let c = b as char;
-            if c.is_ascii_alphabetic() {
+            if c.is_ascii_alphabetic() || c == ' ' {
                 Key::Char(c.to_ascii_lowercase())
             } else {
                 Key::Unknown
@@ -338,6 +337,7 @@ mod tests {
         assert_eq!(parse_key_from_bytes(&[27, 91, 65]), Key::Up);
         assert_eq!(parse_key_from_bytes(&[27, 91, 66]), Key::Down);
         assert_eq!(parse_key_from_bytes(b"q"), Key::Char('q'));
+        assert_eq!(parse_key_from_bytes(b" "), Key::Char(' '));
         assert_eq!(parse_key_from_bytes(&[27]), Key::Escape);
     }
 
@@ -353,6 +353,6 @@ mod tests {
             "admin".to_string(),
         ];
         let shortcuts = assign_shortcuts(&options);
-        assert_eq!(shortcuts, vec!['\x1b', 'd', 'r', 'o', 's', 'i', 'a']);
+        assert_eq!(shortcuts, vec!['\x1b', ' ', 'r', 'd', 's', 'i', 'a']);
     }
 }
