@@ -133,27 +133,6 @@ The first eight items shipped as stacked PRs — branches, merge order, and revi
 tracked in [stabilization-plan-stage-a-prs.md](stabilization-plan-stage-a-prs.md); each item
 below also links its PR.
 
-Security fixes that don't touch the auth model:
-
-- [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
-      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195)) **(PR: [#284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284))**
-- [ ] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
-      config flag — [01 § 1.3](01-authentication-session.md#13--login-rate-limiter-is-keyed-only-by-client-ip-not-by-account),
-      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)) **(PR: [#285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285))**
-- [ ] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
-      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197)) **(PR: [#286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286))**
-- [ ] Request body limit + password/name max-length validation (hash-amplification DoS) —
-      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)) **(PR: [#287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287))**
-- [ ] Request timeout layer; timeout on the OAuth token exchange —
-      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)) **(PR: [#288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288))**
-- [ ] Graceful shutdown on SIGTERM (container rollouts) —
-      [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200)) **(PR: [#289](https://github.com/AndreiBozantan/svelte-axum-template/pull/289))**
-- [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
-      and the trusted-proxy header config (from the item above) —
-      [05 § 5.2](05-http-transport-security.md#52--https-enforcement--httphttps-redirect-is-undocumented-and-unimplemented-in-app); outline in [Design docs](#design-docs) ([#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201)) **(PR: [#290](https://github.com/AndreiBozantan/svelte-axum-template/pull/290))**
-- [ ] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
-      the authorize URL — [01 § 1.10](01-authentication-session.md#110--google-oauth-flow-skips-the-consent--account-chooser-screen) ([#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202)) **(PR: [#291](https://github.com/AndreiBozantan/svelte-axum-template/pull/291))**
-
 Configuration correctness:
 
 - [ ] Environment selection: `env` only from the process environment; remove it from all TOML
