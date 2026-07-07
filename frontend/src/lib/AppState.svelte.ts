@@ -1,5 +1,6 @@
 import type { UserInfo } from './generated/api';
 import { AuthRefreshManager } from './auth-refresh-manager';
+import { router, push } from 'svelte-spa-router';
 
 class AppStateDef {
     // counter which lets overlapping loads stack instead
@@ -13,16 +14,11 @@ class AppStateDef {
         this.#loadingCount = Math.max(0, this.#loadingCount - 1);
     }
 
-    activePage = $state<string>('about'); // Default to 'about'
-    setActivePage(route: string, updateHistory = true) {
+    // derived from the router's hash location so it always reflects the current route
+    activePage = $derived(router.location === '/' ? '' : router.location.slice(1));
+    setActivePage(route: string) {
         const id = route.startsWith('/') ? route.slice(1) : route;
-        this.activePage = id;
-        if (updateHistory) {
-            const path = `/${id}`;
-            if (window.location.pathname !== path) {
-                history.pushState(null, '', path);
-            }
-        }
+        push(`/${id}`);
     }
 
     intendedPage = $state<string | null>(null);

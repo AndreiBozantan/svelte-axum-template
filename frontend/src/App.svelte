@@ -1,61 +1,41 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import Router, { push } from 'svelte-spa-router';
+    import type { RouteDetail } from 'svelte-spa-router';
     import { AppState } from '$lib/AppState.svelte';
-    import { Pages } from './AppPages.svelte';
+    import { routes } from './AppPages.svelte';
     import AppSidebar from './AppSidebar.svelte';
 
-    const pageMap = Object.fromEntries(Pages.map((item) => [item.id, item]));
-    const getActivePage = () => pageMap[AppState.activePage];
-
-    onMount(async () => {
-        // await new Promise((resolve) => setTimeout(resolve, 900));
-
+    onMount(() => {
         AppState.stopLoading();
-
-        // set initial page from URL
-        AppState.setActivePage(window.location.pathname, false);
-
-        // listen to browser back/forward
-        window.addEventListener('popstate', () => {
-            AppState.setActivePage(window.location.pathname, false);
-        });
     });
 
-    // auto-redirect logic
-    $effect(() => {
-        const active = getActivePage();
-
-        // if logged out and on a protected page, redirect to login
-        if (active && !active.public && !AppState.isLoggedIn) {
-            const isAuthPage = ['logout', 'login'].includes(AppState.activePage);
-            if (!isAuthPage) {
-                AppState.setIntendedPage(AppState.activePage); // only store real destinations
-            }
-            AppState.setActivePage('login');
+    function handleConditionsFailed(detail: RouteDetail) {
+        if (AppState.isLoggedIn) {
+            // logged-in user hit an anonymous-only route (e.g. /login) -> send them home
+            push('/');
+        } else {
+            // anonymous user hit a protected route -> remember it and bounce to login
+            AppState.setIntendedPage(detail.location);
+            push('/login');
         }
+    }
 
-        // if just logged in and on Login page, go to Home
+    // once login completes while sitting on the Login page, go to the originally intended page
+    $effect(() => {
         if (AppState.isLoggedIn && AppState.activePage === 'login') {
             const target = AppState.intendedPage || '';
-            AppState.setActivePage(target);
             AppState.setIntendedPage(null);
+            AppState.setActivePage(target);
         }
     });
-
-    const CurrentPage = $derived(getActivePage());
 </script>
 
 <div class="app-layout">
     <AppSidebar />
 
     <main class="content">
-        {#if CurrentPage}
-            <CurrentPage.component />
-        {:else}
-            <div class="page">
-                <h2>Page Not Found (ID: {AppState.activePage})</h2>
-            </div>
-        {/if}
+        <Router {routes} onConditionsFailed={handleConditionsFailed} />
     </main>
 </div>
 
