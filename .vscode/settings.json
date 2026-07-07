@@ -24,8 +24,6 @@
         "chrono",
         "clippy",
         "codegen",
-        "cxapi",
-        "cxdbpr",
         "distroless",
         "dotenvy",
         "eprintln",
@@ -74,6 +72,7 @@
         "utoipa",
         "utoipax",
         "vitest",
+        "xdbpr",
         "xtask"
     ],
     "editor.formatOnSave": true,

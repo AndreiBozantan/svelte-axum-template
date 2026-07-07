@@ -1,17 +1,16 @@
 use std::env;
 use std::fs;
-use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Command, ExitStatus};
-use std::thread;
-use std::time::Duration;
 
-mod checks;
+mod check;
 mod database;
+mod dev;
 mod docker;
-mod lintmd;
-mod status;
-mod stop;
+mod docs;
+mod info;
+mod make;
+mod run;
 
 struct XtaskCommand {
     name: &'static str,
@@ -19,165 +18,79 @@ struct XtaskCommand {
     run: fn(args: &[String]),
 }
 
+struct SubcommandInfo {
+    name: &'static str,
+    subcommands: &'static [&'static str],
+}
+
+const SUBCOMMANDS: &[SubcommandInfo] = &[
+    SubcommandInfo {
+        name: "dev",
+        subcommands: &["run", "stop", "info", "init", "create-admin"],
+    },
+    SubcommandInfo {
+        name: "make",
+        subcommands: &["all", "backend", "frontend", "release", "clean", "openapi"],
+    },
+    SubcommandInfo {
+        name: "check",
+        subcommands: &["all", "backend", "frontend", "security", "docs", "sqlx"],
+    },
+    SubcommandInfo {
+        name: "db",
+        subcommands: &["init", "reset", "prepare", "prepare-check"],
+    },
+    SubcommandInfo {
+        name: "docker",
+        subcommands: &["build", "run", "down", "debug"],
+    },
+];
+
 const COMMANDS: &[XtaskCommand] = &[
     XtaskCommand {
-        name: "clean",
-        description: "Deletes build files, target, .sqlx, and node_modules",
-        run: |_| clean(),
+        name: "dev",
+        description: "Local dev environment/servers control [run | stop | info | init | create-admin]",
+        run: dev::run,
     },
     XtaskCommand {
-        name: "status",
-        description: "Displays project development status (branch, DB, services, tests, clippy, size)",
-        run: status,
+        name: "make",
+        description: "Builds backend and frontend targets [all | backend | frontend | release | clean | openapi]",
+        run: make::run,
     },
     XtaskCommand {
-        name: "release",
-        description: "Builds the frontend and backend in release mode",
-        run: |_| release(),
+        name: "check",
+        description: "Runs CI verification checks [backend | frontend | security | docs | sqlx]",
+        run: check::run,
     },
     XtaskCommand {
-        name: "lint-security",
-        description: "Runs semgrep security scan",
-        run: |_| {
-            lint_security().expect("failed to run semgrep");
-        },
+        name: "db",
+        description: "Database utility actions [init | reset | prepare | prepare-check]",
+        run: database::run,
     },
     XtaskCommand {
-        name: "db-init",
-        description: "Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries",
-        run: |_| database::db_init(),
-    },
-    XtaskCommand {
-        name: "db-create",
-        description: "Creates the SQLite database",
-        run: |_| {
-            database::db_create().expect("failed to create database");
-        },
-    },
-    XtaskCommand {
-        name: "db-migrate",
-        description: "Runs database migrations",
-        run: |_| {
-            database::db_migrate().expect("failed to run migrations");
-        },
-    },
-    XtaskCommand {
-        name: "db-prepare",
-        description: "Prepares SQLx offline metadata (.sqlx/)",
-        run: |_| {
-            database::db_prepare().expect("failed to prepare sqlx queries");
-        },
-    },
-    XtaskCommand {
-        name: "db-prepare-check",
-        description: "Checks if SQLx offline metadata (.sqlx/) is up to date",
-        run: |_| {
-            database::db_prepare_check().expect("failed to check sqlx queries");
-        },
-    },
-    XtaskCommand {
-        name: "db-drop",
-        description: "Drops the SQLite database",
-        run: |_| {
-            database::db_drop().expect("failed to drop database");
-        },
-    },
-    XtaskCommand {
-        name: "db-reset",
-        description: "Drops database and re-initializes it",
-        run: |_| database::db_reset(),
-    },
-    XtaskCommand {
-        name: "dev-init",
-        description: "Installs frontend packages, initializes DB, and seeds admin user",
-        run: |_| dev_init(),
-    },
-    XtaskCommand {
-        name: "create-admin",
-        description: "Creates/updates the admin user interactively",
-        run: create_admin,
-    },
-    XtaskCommand {
-        name: "setup-hooks",
-        description: "Sets up workspace git hooks",
-        run: |_| {
-            checks::setup_hooks().expect("failed to set up git hooks");
-        },
+        name: "docker",
+        description: "Production Docker actions [build | run | down | debug]",
+        run: docker::run,
     },
     XtaskCommand {
         name: "pre-commit",
         description: "Runs pre-commit checks (formatting, clippy, sqlx, svelte-check, prettier)",
         run: |_| {
-            checks::pre_commit().expect("failed to run pre-commit checks");
+            check::pre_commit().expect("failed to run pre-commit checks");
         },
     },
     XtaskCommand {
         name: "pre-push",
         description: "Runs pre-push checks (backend/frontend tests)",
         run: |_| {
-            checks::pre_push().expect("failed to run pre-push checks");
+            check::pre_push().expect("failed to run pre-push checks");
         },
     },
     XtaskCommand {
-        name: "ci-backend",
-        description: "Runs all backend CI checks (fmt, clippy, sqlx, tests)",
+        name: "setup-hooks",
+        description: "Sets up workspace git hooks",
         run: |_| {
-            checks::ci_backend().expect("failed to run CI backend checks");
-        },
-    },
-    XtaskCommand {
-        name: "ci-frontend",
-        description: "Runs all frontend CI checks (prettier, svelte-check, tests, build)",
-        run: |_| {
-            checks::ci_frontend().expect("failed to run CI frontend checks");
-        },
-    },
-    XtaskCommand {
-        name: "check-md-links",
-        description: "Validates relative markdown links and heading anchors across the repo",
-        run: |_| lintmd::check_md_links().expect("failed to check markdown links"),
-    },
-    XtaskCommand {
-        name: "dev",
-        description: "Runs backend watch and frontend dev server concurrently",
-        run: |_| dev(),
-    },
-    XtaskCommand {
-        name: "openapi",
-        description: "Generates OpenAPI spec and frontend TypeScript client",
-        run: |_| openapi(),
-    },
-    XtaskCommand {
-        name: "stop",
-        description: "Stops any running backend servers",
-        run: |_| stop::stop(),
-    },
-    XtaskCommand {
-        name: "docker-build",
-        description: "Builds the production Docker image (svelaxum:release)",
-        run: |_| {
-            docker::docker_build().expect("failed to build docker image");
-        },
-    },
-    XtaskCommand {
-        name: "docker-run",
-        description: "Runs the production Docker container locally",
-        run: |_| {
-            docker::docker_run().expect("failed to run docker container");
-        },
-    },
-    XtaskCommand {
-        name: "docker-down",
-        description: "Stops and removes the production Docker container",
-        run: |_| {
-            docker::docker_down().expect("failed to stop docker container");
-        },
-    },
-    XtaskCommand {
-        name: "docker-debug",
-        description: "Runs a debug container mounting the data volume",
-        run: |_| {
-            docker::docker_debug().expect("failed to run docker debug container");
+            check::setup_hooks().expect("failed to set up git hooks");
         },
     },
 ];
@@ -190,6 +103,14 @@ fn main() {
         print_help();
         return;
     }
+
+    if task_name == "completions" {
+        print!("{}", generate_completions());
+        return;
+    }
+
+    // Auto-update completions in the background when running any xtask command
+    ensure_fish_completions();
 
     if let Some(cmd) = COMMANDS.iter().find(|c| c.name == task_name) {
         (cmd.run)(&args);
@@ -204,8 +125,12 @@ fn main() {
 fn print_help() {
     println!("Svelaxum Xtask Runner\n");
     println!("Available commands:");
-    let max_len = COMMANDS.iter().map(|c| c.name.len()).max().unwrap_or(0);
-    for cmd in COMMANDS {
+    let visible_commands: Vec<&XtaskCommand> = COMMANDS
+        .iter()
+        .filter(|c| c.name != "pre-commit" && c.name != "pre-push" && c.name != "setup-hooks")
+        .collect();
+    let max_len = visible_commands.iter().map(|c| c.name.len()).max().unwrap_or(0);
+    for cmd in visible_commands {
         println!("  {:width$} - {}", cmd.name, cmd.description, width = max_len);
     }
 }
@@ -223,283 +148,48 @@ pub(crate) fn run_command(
     command.status()
 }
 
-fn status(args: &[String]) {
-    let refresh = args.get(2).map(String::as_str) == Some("--refresh") || args.get(2).map(String::as_str) == Some("-r");
-    let refresh_silent = args.get(2).map(String::as_str) == Some("--refresh-silent");
-    self::status::status(refresh, refresh_silent);
-}
+fn generate_completions() -> String {
+    let mut completions = String::new();
+    completions.push_str("# Auto-generated cargo xtask completions\n");
+    completions.push_str("complete -c cargo -n \"__fish_seen_subcommand_from xtask\" -f\n");
 
-fn create_admin(args: &[String]) {
-    let mut run_args = vec!["run", "--quiet", "--package", "app", "--", "create-admin"];
-    for arg in &args[2..] {
-        run_args.push(arg);
-    }
-    let status = run_command("cargo", &run_args, None);
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to create admin user.");
-        std::process::exit(1);
-    }
-}
-
-fn clean() {
-    println!("Cleaning build artifacts and node_modules...");
-    let targets = [
-        "target",
-        ".sqlx",
-        "frontend/dist",
-        "frontend/node_modules",
-        "node_modules",
-        "package-lock.json",
-    ];
-    for target in &targets {
-        let path = Path::new(target);
-        if path.exists() {
-            if path.is_dir() {
-                match fs::remove_dir_all(path) {
-                    Ok(_) => println!("Removed directory: {}", target),
-                    Err(e) => eprintln!("Failed to remove directory {}: {}", target, e),
-                }
-            } else {
-                match fs::remove_file(path) {
-                    Ok(_) => println!("Removed file: {}", target),
-                    Err(e) => eprintln!("Failed to remove file {}: {}", target, e),
-                }
-            }
-        }
-    }
-    println!("Clean completed.");
-}
-
-fn dev_init() {
-    println!("Initializing development environment...");
-    database::ensure_cargo_watch();
-
-    // Set up git hooks
-    checks::setup_hooks().expect("failed to set up git hooks");
-
-    // Install frontend dependencies
-    println!("Installing frontend dependencies...");
-    let status = run_command("npm", &["install"], Some("frontend"));
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to install frontend dependencies.");
-        std::process::exit(1);
-    }
-
-    // Build frontend once so that rust-embed has files
-    println!("Building frontend...");
-    let status = run_command("npm", &["run", "build"], Some("frontend"));
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to build frontend.");
-        std::process::exit(1);
-    }
-
-    // Initialize database
-    database::db_init();
-
-    // Seed admin user
-    println!("Seeding default admin user...");
-    let status = run_command(
-        "cargo",
-        &["run", "--quiet", "--package", "app", "--", "create-admin"],
-        None,
-    );
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to seed admin user.");
-        std::process::exit(1);
-    }
-    println!("Development environment initialized successfully!");
-}
-
-fn wait_for_port(port: u16) {
-    let addr = format!("127.0.0.1:{}", port);
-    println!("Waiting for port {} to open...", port);
-    for _ in 0..150 {
-        if TcpStream::connect(&addr).is_ok() {
-            println!("Port {} is open.", port);
-            return;
-        }
-        thread::sleep(Duration::from_millis(200));
-    }
-    eprintln!("Timeout waiting for port {}.", port);
-}
-
-fn dev() {
-    database::ensure_cargo_watch();
-
-    // Check if database exists, if not initialize it
-    if !Path::new("data/db.sqlite").exists() {
-        println!("Database not found. Initializing...");
-        database::db_init();
-    }
-
-    // Check if frontend node_modules exists, if not install dependencies
-    if !Path::new("frontend/node_modules").exists() {
-        println!("Frontend node_modules not found. Installing...");
-        let status = run_command("npm", &["install"], Some("frontend"));
-        if status.is_err() || !status.unwrap().success() {
-            eprintln!("Failed to install frontend dependencies.");
-            std::process::exit(1);
+    let mut top_level = Vec::new();
+    for cmd in COMMANDS {
+        if cmd.name != "pre-commit" && cmd.name != "pre-push" && cmd.name != "setup-hooks" && cmd.name != "completions"
+        {
+            top_level.push(cmd.name);
         }
     }
 
-    println!("Starting backend development watch server...");
-    let mut backend = Command::new("cargo")
-        .args([
-            "watch",
-            "--quiet",
-            "--ignore",
-            "data/db.sqlite",
-            "--watch",
-            "backend",
-            "--exec",
-            "run --package app --features swagger",
-        ])
-        .spawn()
-        .expect("failed to start backend watch");
+    completions.push_str(&format!(
+        "complete -c cargo -n \"__fish_seen_subcommand_from xtask; and not __fish_seen_subcommand_from {}\" -a \"{}\"\n",
+        SUBCOMMANDS.iter().map(|s| s.name).collect::<Vec<_>>().join(" "),
+        top_level.join(" ")
+    ));
 
-    // Wait for backend to start up before starting frontend dev server
-    wait_for_port(3000);
-
-    println!("Starting frontend dev server...");
-    let mut frontend = Command::new("npm")
-        .args(["run", "dev"])
-        .current_dir("frontend")
-        .stdin(std::process::Stdio::null())
-        .spawn()
-        .expect("failed to start frontend dev server");
-
-    // Wait for frontend dev server
-    wait_for_port(5173);
-
-    // Monitor processes
-    loop {
-        if let Ok(Some(status)) = backend.try_wait() {
-            #[cfg(unix)]
-            {
-                use std::os::unix::process::ExitStatusExt;
-                if let Some(sig) = status.signal() {
-                    if sig == 15 {
-                        println!("Backend server stopped.");
-                    } else {
-                        println!("Backend server terminated by signal: {}", sig);
-                    }
-                } else {
-                    println!("Backend server exited with status: {}", status);
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                println!("Backend server exited with: {}", status);
-            }
-            let _ = frontend.kill();
-            break;
-        }
-        if let Ok(Some(status)) = frontend.try_wait() {
-            #[cfg(unix)]
-            {
-                use std::os::unix::process::ExitStatusExt;
-                if let Some(sig) = status.signal() {
-                    if sig == 15 {
-                        println!("Frontend server stopped.");
-                    } else {
-                        println!("Frontend server terminated by signal: {}", sig);
-                    }
-                } else {
-                    println!("Frontend server exited with status: {}", status);
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                println!("Frontend server exited with: {}", status);
-            }
-            let _ = backend.kill();
-            break;
-        }
-        thread::sleep(Duration::from_millis(500));
+    for sub in SUBCOMMANDS {
+        completions.push_str(&format!(
+            "complete -c cargo -n \"__fish_seen_subcommand_from xtask; and __fish_seen_subcommand_from {}; and not __fish_seen_subcommand_from {}\" -a \"{}\"\n",
+            sub.name,
+            sub.subcommands.join(" "),
+            sub.subcommands.join(" ")
+        ));
     }
+
+    completions
 }
 
-fn release() {
-    println!("Building frontend and backend in release mode...");
-
-    // 1. Install frontend dependencies
-    println!("Installing frontend dependencies...");
-    let status = run_command("npm", &["install"], Some("frontend"));
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to install frontend dependencies.");
-        std::process::exit(1);
-    }
-
-    // 2. Build frontend
-    println!("Building frontend...");
-    let status = run_command("npm", &["run", "build"], Some("frontend"));
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to build frontend.");
-        std::process::exit(1);
-    }
-
-    // 3. Initialize database and offline query cache
-    database::db_init();
-
-    // 4. Build backend in release mode
-    println!("Building backend in release mode...");
-    let status = run_command("cargo", &["build", "--release"], None);
-    if status.is_err() || !status.unwrap().success() {
-        eprintln!("Failed to build backend.");
-        std::process::exit(1);
-    }
-    println!("Release build completed successfully!");
-}
-
-fn lint_security() -> std::io::Result<ExitStatus> {
-    println!("Running Semgrep security scan...");
-    run_command("semgrep", &["--config", "r/all"], None)
-}
-
-pub(crate) fn openapi() {
-    println!("Generating OpenAPI JSON specification...");
-
-    let output = Command::new("cargo")
-        .args(["run", "--package", "app", "--quiet", "--", "export-openapi"])
-        .output();
-
-    let output = match output {
-        Ok(out) => {
-            if !out.status.success() {
-                eprintln!("Error: backend failed to export OpenAPI spec.");
-                std::process::exit(out.status.code().unwrap_or(1));
-            }
-            out
-        },
-        Err(e) => {
-            eprintln!("Error: failed to execute cargo run: {e}");
-            std::process::exit(1);
-        },
+fn ensure_fish_completions() {
+    let path = Path::new("/home/vscode/.config/fish/completions/cargo-xtask.fish");
+    let Some(parent) = path.parent() else {
+        return;
     };
-
-    if let Err(e) = fs::write("openapi.json", &output.stdout) {
-        eprintln!("Error: failed to write openapi.json: {e}");
-        std::process::exit(1);
+    if !parent.exists() {
+        return;
     }
-    println!("Saved OpenAPI JSON specification to openapi.json");
-
-    println!("Generating frontend TypeScript client...");
-    let status = run_command("node", &["scripts/generate-api.ts"], Some("frontend"));
-
-    match status {
-        Ok(st) => {
-            if !st.success() {
-                eprintln!("Error: frontend API client generation failed.");
-                std::process::exit(st.code().unwrap_or(1));
-            }
-        },
-        Err(e) => {
-            eprintln!("Error: failed to execute npm run generate:api: {e}");
-            std::process::exit(1);
-        },
+    let completions = generate_completions();
+    if fs::read_to_string(path).is_ok_and(|existing| existing == completions) {
+        return;
     }
-
-    println!(
-        "Successfully generated and formatted TypeScript client: frontend/src/lib/generated/api.d.ts and endpoints.ts"
-    );
+    let _ = fs::write(path, completions);
 }

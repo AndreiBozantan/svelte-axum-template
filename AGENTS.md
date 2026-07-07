@@ -25,7 +25,7 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - implement larger changes as a sequence of small, individually reviewable steps and stop after each step for review
 - if the user edited files since your last read, re-read them before making further changes
 - ask clarifying questions when the request is ambiguous, before writing code
-- after completing code changes run `cargo -q xtask ci-backend` and/or `cargo -q xtask ci-frontend` and fix any issues
+- after completing code changes run `cargo -q xtask check backend` and/or `cargo -q xtask check frontend` and fix any issues
 - when introducing new code write new tests, including a test which fails before fixing code issues
 
 # CODING STYLE
@@ -78,7 +78,7 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 # GIT HOOKS
 
-- configured in `.githooks/` and installed via `cargo xtask setup-hooks`, also executed with `cargo xtask dev-init`
+- configured in `.githooks/` and installed via `cargo xtask setup-hooks`, also executed with `cargo xtask dev init`
 - `pre-commit`: backend: formatting, clippy, sqlx; frontend: svelte-check, prettier
 - `pre-push`: backend (`cargo test`) and/or frontend (`vitest`) tests based on what directories have changed
 

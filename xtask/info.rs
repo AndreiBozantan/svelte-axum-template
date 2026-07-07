@@ -407,7 +407,7 @@ pub fn status(
                     .as_secs();
                 if now.saturating_sub(c.last_run_timestamp) > 30 {
                     let _ = Command::new("cargo")
-                        .args(["xtask", "status", "--refresh-silent"])
+                        .args(["xtask", "dev", "info", "--refresh-silent"])
                         .stdout(Stdio::null())
                         .stderr(Stdio::null())
                         .spawn();
