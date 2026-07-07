@@ -18,7 +18,7 @@ From the project root folder:
 
 The backend runs at `http://localhost:3000` and the frontend at `http://localhost:5173`. In dev mode, Vite proxies API requests to the backend, so the app is used via `http://localhost:5173`.
 
-Run `cargo xtask --help` to see all available tasks (dev control, database management, make targets, CI checks, docker).
+Run `cargo xtask --help` to see all available tasks (dev control, SQLx management, make targets, CI checks, prod).
 
 # Release build
 

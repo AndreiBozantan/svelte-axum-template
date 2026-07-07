@@ -1,5 +1,5 @@
-use crate::database;
 use crate::run_command;
+use crate::sqlx;
 use std::net::TcpStream;
 use std::path::Path;
 use std::process::Command;
@@ -7,12 +7,12 @@ use std::thread;
 use std::time::Duration;
 
 pub fn run() {
-    database::ensure_cargo_watch();
+    sqlx::ensure_cargo_watch();
 
     // Check if database exists, if not initialize it
     if !Path::new("data/db.sqlite").exists() {
         println!("Database not found. Initializing...");
-        database::init();
+        sqlx::init();
     }
 
     // Check if frontend node_modules exists, if not install dependencies

@@ -1,5 +1,5 @@
-use crate::database;
 use crate::docs;
+use crate::sqlx;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -399,7 +399,7 @@ pub fn run(args: &[String]) {
             docs::check_links().expect("failed to check markdown links");
         },
         "sqlx" => {
-            database::check_sqlx_queries().expect("failed to check sqlx queries");
+            sqlx::check_sqlx_queries().expect("failed to check sqlx queries");
         },
         "all" => {
             println!("Running all verification checks...");

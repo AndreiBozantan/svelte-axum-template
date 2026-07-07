@@ -10,7 +10,7 @@ fn is_docker_available() -> bool {
         .unwrap_or(false)
 }
 
-pub fn handle_docker_command(subcommand: Option<&str>) -> std::io::Result<()> {
+pub fn handle_prod_command(subcommand: Option<&str>) -> std::io::Result<()> {
     let commands = [
         (
             "build",
@@ -28,18 +28,18 @@ pub fn handle_docker_command(subcommand: Option<&str>) -> std::io::Result<()> {
             "docker compose down",
         ),
         (
-            "debug",
-            "Runs a debug container mounting the data volume",
+            "inspect",
+            "Runs a debug/inspect container mounting the data volume",
             "docker run --rm -it --mount type=volume,src=svelaxum-data,dst=/data debian:bookworm-slim bash",
         ),
     ];
 
     let subcommand = match subcommand {
         None => {
-            println!("Docker Commands Cheat Sheet (for host machine or devcontainer):");
+            println!("Prod Commands Cheat Sheet (for host machine or devcontainer):");
             println!();
             for (name, desc, cmd) in &commands {
-                println!("  cargo xtask docker {:<6} - {}", name, desc);
+                println!("  cargo xtask prod {:<7} - {}", name, desc);
                 println!("    {}", cmd);
                 println!();
             }
@@ -50,11 +50,11 @@ pub fn handle_docker_command(subcommand: Option<&str>) -> std::io::Result<()> {
 
     let matched = commands.iter().find(|(name, _, _)| *name == subcommand);
     if matched.is_none() {
-        eprintln!("Unknown docker subcommand: {}", subcommand);
+        eprintln!("Unknown prod subcommand: {}", subcommand);
         println!();
         println!("Available subcommands:");
         for (name, desc, _) in &commands {
-            println!("  {:<6} - {}", name, desc);
+            println!("  {:<7} - {}", name, desc);
         }
         std::process::exit(1);
     }
@@ -83,8 +83,8 @@ pub fn handle_docker_command(subcommand: Option<&str>) -> std::io::Result<()> {
 
 pub fn run(args: &[String]) {
     let subcommand = args.get(2).map(String::as_str);
-    if let Err(e) = handle_docker_command(subcommand) {
-        eprintln!("Docker command failed: {}", e);
+    if let Err(e) = handle_prod_command(subcommand) {
+        eprintln!("Prod command failed: {}", e);
         std::process::exit(1);
     }
 }

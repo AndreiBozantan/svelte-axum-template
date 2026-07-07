@@ -1,5 +1,5 @@
-use crate::database;
 use crate::run_command;
+use crate::sqlx;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -101,7 +101,7 @@ pub fn release() {
     }
 
     // 3. Initialize database and offline query cache
-    database::init();
+    sqlx::init();
 
     // 4. Build backend in release mode
     println!("Building backend in release mode...");

@@ -55,9 +55,9 @@ abbr -a xcf "cargo -q xtask check frontend"
 abbr -a xcs "cargo -q xtask check security"
 abbr -a xcd "cargo -q xtask check docs"
 abbr -a xcx "cargo -q xtask check sqlx"
-abbr -a xdb "cargo -q xtask db"
-abbr -a xdbpr "cargo -q xtask db prepare"
-abbr -a xdk "cargo -q xtask docker"
+abbr -a xs "cargo -q xtask sqlx"
+abbr -a xsp "cargo -q xtask sqlx prepare"
+abbr -a xp "cargo -q xtask prod"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."
@@ -256,10 +256,10 @@ cat << 'EOF' > "$REPO_DIR/.claude/settings.json"
       "Bash(cargo test:*)",
       "Bash(cargo build:*)",
       "Bash(cargo xtask check:*)",
-      "Bash(cargo xtask db:*)",
+      "Bash(cargo xtask sqlx:*)",
       "Bash(cargo xtask dev:*)",
       "Bash(cargo xtask make:*)",
-      "Bash(cargo xtask docker:*)",
+      "Bash(cargo xtask prod:*)",
       "Bash(npx prettier:*)",
       "Bash(npx svelte-check:*)",
       "Bash(npx vitest run:*)",

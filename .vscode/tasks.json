@@ -26,13 +26,13 @@
         {
             "type": "shell",
             "label": "xtask: reset database",
-            "command": "cargo run -p xtask db reset",
+            "command": "cargo run -p xtask sqlx reset",
             "problemMatcher": []
         },
         {
             "type": "shell",
             "label": "xtask: status - run status check",
-            "command": "cargo run -p xtask dev info",
+            "command": "cargo run -p xtask dev status",
             "problemMatcher": []
         },
         {

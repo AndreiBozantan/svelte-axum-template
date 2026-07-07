@@ -6,28 +6,28 @@ use std::thread;
 use std::time::Duration;
 
 use crate::check;
-use crate::database;
 use crate::info;
 use crate::run;
 use crate::run_command;
+use crate::sqlx;
 
 pub fn run(args: &[String]) {
     let subcommand = args.get(2).map(String::as_str);
     match subcommand {
         Some("run") => run::run(),
-        Some("stop") => stop(),
-        Some("info") => {
+        Some("down") => down(),
+        Some("status") => {
             let refresh =
                 args.get(3).map(String::as_str) == Some("--refresh") || args.get(3).map(String::as_str) == Some("-r");
             let refresh_silent = args.get(3).map(String::as_str) == Some("--refresh-silent");
             info::status(refresh, refresh_silent);
         },
         Some("init") => init(),
-        Some("create-admin") | Some("admin") => create_admin(args),
+        Some("admin") => admin(args),
         None => {
             if is_running() {
-                println!("Development servers are running. Stopping them...");
-                stop();
+                println!("Development servers are running. Bringing them down...");
+                down();
             } else {
                 println!("No development servers are running. Starting them...");
                 run::run();
@@ -47,17 +47,17 @@ pub fn run(args: &[String]) {
 
 fn print_help() {
     println!("Workspace Dev Actions:");
-    println!("  cargo xtask dev              - Runs dev environment if stopped, otherwise stops it");
-    println!("  cargo xtask dev run          - Runs backend watch and frontend dev server");
-    println!("  cargo xtask dev stop         - Stops any running backend or frontend servers");
-    println!("  cargo xtask dev info         - Displays project development status");
-    println!("  cargo xtask dev init         - Installs frontend packages, initializes DB, and seeds admin");
-    println!("  cargo xtask dev create-admin - Creates/updates the admin user interactively");
+    println!("  cargo xtask dev        - Runs dev environment if stopped, otherwise brings it down");
+    println!("  cargo xtask dev run    - Runs backend watch and frontend dev server");
+    println!("  cargo xtask dev down   - Stops any running backend or frontend servers");
+    println!("  cargo xtask dev status - Displays project development status");
+    println!("  cargo xtask dev init   - Installs frontend packages, initializes DB, and seeds admin");
+    println!("  cargo xtask dev admin  - Creates/updates the admin user interactively");
 }
 
 pub fn init() {
     println!("Initializing development environment...");
-    database::ensure_cargo_watch();
+    sqlx::ensure_cargo_watch();
 
     // Set up git hooks
     check::setup_hooks().expect("failed to set up git hooks");
@@ -79,7 +79,7 @@ pub fn init() {
     }
 
     // Initialize database
-    database::init();
+    sqlx::init();
 
     // Seed admin user
     println!("Seeding default admin user...");
@@ -95,9 +95,9 @@ pub fn init() {
     println!("Development environment initialized successfully!");
 }
 
-pub fn create_admin(args: &[String]) {
+pub fn admin(args: &[String]) {
     let mut run_args = vec!["run", "--quiet", "--package", "app", "--", "create-admin"];
-    // Skip the first three arguments: ["xtask", "dev", "create-admin"]
+    // Skip the first three arguments: ["xtask", "dev", "admin"]
     for arg in args.iter().skip(3) {
         run_args.push(arg);
     }
@@ -112,7 +112,7 @@ pub fn is_running() -> bool {
     !find_dev_pids().is_empty()
 }
 
-pub fn stop() {
+pub fn down() {
     println!("Finding running development servers...");
     let pids = find_dev_pids();
     if pids.is_empty() {

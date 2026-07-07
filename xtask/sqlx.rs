@@ -124,18 +124,18 @@ pub fn run(args: &[String]) {
         Some("prepare") => {
             prepare().expect("failed to prepare sqlx queries");
         },
-        Some("prepare-check") => {
+        Some("check") => {
             check_sqlx_queries().expect("failed to check sqlx queries");
         },
         _ => {
-            println!("Database Utility Actions:");
+            println!("SQLx Utility Actions:");
             println!(
-                "  cargo xtask db init          - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries"
+                "  cargo xtask sqlx init    - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries"
             );
-            println!("  cargo xtask db reset         - Drops database and re-initializes it");
-            println!("  cargo xtask db prepare       - Prepares SQLx offline metadata (.sqlx/)");
-            println!("  cargo xtask db prepare-check - Checks if SQLx offline metadata (.sqlx/) is up to date");
-            println!("\nError: Please specify a valid database action.");
+            println!("  cargo xtask sqlx reset   - Drops database and re-initializes it");
+            println!("  cargo xtask sqlx prepare - Prepares SQLx offline metadata (.sqlx/)");
+            println!("  cargo xtask sqlx check   - Checks if SQLx offline metadata (.sqlx/) is up to date");
+            println!("\nError: Please specify a valid sqlx action.");
             std::process::exit(1);
         },
     }

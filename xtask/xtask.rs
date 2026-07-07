@@ -5,13 +5,13 @@ use std::path::Path;
 use std::process::{Command, ExitStatus};
 
 mod check;
-mod database;
 mod dev;
-mod docker;
 mod docs;
 mod info;
 mod make;
+mod prod;
 mod run;
+mod sqlx;
 mod xmenu;
 
 pub(crate) struct XtaskCommand {
@@ -28,7 +28,7 @@ pub(crate) struct SubcommandInfo {
 pub(crate) const SUBCOMMANDS: &[SubcommandInfo] = &[
     SubcommandInfo {
         name: "dev",
-        subcommands: &["run", "stop", "info", "init", "create-admin"],
+        subcommands: &["run", "down", "status", "init", "admin"],
     },
     SubcommandInfo {
         name: "make",
@@ -39,19 +39,19 @@ pub(crate) const SUBCOMMANDS: &[SubcommandInfo] = &[
         subcommands: &["all", "backend", "frontend", "security", "docs", "sqlx"],
     },
     SubcommandInfo {
-        name: "db",
-        subcommands: &["init", "reset", "prepare", "prepare-check"],
+        name: "sqlx",
+        subcommands: &["init", "reset", "prepare", "check"],
     },
     SubcommandInfo {
-        name: "docker",
-        subcommands: &["build", "run", "down", "debug"],
+        name: "prod",
+        subcommands: &["build", "run", "down", "inspect"],
     },
 ];
 
 pub(crate) const COMMANDS: &[XtaskCommand] = &[
     XtaskCommand {
         name: "dev",
-        description: "Local dev environment/servers control [run | stop | info | init | create-admin]",
+        description: "Local dev environment/servers control [run | down | status | init | admin]",
         run: dev::run,
     },
     XtaskCommand {
@@ -65,14 +65,14 @@ pub(crate) const COMMANDS: &[XtaskCommand] = &[
         run: check::run,
     },
     XtaskCommand {
-        name: "db",
-        description: "Database utility actions [init | reset | prepare | prepare-check]",
-        run: database::run,
+        name: "sqlx",
+        description: "SQLx utility actions [init | reset | prepare | check]",
+        run: sqlx::run,
     },
     XtaskCommand {
-        name: "docker",
-        description: "Production Docker actions [build | run | down | debug]",
-        run: docker::run,
+        name: "prod",
+        description: "Production Docker actions [build | run | down | inspect]",
+        run: prod::run,
     },
     XtaskCommand {
         name: "pre-commit",
