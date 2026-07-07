@@ -7,11 +7,10 @@ use std::process::{Command, ExitStatus};
 mod check;
 mod dev;
 mod docs;
-mod info;
 mod make;
 mod prod;
-mod run;
 mod sqlx;
+mod status;
 mod xmenu;
 
 pub(crate) struct XtaskCommand {

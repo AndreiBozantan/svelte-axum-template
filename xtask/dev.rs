@@ -1,26 +1,26 @@
 use std::env;
 use std::fs;
+use std::net::TcpStream;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
 use crate::check;
-use crate::info;
-use crate::run;
 use crate::run_command;
 use crate::sqlx;
+use crate::status;
 
 pub fn run(args: &[String]) {
     let subcommand = args.get(2).map(String::as_str);
     match subcommand {
-        Some("run") => run::run(),
+        Some("run") => run_servers(),
         Some("down") => down(),
         Some("status") => {
             let refresh =
                 args.get(3).map(String::as_str) == Some("--refresh") || args.get(3).map(String::as_str) == Some("-r");
             let refresh_silent = args.get(3).map(String::as_str) == Some("--refresh-silent");
-            info::status(refresh, refresh_silent);
+            status::status(refresh, refresh_silent);
         },
         Some("init") => init(),
         Some("admin") => admin(args),
@@ -30,7 +30,7 @@ pub fn run(args: &[String]) {
                 down();
             } else {
                 println!("No development servers are running. Starting them...");
-                run::run();
+                run_servers();
             }
         },
         Some("--help") | Some("-h") | Some("help") => {
@@ -210,7 +210,7 @@ fn find_dev_pids() -> Vec<u32> {
     let current_dir_str = current_dir.as_ref().and_then(|p| p.to_str());
 
     // 1. Check port 3000 (backend)
-    if let Some(pid) = info::get_pid_for_port(3000) {
+    if let Some(pid) = status::get_pid_for_port(3000) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -241,7 +241,7 @@ fn find_dev_pids() -> Vec<u32> {
     }
 
     // 2. Check port 5173 (frontend)
-    if let Some(pid) = info::get_pid_for_port(5173) {
+    if let Some(pid) = status::get_pid_for_port(5173) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -310,4 +310,113 @@ fn find_dev_pids() -> Vec<u32> {
     }
 
     pids
+}
+
+fn run_servers() {
+    sqlx::ensure_cargo_watch();
+
+    // Check if database exists, if not initialize it
+    if !Path::new("data/db.sqlite").exists() {
+        println!("Database not found. Initializing...");
+        sqlx::init();
+    }
+
+    // Check if frontend node_modules exists, if not install dependencies
+    if !Path::new("frontend/node_modules").exists() {
+        println!("Frontend node_modules not found. Installing...");
+        let status = run_command("npm", &["install"], Some("frontend"));
+        if status.is_err() || !status.unwrap().success() {
+            eprintln!("Failed to install frontend dependencies.");
+            std::process::exit(1);
+        }
+    }
+
+    println!("Starting backend development watch server...");
+    let mut backend = Command::new("cargo")
+        .args([
+            "watch",
+            "--quiet",
+            "--ignore",
+            "data/db.sqlite",
+            "--watch",
+            "backend",
+            "--exec",
+            "run --package app --features swagger",
+        ])
+        .spawn()
+        .expect("failed to start backend watch");
+
+    // Wait for backend to start up before starting frontend dev server
+    wait_for_port(3000);
+
+    println!("Starting frontend dev server...");
+    let mut frontend = Command::new("npm")
+        .args(["run", "dev"])
+        .current_dir("frontend")
+        .stdin(std::process::Stdio::null())
+        .spawn()
+        .expect("failed to start frontend dev server");
+
+    // Wait for frontend dev server
+    wait_for_port(5173);
+
+    // Monitor processes
+    loop {
+        if let Ok(Some(status)) = backend.try_wait() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Backend server stopped.");
+                    } else {
+                        println!("Backend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Backend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Backend server exited with: {}", status);
+            }
+            let _ = frontend.kill();
+            break;
+        }
+        if let Ok(Some(status)) = frontend.try_wait() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = status.signal() {
+                    if sig == 15 {
+                        println!("Frontend server stopped.");
+                    } else {
+                        println!("Frontend server terminated by signal: {}", sig);
+                    }
+                } else {
+                    println!("Frontend server exited with status: {}", status);
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                println!("Frontend server exited with: {}", status);
+            }
+            let _ = backend.kill();
+            break;
+        }
+        thread::sleep(Duration::from_millis(500));
+    }
+}
+
+fn wait_for_port(port: u16) {
+    let addr = format!("127.0.0.1:{}", port);
+    println!("Waiting for port {} to open...", port);
+    for _ in 0..150 {
+        if TcpStream::connect(&addr).is_ok() {
+            println!("Port {} is open.", port);
+            return;
+        }
+        thread::sleep(Duration::from_millis(200));
+    }
+    eprintln!("Timeout waiting for port {}.", port);
 }
