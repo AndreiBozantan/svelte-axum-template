@@ -19,77 +19,197 @@ pub(crate) struct XtaskCommand {
     pub(crate) run: fn(args: &[String]),
 }
 
+pub(crate) struct SubcommandDetail {
+    pub(crate) name: &'static str,
+    pub(crate) description: &'static str,
+}
+
 pub(crate) struct SubcommandInfo {
     pub(crate) name: &'static str,
-    pub(crate) subcommands: &'static [&'static str],
+    pub(crate) default_description: &'static str,
+    pub(crate) subcommands: &'static [SubcommandDetail],
 }
 
 pub(crate) const SUBCOMMANDS: &[SubcommandInfo] = &[
     SubcommandInfo {
         name: "dev",
-        subcommands: &["run", "down", "status", "init", "admin"],
+        default_description: "Runs dev environment if stopped, otherwise brings it down",
+        subcommands: &[
+            SubcommandDetail {
+                name: "run",
+                description: "Runs backend watch and frontend dev server",
+            },
+            SubcommandDetail {
+                name: "down",
+                description: "Stops any running backend or frontend servers",
+            },
+            SubcommandDetail {
+                name: "status",
+                description: "Displays project development status",
+            },
+            SubcommandDetail {
+                name: "init",
+                description: "Installs frontend packages, initializes DB, and seeds admin",
+            },
+            SubcommandDetail {
+                name: "admin",
+                description: "Creates/updates the admin user interactively",
+            },
+        ],
     },
     SubcommandInfo {
         name: "make",
-        subcommands: &["all", "backend", "frontend", "release", "clean", "openapi", "format"],
+        default_description: "Builds frontend and backend in debug mode",
+        subcommands: &[
+            SubcommandDetail {
+                name: "all",
+                description: "Builds frontend and backend in debug mode",
+            },
+            SubcommandDetail {
+                name: "backend",
+                description: "Builds backend in debug mode",
+            },
+            SubcommandDetail {
+                name: "frontend",
+                description: "Builds frontend",
+            },
+            SubcommandDetail {
+                name: "release",
+                description: "Builds frontend and backend in release mode",
+            },
+            SubcommandDetail {
+                name: "clean",
+                description: "Deletes build files, target, .sqlx, and node_modules",
+            },
+            SubcommandDetail {
+                name: "openapi",
+                description: "Generates OpenAPI spec and frontend client",
+            },
+            SubcommandDetail {
+                name: "format",
+                description: "Auto-formats backend (cargo fmt) and frontend (prettier)",
+            },
+        ],
     },
     SubcommandInfo {
         name: "check",
-        subcommands: &["all", "backend", "frontend", "security", "docs", "sqlx"],
+        default_description: "Runs all CI checks",
+        subcommands: &[
+            SubcommandDetail {
+                name: "all",
+                description: "Runs all CI checks",
+            },
+            SubcommandDetail {
+                name: "backend",
+                description: "Runs all backend CI checks (fmt, clippy, tests, drift)",
+            },
+            SubcommandDetail {
+                name: "frontend",
+                description: "Runs all frontend CI checks (prettier, typecheck, tests, build)",
+            },
+            SubcommandDetail {
+                name: "security",
+                description: "Runs semgrep security scan",
+            },
+            SubcommandDetail {
+                name: "docs",
+                description: "Validates markdown relative links and heading anchors",
+            },
+            SubcommandDetail {
+                name: "sqlx",
+                description: "Checks if SQLx offline metadata is up to date (alias)",
+            },
+        ],
     },
     SubcommandInfo {
         name: "sqlx",
-        subcommands: &["init", "reset", "prepare", "check"],
+        default_description: "Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries",
+        subcommands: &[
+            SubcommandDetail {
+                name: "init",
+                description: "Installs sqlx-cli, creates DB, runs migrations, and prepares queries",
+            },
+            SubcommandDetail {
+                name: "reset",
+                description: "Drops database and re-initializes it",
+            },
+            SubcommandDetail {
+                name: "prepare",
+                description: "Prepares SQLx offline metadata (.sqlx/)",
+            },
+            SubcommandDetail {
+                name: "check",
+                description: "Checks if SQLx offline metadata (.sqlx/) is up to date",
+            },
+        ],
     },
     SubcommandInfo {
         name: "prod",
-        subcommands: &["build", "run", "down", "inspect"],
+        default_description: "Shows prod commands cheat sheet",
+        subcommands: &[
+            SubcommandDetail {
+                name: "build",
+                description: "Builds the production Docker image via docker compose",
+            },
+            SubcommandDetail {
+                name: "run",
+                description: "Runs the production Docker container locally",
+            },
+            SubcommandDetail {
+                name: "down",
+                description: "Stops and removes the production Docker container",
+            },
+            SubcommandDetail {
+                name: "inspect",
+                description: "Runs a debug/inspect container mounting the data volume",
+            },
+        ],
     },
 ];
 
 pub(crate) const COMMANDS: &[XtaskCommand] = &[
     XtaskCommand {
         name: "dev",
-        description: "Local dev environment/servers control [run | down | status | init | admin]",
+        description: "local dev environment/servers control",
         run: dev::run,
     },
     XtaskCommand {
         name: "make",
-        description: "Builds/formats backend and frontend targets [all | backend | frontend | release | clean | openapi | format]",
+        description: "builds/formats backend and frontend targets",
         run: make::run,
     },
     XtaskCommand {
         name: "check",
-        description: "Runs CI verification checks [backend | frontend | security | docs | sqlx]",
+        description: "runs CI verification checks",
         run: check::run,
     },
     XtaskCommand {
         name: "sqlx",
-        description: "SQLx utility actions [init | reset | prepare | check]",
+        description: "sqlx utility actions",
         run: sqlx::run,
     },
     XtaskCommand {
         name: "prod",
-        description: "Production Docker actions [build | run | down | inspect]",
+        description: "production docker actions",
         run: prod::run,
     },
     XtaskCommand {
         name: "pre-commit",
-        description: "Runs pre-commit checks (formatting, clippy, sqlx, svelte-check, prettier)",
+        description: "runs pre-commit checks",
         run: |_| {
             check::pre_commit().expect("failed to run pre-commit checks");
         },
     },
     XtaskCommand {
         name: "pre-push",
-        description: "Runs pre-push checks (backend/frontend tests)",
+        description: "runs pre-push checks",
         run: |_| {
             check::pre_push().expect("failed to run pre-push checks");
         },
     },
     XtaskCommand {
         name: "setup-hooks",
-        description: "Sets up workspace git hooks",
+        description: "sets up workspace git hooks",
         run: |_| {
             check::setup_hooks().expect("failed to set up git hooks");
         },
@@ -141,6 +261,12 @@ fn print_help() {
     let max_len = visible_commands.iter().map(|c| c.name.len()).max().unwrap_or(0);
     for cmd in visible_commands {
         println!("  {:width$} - {}", cmd.name, cmd.description, width = max_len);
+        if let Some(sub_info) = SUBCOMMANDS.iter().find(|s| s.name == cmd.name) {
+            let max_sub_len = sub_info.subcommands.iter().map(|s| s.name.len()).max().unwrap_or(0);
+            for sub in sub_info.subcommands {
+                println!("    {:width$} - {}", sub.name, sub.description, width = max_sub_len);
+            }
+        }
     }
 }
 
@@ -177,11 +303,13 @@ fn generate_completions() -> String {
     ));
 
     for sub in SUBCOMMANDS {
+        let sub_names: Vec<&str> = sub.subcommands.iter().map(|s| s.name).collect();
+        let sub_names_str = sub_names.join(" ");
         completions.push_str(&format!(
             "complete -c cargo -n \"__fish_seen_subcommand_from xtask; and __fish_seen_subcommand_from {}; and not __fish_seen_subcommand_from {}\" -a \"{}\"\n",
             sub.name,
-            sub.subcommands.join(" "),
-            sub.subcommands.join(" ")
+            sub_names_str,
+            sub_names_str
         ));
     }
 
