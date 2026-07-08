@@ -60,7 +60,7 @@ Do not copy the `migrations/` directory to production; the binary falls back to 
 # Frontend
 
 - Located in `./frontend`; includes login/logout, a secure page showing session info, and typed API call examples.
-- The API client is generated from the backend's OpenAPI spec — `cargo xtask openapi` regenerates `openapi.json` and the typed client in `frontend/src/lib/generated/`. See `docs/api/codegen.md`.
+- The API client is generated from the backend's OpenAPI spec — `cargo xtask make openapi` regenerates `openapi.json` and the typed client in `frontend/src/lib/generated/`. See `docs/api/codegen.md`.
 
 # OAuth2 SSO Setup (Google)
 

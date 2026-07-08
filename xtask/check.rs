@@ -219,7 +219,7 @@ pub fn check_backend_openapi_drift() -> std::io::Result<()> {
 
     if !status.success() {
         eprintln!(
-            "Error: openapi.json is out of sync with backend code. Run 'cargo xtask build openapi' and commit the changes."
+            "Error: openapi.json is out of sync with backend code. Run 'cargo xtask make openapi' and commit the changes."
         );
         std::process::exit(1);
     }
@@ -244,7 +244,7 @@ pub fn check_frontend_openapi_drift() -> std::io::Result<()> {
 
     if !diff_status.success() {
         eprintln!(
-            "Error: frontend/src/lib/generated/ is out of sync with openapi.json. Run 'cargo xtask build openapi' and commit the changes."
+            "Error: frontend/src/lib/generated/ is out of sync with openapi.json. Run 'cargo xtask make openapi' and commit the changes."
         );
         std::process::exit(1);
     }
