@@ -62,8 +62,7 @@ These supersede the "pick a direction" recommendations in
 - **Scaffolding: a real `projects` + `tasks` reference feature** in `backend/app/` replaces the
   `sample` placeholder and becomes the copy-me pattern for new features.
 - **Environment selection:** `env` comes only from the process environment, never from a config
-  file — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
-  [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none).
+  file
 
 ---
 
@@ -100,9 +99,6 @@ decided:
   routing decision and its rationale; the rune-based `AppState` pattern; the "generated API
   client only, never raw `fetch`" rule; the capability model (`can(permission)` derived from
   `UserInfo`); the auth-refresh-manager contract (cross-linked to `authentication.md`).
-- **`docs/config.md`** — _Stage E._ Reference rather than design: TOML layering and
-  precedence (`common` → per-env → git-ignored `local`), every key with its default, and the
-  env-only environment selection from Stage A — [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented).
 
 ## How the authorization design resolves existing findings
 
@@ -128,12 +124,6 @@ allow — after the cheap, independent work that protects and unblocks it.
 ## Stage A — Cheap, independent, protective (do first)
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
-
-Configuration correctness:
-
-- [ ] Environment selection: `env` only from the process environment; remove it from all TOML
-      layers; set it in Dockerfile/compose/xtask — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
-      [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none) ([#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203))
 
 Decisions that gate later work:
 
@@ -324,9 +314,6 @@ Backend hygiene (batch into few issues):
 - [ ] Import-style switch (decided): AGENTS.md convention becomes `use module::MyType;`
       (direct type imports); update AGENTS.md and sweep the backend — new code follows the new
       convention from now on — [21 § 21.4](21-general-hygiene.md#214--inconsistent-import-style-vs-the-documented-convention) ([#261](https://github.com/AndreiBozantan/svelte-axum-template/issues/261))
-- [ ] Write `docs/config.md`: TOML layering/precedence, key reference with defaults, env-only
-      environment selection ([Design docs](#design-docs)) —
-      [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented) ([#262](https://github.com/AndreiBozantan/svelte-axum-template/issues/262))
 - [ ] README architecture/testing sections; link the design docs from the README —
       [18 § 18.2/18.3](18-documentation-dx.md#182--almost-no-doc-comments-on-public-apis--complex-modules) ([#263](https://github.com/AndreiBozantan/svelte-axum-template/issues/263))
 
