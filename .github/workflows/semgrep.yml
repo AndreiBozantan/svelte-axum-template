@@ -2,10 +2,10 @@ name: Semgrep
 
 on:
   workflow_dispatch: # Enables manual triggering from the GitHub UI/API
-  # push:
-  #   branches: [ main, master ]
-  # pull_request:
-  #   branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   schedule:
     - cron: '0 0 * * 1' # Weekly on Mondays
 
