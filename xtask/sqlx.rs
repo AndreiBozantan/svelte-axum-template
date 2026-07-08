@@ -108,6 +108,19 @@ pub fn init() {
     create().expect("failed to create database");
     migrate().expect("failed to run migrations");
     prepare().expect("failed to prepare offline queries");
+
+    let seed_path = std::path::Path::new("data/test-data.sql");
+    if seed_path.exists() {
+        println!("Seeding database with data/test-data.sql...");
+        if let Ok(file) = std::fs::File::open(seed_path) {
+            let status = Command::new("sqlite3").arg("data/db.sqlite").stdin(file).status();
+            match status {
+                Ok(s) if s.success() => println!("Database seeded successfully."),
+                _ => eprintln!("Failed to seed database."),
+            }
+        }
+    }
+
     println!("Database initialized successfully.");
 }
 

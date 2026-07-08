@@ -83,11 +83,10 @@ pub fn init() {
 
     // Seed admin user
     println!("Seeding default admin user...");
-    let status = run_command(
-        "cargo",
-        &["run", "--quiet", "--package", "app", "--", "create-admin"],
-        None,
-    );
+    let status = Command::new("cargo")
+        .args(["run", "--quiet", "--package", "app", "--", "create-admin"])
+        .env("APP__SERVER__ENV", "development")
+        .status();
     if status.is_err() || !status.unwrap().success() {
         eprintln!("Failed to seed admin user.");
         std::process::exit(1);
@@ -101,7 +100,10 @@ pub fn admin(args: &[String]) {
     for arg in args.iter().skip(3) {
         run_args.push(arg);
     }
-    let status = run_command("cargo", &run_args, None);
+    let status = Command::new("cargo")
+        .args(&run_args)
+        .env("APP__SERVER__ENV", "development")
+        .status();
     if status.is_err() || !status.unwrap().success() {
         eprintln!("Failed to create admin user.");
         std::process::exit(1);
@@ -343,6 +345,7 @@ fn run_servers() {
             "--exec",
             "run --package app --features swagger",
         ])
+        .env("APP__SERVER__ENV", "development")
         .spawn()
         .expect("failed to start backend watch");
 
