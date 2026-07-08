@@ -46,8 +46,6 @@ RUN mkdir -p xtask/src && echo "fn main() {}" > xtask/src/main.rs
 ENV RUSTC_WRAPPER=""
 RUN cargo build --release --bin app
 
-# Create a pristine empty directory for runtime data
-RUN mkdir -p /tmp/empty_data
 
 
 # --- Stage 3: Backend Builder (Final Compilation) ---
@@ -71,6 +69,10 @@ ENV SQLX_OFFLINE=true
 ENV RUSTC_WRAPPER=""
 RUN cargo build --release --bin app
 
+# Prepare the data directory structure for runtime
+RUN mkdir -p /tmp/data
+COPY data/configs.production.toml /tmp/data/configs.production.toml
+
 
 # --- Stage 4: Runtime (from scratch) ---
 FROM scratch
@@ -88,8 +90,8 @@ COPY --from=backend-builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca
 # Copy the compiled static binary from the backend-builder stage
 COPY --from=backend-builder /build/target/release/app /usr/local/bin/app
 
-# Copy the pristine empty directory and map it to /data with nonroot ownership
-COPY --from=backend-builder --chown=nonroot:nonroot /tmp/empty_data /data
+# Copy the runtime data directory containing configs.production.toml
+COPY --from=backend-builder --chown=nonroot:nonroot /tmp/data /data
 
 ENV APP__SERVER__ENV=production
 
