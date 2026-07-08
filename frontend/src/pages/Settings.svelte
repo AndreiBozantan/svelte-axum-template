@@ -1,6 +1,4 @@
 <script lang="ts">
-    import { AppState } from '$lib/AppState.svelte';
-
     // Dummy state for new settings
     let darkMode = $state(false);
     let notifications = $state(true);

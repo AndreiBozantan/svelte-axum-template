@@ -9,7 +9,7 @@ export const fetchClient = createClient<paths>({
 });
 
 const errorHandlingMiddleware: Middleware = {
-    onError({ error }) {
+    onError({ error: _error }) {
         return new Response(
             JSON.stringify({
                 code: 'NETWORK_ERROR',

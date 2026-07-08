@@ -14,7 +14,7 @@
                 healthStatus = 'Service issues';
                 healthColor = '#f59e0b';
             }
-        } catch (e) {
+        } catch {
             healthStatus = 'Offline';
             healthColor = '#ef4444';
         }
