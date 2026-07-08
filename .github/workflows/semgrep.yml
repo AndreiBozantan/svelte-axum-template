@@ -4,8 +4,22 @@ on:
   workflow_dispatch: # Enables manual triggering from the GitHub UI/API
   push:
     branches: [ main, master ]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".vscode/**"
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".vscode/**"
   schedule:
     - cron: '0 0 * * 1' # Weekly on Mondays
 

@@ -1,0 +1,12 @@
+# Ignore build artifacts and package dependencies
+
+target/
+node_modules/
+frontend/dist/
+data/
+tmp/
+docs/
+.git/
+.venv/
+.pytest_cache/
+*.sqlite*
