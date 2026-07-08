@@ -6,7 +6,6 @@ use std::path::Path;
 use chrono;
 use thiserror::Error;
 use tracing::info;
-use tracing::warn;
 
 use crate::platform::common;
 use crate::platform::db;
@@ -32,9 +31,6 @@ pub enum Error {
     #[error("Failed to fetch applied migrations")]
     FetchAppliedMigrationsFailed { #[from] source: sqlx::Error },
 
-    #[error("Failed to execute database seed query: {source}")]
-    SeedExecutionFailed { source: sqlx::Error },
-
     #[error("File system error")]
     FileSystemOperationFailed { #[from] source: std::io::Error },
 }
@@ -56,27 +52,6 @@ pub async fn run_migrations(ctx: &common::ArcContext) -> Result<(), Error> {
         .await
         .map_err(|e| Error::EmbeddedMigrationFailed { source: e })?;
     info!("embedded migrations executed successfully");
-
-    // conditionally run seed data ONLY in local/dev/test environments
-    if ctx.is_dev_env() || ctx.is_test_env() {
-        info!("non-production environment detected - running test data seed");
-
-        let seed_path = Path::new("./data/test-data.sql");
-        if !seed_path.exists() {
-            warn!(file_path = %seed_path.display(), "seed file missing");
-            return Ok(());
-        }
-
-        let seed_sql = fs::read_to_string(seed_path)?;
-
-        // execute the raw script directly on the database handle
-        sqlx::query(&seed_sql)
-            .execute(&ctx.db)
-            .await
-            .map_err(|e| Error::SeedExecutionFailed { source: e })?;
-
-        info!("database migrations and seeding completed successfully");
-    }
     Ok(())
 }
 
