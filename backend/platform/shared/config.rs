@@ -1,3 +1,9 @@
+//! Configuration subsystem for the Svelaxum backend.
+//!
+//! This module handles loading, parsing, and validating application-wide configuration
+//! settings from common, environment-specific, and local TOML files as well as
+//! environment variable overrides.
+
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,23 +15,43 @@ use serde::Serialize;
 
 use crate::platform::constants;
 
+/// Application-wide configuration settings loaded from TOML files and environment variables.
+///
+/// ## Configuration Layering
+/// When `AppSettings::new()` is called, settings are merged in the following order (last write wins):
+///
+/// 1. **Code Defaults**: Hardcoded default values specified in `AppSettings::default()`.
+/// 2. **Common Config** (`data/configs.common.toml`): Shared defaults used across all environments.
+/// 3. **Environment Config** (`data/configs.<env>.toml`): Environment-specific overrides (where `<env>`
+///    is `development`, `production`, or `test`). The environment is determined by the `APP__SERVER__ENV`
+///    or `APP_ENV` environment variable, defaulting to `production`.
+/// 4. **Local Overrides** (`data/configs.local.toml`): Optional git-ignored file containing local
+///    settings/secrets.
+/// 5. **Environment Variables**: System environment variables prefixed with `APP__` (e.g., `APP__SERVER__PORT`).
+///    Keys are separated by a double underscore `__` to traverse nested settings.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AppSettings {
+    /// Configuration settings for the HTTP server.
     #[serde(default)]
     pub server: ServerSettings,
 
+    /// Configuration settings for the `SQLite` database.
     #[serde(default)]
     pub database: DatabaseSettings,
 
+    /// Configuration settings for JSON Web Token (JWT) lifetimes.
     #[serde(default)]
     pub jwt: JwtSettings,
 
+    /// Configuration settings for Google `OAuth2` SSO.
     #[serde(default)]
     pub oauth: OAuthSettings,
 
+    /// Configuration settings for the shared outbound HTTP client.
     #[serde(default)]
     pub http_client: HttpClientSettings,
 
+    /// Configuration settings for API rate limiting.
     #[serde(default)]
     pub rate_limiter: AppRateLimiterSettings,
 }
@@ -52,18 +78,23 @@ impl Default for HttpClientSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DatabaseSettings {
+    /// The `SQLite` database connection URL (e.g., `sqlite:data/db.sqlite` or `:memory:`).
     #[serde(default)]
     pub url: String,
 
+    /// The minimum number of connections to maintain in the database connection pool.
     #[serde(default)]
     pub min_connections: u32,
 
+    /// The maximum number of connections to allow in the database connection pool.
     #[serde(default)]
     pub max_connections: u32,
 
+    /// If true, `SQLite` temporary tables are stored in memory rather than on disk.
     #[serde(default)]
     pub store_temp_tables_in_memory: bool,
 
+    /// The timeout in seconds to wait when writing to a locked database before returning a busy error.
     #[serde(default)]
     pub write_busy_timeout_seconds: u64,
 }
@@ -82,9 +113,11 @@ impl Default for DatabaseSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct JwtSettings {
+    /// The lifespan of access tokens in minutes.
     #[serde(default)]
     pub access_token_expiry_minutes: u32,
 
+    /// The lifespan of refresh tokens in days.
     #[serde(default)]
     pub refresh_token_expiry_days: u32,
 }
@@ -100,16 +133,19 @@ impl Default for JwtSettings {
 
 #[derive(Clone, Deserialize, Serialize)]
 pub struct OAuthSettings {
+    /// The Google `OAuth2` Client ID.
     #[serde(default)]
     pub google_client_id: String,
 
+    /// The Google `OAuth2` Client Secret.
     #[serde(default, serialize_with = "serialize_masked_secret")]
     pub google_client_secret: String,
 
+    /// The Google `OAuth2` Redirect URI (callback URL).
     #[serde(default)]
     pub google_redirect_uri: String,
 
-    /// Session timeout in minutes for OAuth flow
+    /// Session timeout in minutes for the OAuth flow.
     #[serde(default = "default_session_timeout")]
     pub session_timeout_minutes: u32,
 }
@@ -130,18 +166,23 @@ impl Default for OAuthSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerSettings {
+    /// The IP address or host to bind the server to (e.g., `0.0.0.0` or `127.0.0.1`).
     #[serde(default)]
     pub host: String,
 
+    /// The port number to bind the server to (e.g., 3000).
     #[serde(default)]
     pub port: u16,
 
+    /// `RUST_LOG` style filter directives for structured logging (e.g., `info,tower_http=info`).
     #[serde(default)]
     pub log_directives: String,
 
+    /// The prefix for environment variable overrides (e.g., `APP` overrides via `APP__SERVER__PORT`).
     #[serde(default)]
     pub env_vars_prefix: String,
 
+    /// If true, trusts reverse proxy headers (like `X-Forwarded-For`) for identifying the client IP.
     #[serde(default)]
     pub trusted_proxy: bool,
 }
@@ -347,9 +388,11 @@ impl std::fmt::Debug for OAuthSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AppRateLimiterSettings {
+    /// Rate limit configuration applied globally to all endpoints.
     #[serde(default)]
     pub global: RateLimitSettings,
 
+    /// Rate limit configuration applied specifically to auth/login/register endpoints.
     #[serde(default)]
     pub login: RateLimitSettings,
 }
@@ -375,15 +418,19 @@ impl Default for AppRateLimiterSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RateLimitSettings {
+    /// If true, rate limiting is enabled for this category.
     #[serde(default)]
     pub enabled: bool,
 
+    /// The number of allowed requests per period.
     #[serde(default)]
     pub rate: u32,
 
+    /// The duration of the measurement period in seconds.
     #[serde(default)]
     pub period_in_seconds: u64,
 
+    /// The capacity of the token bucket (maximum requests allowed in a sudden burst).
     #[serde(default)]
     pub burst_size: u32,
 }
