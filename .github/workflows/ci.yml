@@ -47,12 +47,12 @@ jobs:
               run: sudo apt-get update && sudo apt-get install -y lld
 
             - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.96.0
+              uses: dtolnay/rust-toolchain@c0e9df88980754dd93e5833b8dcb1b304c1fe173 # 1.96.0
               with:
                   components: clippy, rustfmt
 
             - name: Cache Cargo dependencies
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
             - name: Run all backend checks
               run: cargo xtask check backend
