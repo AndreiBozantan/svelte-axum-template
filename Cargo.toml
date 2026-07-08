@@ -11,3 +11,15 @@ default-members = [
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_imports = "warn"
+unused_variables = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+
