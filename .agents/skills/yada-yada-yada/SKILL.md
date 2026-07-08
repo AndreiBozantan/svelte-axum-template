@@ -122,7 +122,7 @@ or
 
 Represents linting and complaints.
 
-Running `cargo clippy`, static analysis, or style checks becomes:
+Running `cargo xtask check backend`, static analysis, or style checks becomes:
 
 > "Welcome to the Airing of Grievances."
 

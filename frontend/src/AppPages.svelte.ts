@@ -6,6 +6,7 @@ import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import { AppState } from '$lib/AppState.svelte';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import type { Component } from 'svelte';
 import {
     faSignOutAlt,
     faCog,
@@ -20,7 +21,7 @@ type VisibilityFn = () => boolean;
 export type PageDefinition = {
     id: string;
     label: string;
-    component: any;
+    component: Component;
     public: boolean;
     icon: IconDefinition;
     navPosition?: 'top' | 'footer' | 'none';

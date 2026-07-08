@@ -13,9 +13,9 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 - backend/ - unified backend package containing platform and application code
 - data/ - config files (`configs.common.toml` + per-env + git-ignored `configs.local.toml`) and SQLite database
 - migrations/ - SQL migration files embedded via sqlx; main SQL schema is in migrations/01_initial_schema.sql
-- xtask/ - Rust-based automation scripts; run `cargo xtask --help` for the full command list
+- xtask/ - Rust-based automation scripts; run `cargo xtask help` for the full command list
 - docs/ - API conventions, codegen, and devops docs
-- .githooks/ - pre-commit and pre-push hook templates (copied via `cargo xtask setup-hooks`)
+- .githooks/ - pre-commit and pre-push hook templates (copied via `cargo xtask dev init`)
 - .agents/skills/ - agent skills (see below)
 
 # WORKFLOW
@@ -72,15 +72,20 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 - API conventions (status codes, error shape, REST rules) are in docs/api/conventions.md - all endpoints must follow them
 - the TypeScript API client is generated from the backend OpenAPI spec; see docs/api/codegen.md
-- after adding or changing an endpoint: annotate handlers/DTOs with utoipa, then run `cargo xtask openapi` to regenerate openapi.json and the frontend client
+- after adding or changing an endpoint: annotate handlers/DTOs with utoipa, then run `cargo xtask make openapi` to regenerate openapi.json and the frontend client
 - never hand-edit files under frontend/src/lib/generated/
 - frontend code calls the API via the generated client (e.g. `api.auth.login(...)` from `$lib/generated/endpoints.ts`), never via raw fetch
 
 # GIT HOOKS
 
-- configured in `.githooks/` and installed via `cargo xtask setup-hooks`, also executed with `cargo xtask dev init`
-- `pre-commit`: backend: formatting, clippy, sqlx; frontend: svelte-check, prettier. Run `cargo xtask make format` to automatically format all files.
-- `pre-push`: backend (`cargo test`) and/or frontend (`vitest`) tests based on what directories have changed
+- configured in `.githooks/` and installed via `cargo xtask dev init`
+- `pre-commit` (`cargo -q xtask check commit`)
+    - backend: formatting, openapi spec drift;
+    - frontend: formatting (prettier), linting (eslint), client drift;
+    - run `cargo xtask make format` to automatically format all files;
+- `pre-push` (`cargo -q xtask check push`)
+    - backend: lints (clippy), sqlx prep, tests, openapi drift;
+    - frontend: lints (eslint), diagnostics (svelte-check, tsc), tests, client drift;
 
 # CUSTOM AGENT SKILLS
 

@@ -19,7 +19,7 @@ Generated Code: Files under `src/lib/generated/` must never be hand-edited. If t
 
 State: Shared app state lives in `AppState.svelte.ts` using rune-based class fields (`$state`, `$derived`) with small setter methods. New global state should follow this pattern, not ad-hoc module-level variables or legacy stores.
 
-Formatting & Checks: Code must pass `prettier`, `svelte-check`, and `vitest`. Flag `any` casts, `@ts-ignore`, and disabled lint rules without justification.
+Formatting & Checks: Code must pass `cargo -q xtask check frontend`. Flag `any` casts, `@ts-ignore`, and disabled lint rules without justification.
 
 ## 2. Svelte 5 Correctness
 

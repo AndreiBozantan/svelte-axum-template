@@ -132,15 +132,6 @@ Decisions that gate later work:
       record the decision + rationale as the first section of a new `docs/design/frontend.md`
       ([Design docs](#design-docs)) — [09 § 9.4](09-frontend-code-quality.md#94--sidebar-navigation-does-full-page-reloads-spa-routing-only-half-exists) ([#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205))
 
-Tooling that protects every later commit:
-
-- [ ] CI supply-chain gating: `cargo audit`/`cargo deny` + `npm audit` as PR gates; Semgrep on
-      PRs; Dependabot/Renovate — [06 § 6.1/6.2](06-dependency-supply-chain.md#61--no-dependency-vulnerability-scanning-runs-in-ci),
-      [17 § 17.1](17-cicd.md#171--security-scanning-is-not-a-required-pr-gate) ([#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206))
-- [ ] Enforce lint-level style rules through tooling (formatting is already gated): ESLint
-      (`typescript-eslint` + `eslint-plugin-svelte`) wired into hooks + CI, and a
-      `[workspace.lints]` table in the root `Cargo.toml` — [18 § 18.6](18-documentation-dx.md#186--formatting-is-tooled-and-ci-gated-but-lint-level-style-rules-are-not) ([#207](https://github.com/AndreiBozantan/svelte-axum-template/issues/207))
-
 ## Stage B — The authorization & multi-tenancy refactor (the spine)
 
 Implements the [authorization design](../docs/design/authorization.md), landed as

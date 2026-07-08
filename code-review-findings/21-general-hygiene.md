@@ -6,6 +6,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.1 — `console.log`/`console.error` left in frontend production code
+
 - **GitHub Issue:** [#267](https://github.com/AndreiBozantan/svelte-axum-template/issues/267)
 
 - **Severity:** Minor
@@ -21,13 +22,14 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.2 — Commented-out code blocks
+
 - **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
 - **Location:** `frontend/src/App.svelte:11` (`// await new Promise(... setTimeout ... 900)`),
   `frontend/src/pages/Settings.svelte:82-105` (large commented-out CSS/button block),
   `frontend/src/lib/common.rs` n/a; `backend/platform/shared/common.rs:8` (`// pub type AppContext
-  = ...`).
+= ...`).
 - **Finding:** Dead commented-out code in a few spots (an artificial loading delay, a big CSS
   comment block, a commented type alias). Review criteria: delete commented-out code.
 - **Recommendation:** Remove them; git history preserves anything needed.
@@ -35,6 +37,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.3 — `AppState.userId` field is unused / dead
+
 - **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
@@ -46,6 +49,7 @@ paths, constants extracted, clippy-clean. Findings are small.
 ---
 
 ## 21.4 — Inconsistent import style vs the documented convention
+
 - **GitHub Issue:** [#261](https://github.com/AndreiBozantan/svelte-axum-template/issues/261)
 
 - **Severity:** Minor
@@ -61,12 +65,12 @@ paths, constants extracted, clippy-clean. Findings are small.
   (`use module::MyType;`) and drop the `module::MyType` qualification style. Rationale: it is
   the dominant Rust ecosystem idiom and reduces per-file noise/token count. The work is:
   (a) update the imports section of `AGENTS.md`; (b) sweep the backend files that still follow
-  the old style; (c) new code follows the new convention immediately. See also
-  [18 § 18.6](18-documentation-dx.md#186--formatting-is-tooled-and-ci-gated-but-lint-level-style-rules-are-not) — encode style conventions as tool rules where possible.
+  the old style; (c) new code follows the new convention immediately.
 
 ---
 
 ## 21.5 — Minor naming/label inconsistencies
+
 - **GitHub Issue:** [#268](https://github.com/AndreiBozantan/svelte-axum-template/issues/268)
 
 - **Severity:** Minor
