@@ -42,4 +42,4 @@ jobs:
               uses: Swatinem/rust-cache@v2
 
             - name: Check markdown links
-              run: cargo xtask check-md-links
+              run: cargo -q xtask check docs
