@@ -16,7 +16,7 @@ use crate::platform::rate_limiter::extract_client_ip;
 fn test_extract_client_ip() -> Result<(), axum::http::Error> {
     use std::sync::atomic::Ordering;
 
-    // By default, trusted_proxy is false
+    // by default, trusted_proxy is false
     crate::platform::rate_limiter::TRUSTED_PROXY.store(false, Ordering::Relaxed);
 
     // test headers ignored when trusted_proxy is false
@@ -28,7 +28,7 @@ fn test_extract_client_ip() -> Result<(), axum::http::Error> {
     let req2 = Request::builder().header("x-real-ip", "203.0.113.196").body(())?;
     assert_eq!(extract_client_ip(&req2), "unknown");
 
-    // Enable trusted proxy
+    // enable trusted proxy
     crate::platform::rate_limiter::TRUSTED_PROXY.store(true, Ordering::Relaxed);
 
     // test headers honored when trusted_proxy is true

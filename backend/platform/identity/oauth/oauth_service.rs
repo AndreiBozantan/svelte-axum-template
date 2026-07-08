@@ -168,12 +168,6 @@ pub fn validate_google_config(config: &config::OAuthSettings) -> Result<(), Erro
     Ok(())
 }
 
-pub fn check_oauth_config(config: &config::OAuthSettings) {
-    if let Err(error) = validate_google_config(config) {
-        warn!(error = error.to_string(), provider = "google", "incomplete_config");
-    }
-}
-
 fn create_google_client(config: &config::OAuthSettings) -> Result<GoogleOAuth2Client, Error> {
     validate_google_config(config)?;
     let redirect_url = oauth2::RedirectUrl::new(config.google_redirect_uri.clone())?;
@@ -266,9 +260,19 @@ impl Service {
         }
 
         let client = create_google_client(&self.context.settings.oauth)?;
-        let oauth_client = oauth2::reqwest::ClientBuilder::new()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()?;
+        let http_client_settings = &self.context.settings.http_client;
+        let mut oauth_client_builder = oauth2::reqwest::ClientBuilder::new();
+        // a configured value of 0 means "no timeout"
+        if http_client_settings.timeout_seconds > 0 {
+            oauth_client_builder =
+                oauth_client_builder.timeout(std::time::Duration::from_secs(http_client_settings.timeout_seconds));
+        }
+        if http_client_settings.connect_timeout_seconds > 0 {
+            oauth_client_builder = oauth_client_builder.connect_timeout(std::time::Duration::from_secs(
+                http_client_settings.connect_timeout_seconds,
+            ));
+        }
+        let oauth_client = oauth_client_builder.build()?;
 
         let pkce_verifier = oauth2::PkceCodeVerifier::new(token_data.claims.pkce_verifier);
 
@@ -284,7 +288,6 @@ impl Service {
             .http_client
             .get("https://www.googleapis.com/oauth2/v2/userinfo")
             .bearer_auth(access_token)
-            .timeout(std::time::Duration::from_secs(10))
             .send()
             .await?
             .error_for_status()?;

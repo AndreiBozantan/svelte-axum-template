@@ -788,6 +788,13 @@ async fn test_begin_google_flow_adds_prompt() -> TestResult {
             google_redirect_uri: "http://localhost/callback".to_string(),
             ..Default::default()
         },
+        // the default database url points at the on-disk dev database; tests must not touch it
+        database: crate::platform::config::DatabaseSettings {
+            url: "sqlite::memory:".to_string(),
+            min_connections: 1,
+            max_connections: 1,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let ctx = crate::platform::common::Context::create(settings, "test__secret__key__for__jwt__testing").await?;

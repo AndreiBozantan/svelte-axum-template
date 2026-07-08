@@ -24,7 +24,30 @@ pub struct AppSettings {
     pub oauth: OAuthSettings,
 
     #[serde(default)]
+    pub http_client: HttpClientSettings,
+
+    #[serde(default)]
     pub rate_limiter: AppRateLimiterSettings,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct HttpClientSettings {
+    /// Total request timeout in seconds (connect + TLS + response body).
+    #[serde(default)]
+    pub timeout_seconds: u64,
+
+    /// Connection establishment timeout in seconds.
+    #[serde(default)]
+    pub connect_timeout_seconds: u64,
+}
+
+impl Default for HttpClientSettings {
+    fn default() -> Self {
+        Self {
+            timeout_seconds: 10,
+            connect_timeout_seconds: 5,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -149,6 +172,9 @@ pub enum Error {
 
     #[error("TOML serialization error: {0}")]
     SerializationFailed(#[from] toml::ser::Error),
+
+    #[error("Configuration validation failed: {0}")]
+    ValidationFailed(String),
 }
 
 impl AppSettings {
@@ -201,12 +227,81 @@ impl AppSettings {
             fs::write(&env_config_path, settings_str)?;
         }
 
+        // Validate the configuration before returning it
+        settings.validate()?;
+
         Ok(settings)
     }
 
     #[must_use]
     pub fn get_server_address(&self) -> String {
         format!("{}:{}", self.server.host, self.server.port)
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        use std::str::FromStr;
+
+        // validate environment
+        let env = self.server.env.as_str();
+        if env != constants::env::PRODUCTION && env != constants::env::DEVELOPMENT && env != constants::env::TEST {
+            return Err(Error::ValidationFailed(format!(
+                "invalid server environment '{}', must be one of: {}, {}, {}",
+                env,
+                constants::env::PRODUCTION,
+                constants::env::DEVELOPMENT,
+                constants::env::TEST
+            )));
+        }
+
+        // validate database URL
+        if self.database.url.is_empty() {
+            return Err(Error::ValidationFailed("database URL cannot be empty".to_string()));
+        }
+
+        if !self.database.url.starts_with("sqlite:") && self.database.url != ":memory:" {
+            return Err(Error::ValidationFailed(
+                "invalid database URL: must start with 'sqlite:' or be ':memory:'".to_string(),
+            ));
+        }
+
+        sqlx::sqlite::SqliteConnectOptions::from_str(&self.database.url)
+            .map_err(|err| Error::ValidationFailed(format!("invalid database URL: {err}")))?;
+
+        // validate OAuth settings if any OAuth field is set
+        let has_oauth_field = !self.oauth.google_client_id.is_empty()
+            || !self.oauth.google_client_secret.is_empty()
+            || !self.oauth.google_redirect_uri.is_empty();
+
+        if has_oauth_field {
+            if self.oauth.google_client_id.is_empty() {
+                return Err(Error::ValidationFailed(
+                    "Google Client ID is required when OAuth is configured".to_string(),
+                ));
+            }
+            if self.oauth.google_client_secret.is_empty() {
+                return Err(Error::ValidationFailed(
+                    "Google Client Secret is required when OAuth is configured".to_string(),
+                ));
+            }
+            if self.oauth.google_redirect_uri.is_empty() {
+                return Err(Error::ValidationFailed(
+                    "Google Redirect URI is required when OAuth is configured".to_string(),
+                ));
+            }
+
+            let parsed = url::Url::parse(&self.oauth.google_redirect_uri)
+                .map_err(|err| Error::ValidationFailed(format!("invalid Google redirect URI: {err}")))?;
+
+            let host = parsed.host_str().unwrap_or("");
+            let is_localhost = host == "localhost" || host == "127.0.0.1" || host == "::1";
+            if parsed.scheme() != "https" && !is_localhost {
+                return Err(Error::ValidationFailed(
+                    "Google Redirect URI must use HTTPS in non-localhost environments".to_string(),
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_config_dir() -> Result<PathBuf, std::io::Error> {

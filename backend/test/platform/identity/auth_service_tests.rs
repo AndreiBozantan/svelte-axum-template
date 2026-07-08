@@ -72,7 +72,7 @@ async fn oauth_user_linking_existing_password_user() -> TestResult {
     let res = auth_service.login_oauth(command).await?;
     assert_eq!(res.user.id, user.id);
 
-    // Query DB to verify SSO info was linked
+    // query DB to verify SSO info was linked
     let sso_info_after = users::db::Repository.find_sso_info_by_id(&ctx.db, user.id).await?;
     assert_eq!(sso_info_after.sso_provider, Some("google".to_string()));
     assert_eq!(sso_info_after.sso_id, Some("google-linked-id".to_string()));
@@ -126,12 +126,12 @@ async fn suspended_user_login_and_refresh_failure() -> TestResult {
         .register(
             email.clone(),
             "super_secure_pass_123".to_string(),
-            Some("Suspended".to_string()),
-            Some("User".to_string()),
+            Some("John".to_string()),
+            Some("Wick".to_string()),
         )
         .await?;
 
-    // Initial login should succeed when user is active
+    // initial login should succeed when user is active
     let login_cmd = auth::LoginCommand {
         email: email.clone(),
         password: "super_secure_pass_123".to_string(),
@@ -139,18 +139,18 @@ async fn suspended_user_login_and_refresh_failure() -> TestResult {
     let auth_res = auth_service.login(login_cmd.clone()).await?;
     assert_eq!(auth_res.user.id, user.id);
 
-    // Now suspend the user in the database
+    // now suspend the user in the database
     sqlx::query("UPDATE users SET status = 'suspended' WHERE id = ?")
         .bind(user.id.0)
         .execute(&ctx.db)
         .await?;
 
-    // Subsequent login should fail
+    // subsequent login should fail
     let login_err = auth_service.login(login_cmd).await;
     assert!(login_err.is_err());
     assert!(matches!(login_err, Err(auth::Error::InvalidCredentials)));
 
-    // Refresh should fail
+    // refresh should fail
     let refresh_err = auth_service.refresh(&auth_res.refresh_token.value).await;
     assert!(refresh_err.is_err());
     assert!(matches!(refresh_err, Err(auth::Error::InvalidToken)));

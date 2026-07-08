@@ -20,12 +20,24 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 # WORKFLOW
 
-- when asked a question or for proposals/alternatives: answer and explain, do NOT change code until told to proceed
-- when asked to evaluate a review finding or plan: verify the claim against the actual code first, judge whether it really applies, explain your assessment, then wait for a go-ahead
-- implement larger changes as a sequence of small, individually reviewable steps; stop after each step for review
-- never run `git commit` or `git push` - the user reviews and commits
+- when asked a question: answer, explain, give alternative solution, do NOT change code until told to proceed
+- do not run git commit, unless explicitly asked
+- implement larger changes as a sequence of small, individually reviewable steps and stop after each step for review
 - if the user edited files since your last read, re-read them before making further changes
 - ask clarifying questions when the request is ambiguous, before writing code
+- after completing code changes run `cargo -q xtask check backend` and/or `cargo -q xtask check frontend` and fix any issues
+- when introducing new code write new tests, including a test which fails before fixing code issues
+
+# CODING STYLE
+
+- purity: domain logic functions should be pure (no direct I/O, DB queries, random or system clock calls)
+- functional idioms: prefer method chaining and composition, avoiding intermediate variables and imperative loops with mutable state
+- separation of concerns: I/O, DB access, and HTTP handling should be separate from domain logic
+- type complexity: avoid deeply nested generics or trait bounds unless justified
+- cyclomatic complexity: if a function has more than ~7 decision branches, recommend splitting (excluding exhaustive `match` on sealed enums)
+- nesting depth: logic buried 3+ levels in is hard to read and usually means errors aren't being surfaced properly
+- coupling: avoid reaching into other modules' internals and favor dependency injection
+- single line comments should start with lowercase
 
 # BACKEND STRUCTURE
 
@@ -45,15 +57,16 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 # BACKEND CODING STYLE
 
-- imports: `use module;` and then qualify types with `module::MyType` in the code; avoid `use module::MyType`.
+- use idiomatic Rust and work like an world-expert Rust senior software engineer
+- prioritize following already existing patterns from the surrounding code
 - avoid map_err and use error conversions instead
-- use chaining of method calls when possible, in a functional programming style
+- prefer early returns and ?-propagation over deeply nested if let / match chains
 - use validator::Validate to validate the inputs
+- prefer newtype wrappers over raw primitives for domain IDs
+- avoid unnecessary `.clone()` as a shortcut for fixing borrow issues — it's often a symptom of a structural problem
+- avoid multiple grouped imports in brackets on the same line
 - structured logging: log message must be short, lowercase, using underscores, no spaces; use key-value fields; example:
   `warn!(user_id = user.id.0, error = %err, "password_rehash_failed");`
-- run `cargo clippy --workspace --all-targets` after every change and fix the issues
-- use idiomatic Rust and work like an world-expert Rust senior software engineer
-- prioritize following already existing patterns from the code
 
 # API & CODEGEN
 
@@ -65,9 +78,9 @@ Dev Env: VS Code devcontainer is the preferred development environment (pre-conf
 
 # GIT HOOKS
 
-- configured in `.githooks/` and installed via `cargo xtask setup-hooks` (also executed with `cargo xtask dev-init`)
-- `pre-commit`: runs `cargo fmt`, `cargo clippy`, and `sqlx prepare --check` if backend/xtask changes are staged; runs `prettier` and `svelte-check` if frontend changes are staged
-- `pre-push`: runs backend tests (`cargo test`) and frontend tests (`vitest`) selectively based on what directories have changed
+- configured in `.githooks/` and installed via `cargo xtask setup-hooks`, also executed with `cargo xtask dev init`
+- `pre-commit`: backend: formatting, clippy, sqlx; frontend: svelte-check, prettier. Run `cargo xtask make format` to automatically format all files.
+- `pre-push`: backend (`cargo test`) and/or frontend (`vitest`) tests based on what directories have changed
 
 # CUSTOM AGENT SKILLS
 

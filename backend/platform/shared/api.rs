@@ -110,6 +110,16 @@ impl Error {
     }
 
     #[must_use]
+    pub fn request_timeout() -> Self {
+        Self::new(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "request_timeout",
+            "The request took too long to process. Please try again later.",
+            None,
+        )
+    }
+
+    #[must_use]
     pub fn validation_failed(
         field: &str,
         message: &str,
@@ -242,13 +252,6 @@ where
 /// A custom JSON extractor that wraps axum's standard `Json` extractor to intercept
 /// deserialization/parsing errors and return them as a structured `api::Error`.
 pub struct Json<T>(pub T);
-
-impl<T> Json<T> {
-    #[allow(dead_code)]
-    pub fn data(self) -> T {
-        self.0
-    }
-}
 
 impl<T> From<T> for Json<T> {
     fn from(value: T) -> Self {

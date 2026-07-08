@@ -55,7 +55,7 @@ jobs:
               uses: Swatinem/rust-cache@v2
 
             - name: Run all backend checks
-              run: cargo xtask ci-backend
+              run: cargo xtask check backend
 
     frontend-checks:
         name: Frontend (Svelte)
@@ -76,7 +76,7 @@ jobs:
               working-directory: frontend
 
             - name: Run all frontend checks
-              run: cargo xtask ci-frontend
+              run: cargo xtask check frontend
               env:
                   RUSTC_WRAPPER: "" # bypasses sccache for compiling xtask
                   RUSTFLAGS: "-C linker=cc" # override repository-level config, to compile the xtask with the cc linker - avoids installing lld

@@ -29,3 +29,8 @@ google_redirect_uri = ""   # 🚀 add your actual redirect URI here
 
 # Session timeout for OAuth flow (in minutes) - shorter for production
 session_timeout_minutes = 5
+
+# Outbound HTTP client (used for OAuth token exchange and provider userinfo calls)
+[http_client]
+timeout_seconds = 10         # total request budget: connect + TLS + response body; 0 = no timeout
+connect_timeout_seconds = 5  # fail fast when the remote is unreachable; 0 = no timeout

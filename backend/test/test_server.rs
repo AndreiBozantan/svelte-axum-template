@@ -156,7 +156,7 @@ async fn test_security_headers() -> TestResult {
     response.assert_header(axum::http::header::REFERRER_POLICY, "strict-origin-when-cross-origin");
     response.assert_header(
         axum::http::header::CONTENT_SECURITY_POLICY,
-        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none';"
+        "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none';"
     );
     response.assert_header(
         axum::http::header::STRICT_TRANSPORT_SECURITY,
