@@ -154,6 +154,15 @@ pub fn check_frontend_fmt() -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn check_frontend_lint() -> std::io::Result<()> {
+    println!("Running frontend lints (ESLint)...");
+    let status = crate::run_command("npm", &["run", "lint:check"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
 pub fn check_frontend_diagnostics() -> std::io::Result<()> {
     println!("Checking frontend types (svelte-check)...");
     let status = crate::run_command("npm", &["run", "check"], Some("frontend"))?;
@@ -261,6 +270,7 @@ pub fn backend() -> std::io::Result<()> {
 pub fn frontend() -> std::io::Result<()> {
     println!("Running all frontend CI checks...");
     check_frontend_fmt()?;
+    check_frontend_lint()?;
     check_frontend_diagnostics()?;
     check_frontend_build()?;
     check_frontend_test()?;
@@ -320,6 +330,7 @@ pub fn pre_commit() -> std::io::Result<()> {
 
     if has_frontend {
         check_frontend_fmt()?;
+        check_frontend_lint()?;
         check_frontend_openapi_drift()?;
     } else {
         println!("No frontend changes detected. Skipping frontend formatting and client drift check.");
@@ -372,6 +383,7 @@ pub fn pre_push() -> std::io::Result<()> {
     }
 
     if has_frontend {
+        check_frontend_lint()?;
         check_frontend_diagnostics()?;
         check_frontend_test()?;
         check_frontend_openapi_drift()?;
