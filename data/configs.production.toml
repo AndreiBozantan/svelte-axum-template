@@ -1,5 +1,4 @@
 [server]
-env = "production"
 host = "0.0.0.0"
 port = 3000
 log_directives = "info,tower_http=warn,axum=warn"

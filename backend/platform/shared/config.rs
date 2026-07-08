@@ -131,9 +131,6 @@ impl Default for OAuthSettings {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ServerSettings {
     #[serde(default)]
-    pub env: String,
-
-    #[serde(default)]
     pub host: String,
 
     #[serde(default)]
@@ -152,7 +149,6 @@ pub struct ServerSettings {
 impl Default for ServerSettings {
     fn default() -> Self {
         Self {
-            env: constants::env::PRODUCTION.to_string(),
             host: "0.0.0.0".to_string(),
             port: 3000,
             log_directives: "info,tower_http=info,axum=info".to_string(),
@@ -177,6 +173,30 @@ pub enum Error {
     ValidationFailed(String),
 }
 
+pub fn get_app_env() -> Result<String, Error> {
+    get_app_env_impl(|key| std::env::var(key).ok())
+}
+
+pub fn get_app_env_impl<F>(lookup: F) -> Result<String, Error>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let env = lookup("APP__SERVER__ENV")
+        .or_else(|| lookup("APP_ENV"))
+        .unwrap_or_else(|| constants::env::PRODUCTION.to_string());
+
+    if env != constants::env::PRODUCTION && env != constants::env::DEVELOPMENT && env != constants::env::TEST {
+        return Err(Error::ValidationFailed(format!(
+            "invalid server environment '{env}', must be one of: {}, {}, {}",
+            constants::env::PRODUCTION,
+            constants::env::DEVELOPMENT,
+            constants::env::TEST
+        )));
+    }
+
+    Ok(env)
+}
+
 impl AppSettings {
     pub fn new() -> Result<Self, Error> {
         let config_dir = Self::get_config_dir()?;
@@ -187,16 +207,14 @@ impl AppSettings {
         let default_toml = toml::to_string(&default_settings)?;
         builder = builder.add_source(File::from_str(&default_toml, ::config::FileFormat::Toml));
 
+        // Determine environment strictly from process environment, defaulting to production
+        let app_run_env = get_app_env()?;
+
         // layer 1: add common configuration from files
         let common_config_path = config_dir.join("configs.common.toml");
         if common_config_path.exists() {
             builder = builder.add_source(File::from(common_config_path));
         }
-
-        // clone the builder so we don't mutate the original builder state prematurely
-        let partial_config = builder.clone().build()?.try_deserialize::<Self>()?;
-        // extract the app_run_env from the common config, which will determine which environment-specific config file to load
-        let app_run_env = partial_config.server.env.as_str();
 
         // layer 2: add environment-specific config
         let env_config_path = config_dir.join(format!("configs.{app_run_env}.toml"));
@@ -240,18 +258,6 @@ impl AppSettings {
 
     pub fn validate(&self) -> Result<(), Error> {
         use std::str::FromStr;
-
-        // validate environment
-        let env = self.server.env.as_str();
-        if env != constants::env::PRODUCTION && env != constants::env::DEVELOPMENT && env != constants::env::TEST {
-            return Err(Error::ValidationFailed(format!(
-                "invalid server environment '{}', must be one of: {}, {}, {}",
-                env,
-                constants::env::PRODUCTION,
-                constants::env::DEVELOPMENT,
-                constants::env::TEST
-            )));
-        }
 
         // validate database URL
         if self.database.url.is_empty() {

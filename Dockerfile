@@ -91,6 +91,8 @@ COPY --from=backend-builder /build/target/release/app /usr/local/bin/app
 # Copy the pristine empty directory and map it to /data with nonroot ownership
 COPY --from=backend-builder --chown=nonroot:nonroot /tmp/empty_data /data
 
+ENV APP__SERVER__ENV=production
+
 # Start the application
 WORKDIR /
 EXPOSE 3000

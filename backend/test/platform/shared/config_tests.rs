@@ -8,10 +8,15 @@ fn test_default_config_is_valid() {
 
 #[test]
 fn test_invalid_environment_fails() {
-    let mut settings = AppSettings::default();
-    settings.server.env = "invalid_env".to_string();
-    let Err(err) = settings.validate() else {
-        panic!("expected ValidationError");
+    let res = crate::platform::config::get_app_env_impl(|key| {
+        if key == "APP__SERVER__ENV" {
+            Some("invalid_env".to_string())
+        } else {
+            None
+        }
+    });
+    let Err(err) = res else {
+        panic!("expected get_app_env_impl to fail with invalid environment");
     };
     let err_msg = err.to_string();
     assert!(err_msg.contains("invalid server environment"));
@@ -92,4 +97,17 @@ fn test_valid_oauth_succeeds() {
     settings.oauth.google_client_secret = "some-secret".to_string();
     settings.oauth.google_redirect_uri = "https://example.com/oauth".to_string();
     assert!(settings.validate().is_ok());
+}
+
+#[test]
+fn test_env_from_process_env_only() -> Result<(), Box<dyn std::error::Error>> {
+    let env = crate::platform::config::get_app_env_impl(|key| {
+        if key == "APP__SERVER__ENV" {
+            Some("test".to_string())
+        } else {
+            None
+        }
+    })?;
+    assert_eq!(env, "test");
+    Ok(())
 }
