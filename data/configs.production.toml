@@ -33,3 +33,22 @@ session_timeout_minutes = 5
 [http_client]
 timeout_seconds = 10         # total request budget: connect + TLS + response body; 0 = no timeout
 connect_timeout_seconds = 5  # fail fast when the remote is unreachable; 0 = no timeout
+
+# The rate limiter is backed by the GCRA (Generic Cell Rate Algorithm) token bucket.
+# - rate: The number of requests allowed over the configured period.
+# - period_in_seconds: The duration in seconds of the measurement period.
+# - burst_size: The capacity of the bucket (maximum number of requests allowed in a sudden burst).
+#
+[rate_limiter]
+# Global rate limit settings
+global.enabled = true
+global.rate = 1000
+global.period_in_seconds = 1
+global.burst_size = 2000 # Max capacity of 2000 requests, replenishing 1000 requests every 1 second
+
+# Login/Register specific rate limit settings
+login.enabled = true
+login.rate = 10
+login.period_in_seconds = 60 # 10 requests per 60 seconds (1 request every 6 seconds on average)
+login.burst_size = 10 # Max capacity of 10 requests, replenishing 10 requests every 60 seconds
+
