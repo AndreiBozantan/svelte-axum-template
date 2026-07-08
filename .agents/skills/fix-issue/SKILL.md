@@ -22,12 +22,12 @@ Given a link, `#number`, or direct text description of a GitHub issue, resolve i
 6. **Plan and pause.** For anything beyond a one-file, obvious fix: write the plan as small, individually reviewable steps (per `AGENTS.md`), and stop for approval before touching code. Ask clarifying questions instead of guessing when the issue is ambiguous. Use plan mode for multi-file or multi-step work.
 
 7. **Implement one step at a time.** After approval, apply a single step, then run what's relevant to what changed before moving to the next:
-   - `cargo clippy --workspace --all-targets` and `cargo test` for backend changes
-   - `cargo xtask openapi` whenever an endpoint or DTO changed, and confirm the regenerated frontend client still compiles
-   - frontend checks/tests (`svelte-check`, `vitest`) for frontend changes
+   - `cargo xtask check backend` for backend changes
+   - `cargo xtask make openapi` whenever an endpoint or DTO changed, and confirm the regenerated frontend client still compiles
+   - `cargo xtask check frontend` for frontend changes
    Stop after each step for review rather than delivering the whole issue as one big diff.
 
-8. **Definition of done.** Before calling it finished, confirm (this applies to any issue, not just plan-sourced ones): new code has automated tests, `cargo clippy --workspace --all-targets` is clean, `cargo test` is green, frontend checks/tests are green if frontend files were touched, `cargo xtask openapi` was re-run if the API surface changed, and the change follows `docs/api/conventions.md` and `AGENTS.md`.
+8. **Definition of done.** Before calling it finished, confirm (this applies to any issue, not just plan-sourced ones): new code has automated tests, `cargo xtask check backend` is clean/green, `cargo xtask check frontend` is clean/green if frontend files were touched, `cargo xtask make openapi` was re-run if the API surface changed, and the change follows `docs/api/conventions.md` and `AGENTS.md`.
 
 9. **Stop short of git.** Never run `git commit` or `git push` — summarize what changed and let the user test and commit. Do not edit `code-review-findings/stabilization-plan.md` (e.g. checking off the box) unless the user asks.
 
