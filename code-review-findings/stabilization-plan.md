@@ -129,17 +129,11 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
-The first eight items shipped as stacked PRs — branches, merge order, and review notes are
-tracked in [stabilization-plan-stage-a-prs.md](stabilization-plan-stage-a-prs.md); each item
-below also links its PR.
-
 Configuration correctness:
 
 - [ ] Environment selection: `env` only from the process environment; remove it from all TOML
       layers; set it in Dockerfile/compose/xtask — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
       [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none) ([#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203))
-- [ ] Fail-fast config validation at startup (esp. production) —
-      [15 § 15.2](15-configuration-environment.md#152--no-fail-fast-validation-of-required-configuration-at-startup) ([#204](https://github.com/AndreiBozantan/svelte-axum-template/issues/204))
 
 Decisions that gate later work:
 
