@@ -237,14 +237,6 @@ impl AppSettings {
         // build the config
         let settings = builder.build()?.try_deserialize::<Self>()?;
 
-        // in the production environment, create the config file if it doesn't exist
-        // this allows users to easily modify the file without needing to copy it during deployment
-        if app_run_env == constants::env::PRODUCTION && !env_config_exists {
-            println!("Creating default config file at {}", env_config_path.to_string_lossy());
-            let settings_str = toml::to_string(&settings)?;
-            fs::write(&env_config_path, settings_str)?;
-        }
-
         // Validate the configuration before returning it
         settings.validate()?;
 
