@@ -225,15 +225,13 @@ async fn test_asset_and_api_compression() -> TestResult {
     response_api_gzip.assert_header(axum::http::header::CONTENT_ENCODING, "gzip");
 
     // --- TEST 2: Brotli compression on Static Assets ---
-    // In CI, index.html might be missing if the frontend isn't built,
-    // so we test against the API instead.
-    let response_api_br = server
-        .get("/api/health")
+    let response_static_br = server
+        .get("/")
         .add_header(axum::http::header::ACCEPT_ENCODING, "br")
         .await;
 
-    response_api_br.assert_status(StatusCode::OK);
-    response_api_br.assert_header(axum::http::header::CONTENT_ENCODING, "br");
+    response_static_br.assert_status(StatusCode::OK);
+    response_static_br.assert_header(axum::http::header::CONTENT_ENCODING, "br");
 
     Ok(())
 }

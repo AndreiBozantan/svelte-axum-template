@@ -1,7 +1,3 @@
-use crate::platform::api;
-use crate::platform::assets;
-use crate::platform::cookies;
-use crate::platform::rate_limiter;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::Request;
@@ -15,7 +11,11 @@ use tracing::error;
 use tracing::info;
 use utoipax::router::OpenApiRouter;
 
+use crate::platform::api;
+use crate::platform::assets;
 use crate::platform::common::ArcContext;
+use crate::platform::cookies;
+use crate::platform::rate_limiter;
 
 #[derive(Clone)]
 struct CustomPanicHandler;

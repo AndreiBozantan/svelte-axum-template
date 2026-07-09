@@ -34,8 +34,8 @@ pub async fn static_handler(
         },
     };
 
-    let etag = format!("W/\"{}\"", hex::encode(asset.metadata.sha256_hash()));
-    // check If-None-Match header for client caching (304 Not Modified)
+    let etag = hex::encode(asset.metadata.sha256_hash());
+    let etag = format!("W/\"{etag}\""); // check If-None-Match header for client caching (304 Not Modified)
     if headers
         .get(header::IF_NONE_MATCH)
         .and_then(|val| val.to_str().ok())
