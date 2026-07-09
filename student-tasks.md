@@ -1,6 +1,6 @@
 # Starter Student Tasks
 
-## 1. Frontend: Finish SPA Routing or Adopt `svelte-spa-router`
+## Frontend: Finish SPA Routing or Adopt `svelte-spa-router`
 
 - **GitHub Issue:** [#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205)
 - **Files to edit:**
@@ -12,7 +12,7 @@
 - **Educational Value:** A solid architectural task that teaches routing concepts, event interception, and Svelte 5 state management. The performance gain is immediate and highly visible.
 - **Estimated Time:** 45–60 minutes.
 
-## 2. Tooling & DX: Configure and Enforce ESLint and Rust Workspace Lints
+## Tooling & DX: Configure and Enforce ESLint and Rust Workspace Lints
 
 - **GitHub Issue:** [#207](https://github.com/AndreiBozantan/svelte-axum-template/issues/207)
 - **Files to edit:**
@@ -24,18 +24,7 @@
 - **Educational Value:** Helps students get comfortable with build chains, Git hooks, and workspace-level project settings.
 - **Estimated Time:** 30–45 minutes.
 
-## 3. Backend: Implement Fail-Fast Configuration Validation at Startup
-
-- **GitHub Issue:** [#204](https://github.com/AndreiBozantan/svelte-axum-template/issues/204)
-- **Files to edit:**
-    - [config.rs](backend/platform/shared/config.rs)
-    - [server.rs](backend/server.rs)
-- **Description:**
-  Right now, the server will start up silently even if required configuration fields are missing or invalid (e.g. invalid DB URL, incomplete Google OAuth client credentials), which leads to failures later when users hit those routes. You will implement a robust validation method `AppSettings::validate()` that is executed on startup, verifying settings completeness and strength (especially in production), and writing unit tests to assert validation failures.
-- **Educational Value:** Excellent Rust backend task. It teaches validation patterns, parsing, and error propagation. Writing unit tests for configuration edge cases is highly structured.
-- **Estimated Time:** 30–50 minutes.
-
-## 4. Backend: Offload Argon2 Password Hashing to `spawn_blocking`
+## Backend: Offload Argon2 Password Hashing to `spawn_blocking`
 
 - **GitHub Issue:** [#228](https://github.com/AndreiBozantan/svelte-axum-template/issues/228)
 - **Files to edit:**
@@ -46,7 +35,7 @@
 - **Educational Value:** Teaches async scheduling concepts, the distinction between CPU-bound and I/O-bound tasks in Rust, and preventing executor starvation under load.
 - **Estimated Time:** 15–20 minutes.
 
-## 5. Backend & Ops: Configure SQLite Durability Settings and Connection Pool Timeout
+## Backend & Ops: Configure SQLite Durability Settings and Connection Pool Timeout
 
 - **GitHub Issue:** [#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229)
 - **Files to edit:**
@@ -57,7 +46,7 @@
 - **Educational Value:** Covers SQLite WAL performance tuning, connection pool configuration, database durability guarantees, and writing operational runbooks.
 - **Estimated Time:** 20–30 minutes.
 
-## 6. Backend & Observability: Implement Request ID Generation and Propagation
+## Backend & Observability: Implement Request ID Generation and Propagation
 
 - **GitHub Issue:** [#230](https://github.com/AndreiBozantan/svelte-axum-template/issues/230)
 - **Files to edit:**
@@ -68,17 +57,8 @@
 - **Educational Value:** Introduces request correlation, structured tracing, and context propagation in multi-layered HTTP services.
 - **Estimated Time:** 20–35 minutes.
 
-## 7. Backend & Resilience: Supervise and Log Background Cleanup Tasks
 
-- **GitHub Issue:** [#231](https://github.com/AndreiBozantan/svelte-axum-template/issues/231)
-- **Files to edit:**
-    - [server.rs](backend/server.rs)
-- **Description:**
-  The server spawns background loops to clean up expired refresh tokens and rate-limiter entries. If either of these loops panics, the task terminates silently, halting all future cleanup cycles without notifying the system. You will wrap these background loop bodies with panic recovery, log any unexpected task exits, and implement a basic supervision/restart pattern to ensure background tasks remain healthy and resilient.
-- **Educational Value:** Teaches supervision trees, panic recovery/handling in background Tokio tasks, and defensive programming for daemon threads.
-- **Estimated Time:** 15–25 minutes.
-
-## 8. DevOps: Add Container Healthchecks and Modernize Compose Configuration
+## DevOps: Add Container Healthchecks and Modernize Compose Configuration
 
 - **GitHub Issue:** [#232](https://github.com/AndreiBozantan/svelte-axum-template/issues/232)
 - **Files to edit:**
@@ -89,17 +69,7 @@
 - **Educational Value:** Covers container health monitoring, building and running checks on minimal `scratch` images, and maintaining modern Compose configuration files.
 - **Estimated Time:** 20–30 minutes.
 
-## 9. Backend & Performance: Enable HTTP Response Compression
-
-- **GitHub Issue:** [#233](https://github.com/AndreiBozantan/svelte-axum-template/issues/233)
-- **Files to edit:**
-    - [router.rs](backend/router.rs)
-- **Description:**
-  While static assets are cached and hashed correctly, the server currently serves HTML, JS, CSS, and JSON payloads completely uncompressed. You will configure `tower_http::compression::CompressionLayer` on the router to support dynamic compression (gzip, brotli, etc.) for text-based and API responses, reducing bandwidth consumption and improving page load latency.
-- **Educational Value:** Illustrates web performance optimization techniques and middleware integration in Rust HTTP routers.
-- **Estimated Time:** 10–15 minutes.
-
-## 10. Backend & Ops: Secure Diagnostic Endpoints and Separate Liveness/Readiness Probes
+## Backend & Ops: Secure Diagnostic Endpoints and Separate Liveness/Readiness Probes
 
 - **GitHub Issue:** [#234](https://github.com/AndreiBozantan/svelte-axum-template/issues/234)
 - **Files to edit:**
