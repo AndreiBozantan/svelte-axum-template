@@ -1,0 +1,47 @@
+name: Security Audit - Backend (Rust)
+
+on:
+    workflow_dispatch:
+    schedule:
+        - cron: '0 0 * * *' # Daily at midnight UTC
+    push:
+        branches: [main]
+        paths:
+            - 'Cargo.lock'
+    pull_request:
+        branches: [main]
+        paths:
+            - 'Cargo.lock'
+
+permissions:
+    contents: read
+
+jobs:
+    backend-audit:
+        name: Cargo Audit
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        permissions:
+            contents: read
+            checks: write
+            issues: write
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install cargo-audit precompiled binary
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-audit
+
+            - name: Cache RustSec Advisory Database
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cargo/advisory-db
+                  key: rustsec-advisory-db-${{ github.run_id }}
+                  restore-keys: |
+                      rustsec-advisory-db-
+
+            - name: Run Cargo Audit
+              uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
