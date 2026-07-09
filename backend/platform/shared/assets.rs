@@ -97,3 +97,44 @@ pub fn get_embedded_static_paths() -> Vec<String> {
         .filter(|p| p.starts_with("static/"))
         .collect()
 }
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    use axum::body::Body;
+    use axum::http::{
+        Request, StatusCode,
+        header::{ACCEPT_ENCODING, CONTENT_ENCODING},
+    };
+    use axum::{Router, routing::get};
+    use tower::ServiceExt;
+    use tower_http::compression::CompressionLayer;
+
+    #[tokio::test]
+    async fn test_static_assets_are_compressed() {
+        // Arrange: Creăm un router de test care include handler-ul tău și layer-ul de compresie
+        let app = Router::new()
+            .fallback(get(static_handler))
+            .layer(CompressionLayer::new().gzip(true).br(true));
+
+        // Simulăm un client care acceptă compresie gzip
+        let request = Request::builder()
+            .uri("/index.html")
+            .header(ACCEPT_ENCODING, "gzip")
+            .body(Body::default())
+            .unwrap();
+
+        // Act: Executăm cererea HTTP
+        let response = app.oneshot(request).await.unwrap();
+
+        // Assert: Verificăm că a returnat 200 OK și că răspunsul este comprimat
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let content_encoding = response.headers().get(CONTENT_ENCODING);
+        assert!(
+            content_encoding.is_some(),
+            "Header-ul Content-Encoding lipsește, răspunsul nu a fost comprimat!"
+        );
+        assert_eq!(content_encoding.unwrap(), "gzip");
+    }
+}

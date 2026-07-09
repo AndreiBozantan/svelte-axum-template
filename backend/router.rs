@@ -1,3 +1,7 @@
+use crate::platform::api;
+use crate::platform::assets;
+use crate::platform::cookies;
+use crate::platform::rate_limiter;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::Request;
@@ -6,14 +10,10 @@ use axum::response::Response;
 use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
+use tower_http::compression::CompressionLayer;
 use tracing::error;
 use tracing::info;
 use utoipax::router::OpenApiRouter;
-
-use crate::platform::api;
-use crate::platform::assets;
-use crate::platform::cookies;
-use crate::platform::rate_limiter;
 
 use crate::platform::common::ArcContext;
 
@@ -79,6 +79,7 @@ pub fn create(context: ArcContext) -> OpenApiRouter {
         .layer(axum::middleware::from_fn(timeout_middleware))
         .layer(axum::middleware::from_fn(security_headers_middleware))
         .layer(axum::extract::DefaultBodyLimit::max(2 * 1024 * 1024))
+        .layer(CompressionLayer::new().gzip(true).br(true))
         .with_state(context)
 }
 

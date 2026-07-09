@@ -135,7 +135,7 @@ dependencies = [
  "tokio",
  "toml",
  "tower",
- "tower-http",
+ "tower-http 0.5.2",
  "tower_governor",
  "tracing",
  "tracing-subscriber",
@@ -567,8 +567,6 @@ dependencies = [
  "compression-core",
  "flate2",
  "memchr",
- "zstd",
- "zstd-safe",
 ]
 
 [[package]]
@@ -2763,7 +2761,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -2804,7 +2802,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
- "tower-http",
+ "tower-http 0.6.11",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3909,12 +3907,11 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.11"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
+checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
 dependencies = [
  "async-compression",
- "base64",
  "bitflags",
  "bytes",
  "futures-core",
@@ -3930,12 +3927,27 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tokio-util",
- "tower",
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "tower-http"
+version = "0.6.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
+dependencies = [
+ "bitflags",
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body",
+ "pin-project-lite",
+ "tower",
+ "tower-layer",
+ "tower-service",
  "url",
- "uuid",
 ]
 
 [[package]]
@@ -4859,32 +4871,4 @@ dependencies = [
  "crc32fast",
  "log",
  "simd-adler32",
-]
-
-[[package]]
-name = "zstd"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
-dependencies = [
- "zstd-safe",
-]
-
-[[package]]
-name = "zstd-safe"
-version = "7.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
-dependencies = [
- "zstd-sys",
-]
-
-[[package]]
-name = "zstd-sys"
-version = "2.0.16+zstd.1.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
-dependencies = [
- "cc",
- "pkg-config",
 ]
