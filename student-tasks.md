@@ -1,5 +1,17 @@
 # Starter Student Tasks
 
+## Frontend & Tooling: Extract Auth Refresh Manager as an npm Package
+
+- **GitHub Issue:** [#273](https://github.com/AndreiBozantan/svelte-axum-template/issues/273)
+- **Files to edit:**
+    - [auth-refresh-manager.ts](frontend/src/lib/auth-refresh-manager.ts)
+    - [auth-refresh-manager.test.ts](frontend/test/auth-refresh-manager.test.ts)
+    - [package.json](frontend/package.json)
+- **Description:**
+  The `AuthRefreshManager` utility encapsulates token-refresh scheduling, web locks, and local storage state, and is currently tightly coupled to the main frontend application folder. To promote reusability and clean separation of concerns, you will extract the manager and its comprehensive unit tests into a dedicated, self-contained npm package. You will set up a local workspace (e.g., using npm workspaces or a separate folder with local linking), build the package with TypeScript/Vite, run its tests in isolation via Vitest, and import the package back into the frontend application to replace the local module import. Additionally, you will document/explore the configuration required to optionally publish this package to the public npm registry (or a registry like GitHub Packages).
+- **Educational Value:** Teaches monorepo setup, package publishing/linking concepts, modular front-end architecture, and configuring build tools (Vite, TypeScript, Vitest) for library packages.
+- **Estimated Time:** 40–60 minutes.
+
 ## Frontend: Finish SPA Routing or Adopt `svelte-spa-router`
 
 - **GitHub Issue:** [#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205)
