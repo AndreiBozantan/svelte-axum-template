@@ -41,7 +41,7 @@ tokio = { version = "1.51", features = ["full"] }
 toml = { version = "1.1" }
 tower = { version = "0.5" }
 tower_governor = { version = "0.8", features = ["axum"] }
-tower-http = { version = "0.5", features = ["trace", "catch-panic", "fs", "compression-gzip", "compression-br"] }
+tower-http = { version = "0.6", features = ["trace", "catch-panic", "fs", "compression-gzip", "compression-br"] }
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2.5" }

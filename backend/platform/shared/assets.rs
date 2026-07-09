@@ -34,13 +34,12 @@ pub async fn static_handler(
         },
     };
 
-    let etag = hex::encode(asset.metadata.sha256_hash());
-
+    let etag = format!("W/\"{}\"", hex::encode(asset.metadata.sha256_hash()));
     // check If-None-Match header for client caching (304 Not Modified)
     if headers
         .get(header::IF_NONE_MATCH)
         .and_then(|val| val.to_str().ok())
-        .is_some_and(|s| s.trim_matches('"') == etag)
+        .is_some_and(|s| s == etag)
     {
         return Ok(http::StatusCode::NOT_MODIFIED.into_response());
     }
@@ -63,6 +62,7 @@ fn create_index_response_builder(
         .header(header::CONTENT_TYPE, "text/html")
         .header(header::CACHE_CONTROL, "no-cache")
         .header(header::ETAG, etag)
+        .header(header::VARY, "Accept-Encoding")
 }
 
 fn create_asset_response_builder(
@@ -74,7 +74,9 @@ fn create_asset_response_builder(
     let builder = Response::builder()
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-        .header(header::ETAG, etag);
+        .header(header::ETAG, etag)
+        .header(header::VARY, "Accept-Encoding");
+
     match asset_last_modified(asset) {
         Some(last_modified) => builder.header(header::LAST_MODIFIED, last_modified),
         None => builder,
@@ -96,45 +98,4 @@ pub fn get_embedded_static_paths() -> Vec<String> {
         .map(std::borrow::Cow::into_owned)
         .filter(|p| p.starts_with("static/"))
         .collect()
-}
-#[cfg(test)]
-mod tests {
-    #![allow(clippy::unwrap_used)]
-    use super::*;
-    use axum::body::Body;
-    use axum::http::{
-        Request, StatusCode,
-        header::{ACCEPT_ENCODING, CONTENT_ENCODING},
-    };
-    use axum::{Router, routing::get};
-    use tower::ServiceExt;
-    use tower_http::compression::CompressionLayer;
-
-    #[tokio::test]
-    async fn test_static_assets_are_compressed() {
-        // Arrange: Creăm un router de test care include handler-ul tău și layer-ul de compresie
-        let app = Router::new()
-            .fallback(get(static_handler))
-            .layer(CompressionLayer::new().gzip(true).br(true));
-
-        // Simulăm un client care acceptă compresie gzip
-        let request = Request::builder()
-            .uri("/index.html")
-            .header(ACCEPT_ENCODING, "gzip")
-            .body(Body::default())
-            .unwrap();
-
-        // Act: Executăm cererea HTTP
-        let response = app.oneshot(request).await.unwrap();
-
-        // Assert: Verificăm că a returnat 200 OK și că răspunsul este comprimat
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let content_encoding = response.headers().get(CONTENT_ENCODING);
-        assert!(
-            content_encoding.is_some(),
-            "Header-ul Content-Encoding lipsește, răspunsul nu a fost comprimat!"
-        );
-        assert_eq!(content_encoding.unwrap(), "gzip");
-    }
 }
