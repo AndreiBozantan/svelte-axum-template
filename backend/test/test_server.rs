@@ -209,3 +209,29 @@ async fn test_request_validation() -> TestResult {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_asset_and_api_compression() -> TestResult {
+    let server = create_test_server().await?;
+
+    // --- TEST 1: Gzip compression on API ---
+    // The API response is dynamically generated JSON, so it should be compressed.
+    let response_api_gzip = server
+        .get("/api/health")
+        .add_header(axum::http::header::ACCEPT_ENCODING, "gzip")
+        .await;
+
+    response_api_gzip.assert_status(StatusCode::OK);
+    response_api_gzip.assert_header(axum::http::header::CONTENT_ENCODING, "gzip");
+
+    // --- TEST 2: Brotli compression on Static Assets ---
+    let response_static_br = server
+        .get("/")
+        .add_header(axum::http::header::ACCEPT_ENCODING, "br")
+        .await;
+
+    response_static_br.assert_status(StatusCode::OK);
+    response_static_br.assert_header(axum::http::header::CONTENT_ENCODING, "br");
+
+    Ok(())
+}

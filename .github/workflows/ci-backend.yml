@@ -1,0 +1,61 @@
+name: CI Backend Checks
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "backend/**"
+            - "Cargo.*"
+            - "migrations/**"
+            - "xtask/**"
+            - ".github/workflows/ci-backend.yml"
+    pull_request:
+        branches: [main]
+        paths:
+            - "backend/**"
+            - "Cargo.*"
+            - "migrations/**"
+            - "xtask/**"
+            - ".github/workflows/ci-backend.yml"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    backend-checks:
+        name: Backend (Rust)
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        env:
+            SQLX_OFFLINE: true
+            RUSTC_WRAPPER: "" # bypasses sccache
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Create placeholder frontend dist directory
+              # mock frontend/dist for rust-embed so backend compiles & tests pass in CI
+              # without needing to install Node.js/NPM and do a frontend build.
+              run: |
+                  mkdir -p frontend/dist/static
+                  echo "<html><body>test placeholder for compression</body></html>" > frontend/dist/index.html
+                  touch frontend/dist/favicon.ico
+                  touch frontend/dist/static/placeholder.js
+
+            - name: Install system dependencies
+              run: sudo apt-get update && sudo apt-get install -y lld
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@c0e9df88980754dd93e5833b8dcb1b304c1fe173 # 1.96.0
+              with:
+                  components: clippy, rustfmt
+
+            - name: Cache Cargo dependencies
+              uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+            - name: Run all backend checks
+              run: cargo xtask check backend

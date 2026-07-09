@@ -35,12 +35,13 @@ pub async fn static_handler(
     };
 
     let etag = hex::encode(asset.metadata.sha256_hash());
+    let etag = format!("W/\"{etag}\"");
 
     // check If-None-Match header for client caching (304 Not Modified)
     if headers
         .get(header::IF_NONE_MATCH)
         .and_then(|val| val.to_str().ok())
-        .is_some_and(|s| s.trim_matches('"') == etag)
+        .is_some_and(|s| s == etag)
     {
         return Ok(http::StatusCode::NOT_MODIFIED.into_response());
     }
@@ -63,6 +64,7 @@ fn create_index_response_builder(
         .header(header::CONTENT_TYPE, "text/html")
         .header(header::CACHE_CONTROL, "no-cache")
         .header(header::ETAG, etag)
+        .header(header::VARY, "Accept-Encoding")
 }
 
 fn create_asset_response_builder(
@@ -74,7 +76,9 @@ fn create_asset_response_builder(
     let builder = Response::builder()
         .header(header::CONTENT_TYPE, mime_type.as_ref())
         .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-        .header(header::ETAG, etag);
+        .header(header::ETAG, etag)
+        .header(header::VARY, "Accept-Encoding");
+
     match asset_last_modified(asset) {
         Some(last_modified) => builder.header(header::LAST_MODIFIED, last_modified),
         None => builder,
