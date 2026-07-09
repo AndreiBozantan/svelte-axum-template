@@ -117,83 +117,6 @@ fn get_log_directives(settings: &config::AppSettings) -> String {
         settings.server.log_directives.clone()
     }
 }
-
-fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
-    let db = ctx.db.clone();
-
-    tokio::spawn(async move {
-        loop {
-            let db_clone = db.clone();
-
-            let handle = tokio::spawn(run_refresh_tokens_loop(db_clone));
-
-            match handle.await {
-                Ok(()) => {
-                    error!("Task-ul de curățare token-uri a ieșit neașteptat din buclă. Se încearcă repornirea...");
-                },
-                Err(join_err) => {
-                    if join_err.is_panic() {
-                        error!(
-                            "CRITICAL: Task-ul de curățare token-uri a suferit un PANIC! Se încearcă recuperarea și repornirea..."
-                        );
-                    } else {
-                        error!(error = %join_err, "Task-ul de curățare token-uri a fost anulat/oprit forțat. Se încearcă repornirea...");
-                    }
-                },
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        }
-    });
-
-    tokio::spawn(async move {
-        loop {
-            let handle = tokio::spawn(run_rate_limiter_loop());
-
-            match handle.await {
-                Ok(()) => {
-                    error!("Task-ul de rate limiter a ieșit neașteptat din buclă. Se încearcă repornirea...");
-                },
-                Err(join_err) => {
-                    if join_err.is_panic() {
-                        error!(
-                            "CRITICAL: Task-ul de rate limiter a suferit un PANIC! Se încearcă recuperarea și repornirea..."
-                        );
-                    } else {
-                        error!(error = %join_err, "Task-ul de rate limiter a fost anulat/oprit forțat. Se încearcă repornirea...");
-                    }
-                },
-            }
-
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        }
-    });
-}
-async fn run_refresh_tokens_loop(db: crate::platform::db::Context) {
-    let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
-    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-    loop {
-        ticker.tick().await;
-        perform_refresh_tokens_cleanup(&db).await;
-    }
-}
-
-async fn run_rate_limiter_loop() {
-    let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
-    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-    loop {
-        ticker.tick().await;
-        if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
-            config.limiter().retain_recent();
-        }
-        if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
-            config.limiter().retain_recent();
-        }
-    }
-}
-
 async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
     let now = chrono::Utc::now().naive_utc();
 
@@ -209,6 +132,73 @@ async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
                 "expired_refresh_tokens_cleanup_failed"
             );
         },
+    }
+}
+async fn run_rate_limiter_cleanup_loop() {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+        if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+    }
+}
+
+fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
+    let db = ctx.db.clone();
+
+    spawn_supervised_task("refresh_tokens_cleanup_task", move || {
+        run_refresh_tokens_cleanup_loop(db.clone())
+    });
+    #[allow(clippy::redundant_closure)]
+    spawn_supervised_task("rate_limiter_cleanup_task", || run_rate_limiter_cleanup_loop());
+}
+
+fn spawn_supervised_task<F, Fut>(
+    task_name: &'static str,
+    task_factory: F,
+) where
+    F: Fn() -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            let handle = tokio::spawn(task_factory());
+
+            match handle.await {
+                Ok(()) => {
+                    error!("{} exited unexpectedly. Attempting to restart...", task_name);
+                },
+                Err(join_err) => {
+                    if join_err.is_panic() {
+                        error!("CRITICAL: {} panicked! Attempting to recover and restart...", task_name);
+                    } else {
+                        error!(
+                            error = %join_err,
+                            "{} was cancelled/forcefully stopped. Attempting to restart...",
+                            task_name
+                        );
+                    }
+                },
+            }
+
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
+}
+
+async fn run_refresh_tokens_cleanup_loop(db: crate::platform::db::Context) {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        perform_refresh_tokens_cleanup(&db).await;
     }
 }
 
