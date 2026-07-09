@@ -1,0 +1,46 @@
+name: CI Frontend Checks
+
+on:
+    workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "frontend/**"
+            - ".github/workflows/ci-frontend.yml"
+    pull_request:
+        branches: [main]
+        paths:
+            - "frontend/**"
+            - ".github/workflows/ci-frontend.yml"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    frontend-checks:
+        name: Frontend (Svelte)
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Install Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: "npm"
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies
+              run: npm ci
+              working-directory: frontend
+
+            - name: Run all frontend checks
+              run: cargo xtask check frontend
+              env:
+                  RUSTC_WRAPPER: "" # bypasses sccache for compiling xtask
+                  RUSTFLAGS: "-C linker=cc" # override repository-level config, to compile the xtask with the cc linker - avoids installing lld
