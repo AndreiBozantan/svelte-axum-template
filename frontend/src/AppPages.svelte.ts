@@ -8,7 +8,6 @@ import { AppState } from '$lib/AppState.svelte';
 import { wrap, type WrappedComponent } from 'svelte-spa-router/wrap';
 import type { Component } from 'svelte';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import type { Component } from 'svelte';
 import {
     faSignOutAlt,
     faCog,
