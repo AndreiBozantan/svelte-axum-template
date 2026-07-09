@@ -155,8 +155,8 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
     spawn_supervised_task("refresh_tokens_cleanup_task", move || {
         run_refresh_tokens_cleanup_loop(db.clone())
     });
-    #[allow(clippy::redundant_closure)]
-    spawn_supervised_task("rate_limiter_cleanup_task", || run_rate_limiter_cleanup_loop());
+    spawn_supervised_task("rate_limiter_cleanup_task", run_rate_limiter_cleanup_loop);
+
 }
 
 fn spawn_supervised_task<F, Fut>(task_name: &'static str, task_factory: F)
