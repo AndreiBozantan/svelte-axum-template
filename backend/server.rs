@@ -155,11 +155,12 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
         run_refresh_tokens_cleanup_loop(db.clone())
     });
     spawn_supervised_task("rate_limiter_cleanup_task", run_rate_limiter_cleanup_loop);
-
 }
 
-fn spawn_supervised_task<F, Fut>(task_name: &'static str, task_factory: F)
-where
+fn spawn_supervised_task<F, Fut>(
+    task_name: &'static str,
+    task_factory: F,
+) where
     F: Fn() -> Fut + Send + 'static,
     Fut: std::future::Future<Output = ()> + Send + 'static,
 {
