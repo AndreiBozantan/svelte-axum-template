@@ -39,7 +39,7 @@ jobs:
               # without needing to install Node.js/NPM and do a frontend build.
               run: |
                   mkdir -p frontend/dist/static
-                  echo "<html><body>test</body></html>" > frontend/dist/index.html
+                  echo "<html><body>test placeholder for compression</body></html>" > frontend/dist/index.html
                   touch frontend/dist/favicon.ico
                   touch frontend/dist/static/placeholder.js
 
