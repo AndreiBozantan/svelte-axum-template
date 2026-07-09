@@ -5,7 +5,8 @@ import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import { AppState } from '$lib/AppState.svelte';
-import { wrap } from 'svelte-spa-router/wrap';
+import { wrap, type WrappedComponent } from 'svelte-spa-router/wrap';
+import type { Component } from 'svelte';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
     faSignOutAlt,
@@ -21,7 +22,7 @@ type VisibilityFn = () => boolean;
 export type PageDefinition = {
     id: string;
     label: string;
-    component: any;
+    component: Component;
     public: boolean;
     icon: IconDefinition;
     navPosition?: 'top' | 'footer' | 'none';
@@ -85,31 +86,27 @@ export const Pages: PageDefinition[] = [
     },
 ];
 
-export const routes: Record<string, any> = {
-    '/': wrap({
-        component: Home,
-        conditions: [() => AppState.isLoggedIn],
-    }),
-    '/secure': wrap({
-        component: SecureApi,
-        conditions: [() => AppState.isLoggedIn],
-    }),
-    '/about': About,
-    '/settings': wrap({
-        component: Settings,
-        conditions: [() => AppState.isLoggedIn],
-    }),
-    '/login': wrap({
-        component: LogIn,
-        conditions: [() => !AppState.isLoggedIn],
-    }),
-    '/logout': wrap({
-        component: LogOut,
-        conditions: [() => AppState.isLoggedIn],
-    }),
-    // Ruta de fallback (404 / catch-all), trimitem la Home dacă e logat, sau la About dacă e public
-    '*': wrap({
-        component: Home,
-        conditions: [() => AppState.isLoggedIn],
-    }),
-};
+// Dynamically generate the route map from the Pages array to avoid duplication
+export const routes: Record<string, Component | WrappedComponent> = Object.fromEntries(
+    Pages.map((page) => {
+        const path = page.id === '' ? '/' : `/${page.id}`;
+
+        if (page.public) {
+            return [path, page.component];
+        }
+
+        return [
+            path,
+            wrap({
+                component: page.component,
+                conditions: [() => AppState.isLoggedIn],
+            }),
+        ];
+    })
+);
+
+// Fallback (404 / catch-all) route: redirect to Home if logged in, otherwise to About if public
+routes['*'] = wrap({
+    component: Home,
+    conditions: [() => AppState.isLoggedIn],
+});

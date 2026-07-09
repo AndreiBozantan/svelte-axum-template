@@ -15,7 +15,7 @@ class AppStateDef {
     }
 
     // derived from the router's hash location so it always reflects the current route
-    activePage = $derived(router.location === '/' ? '' : router.location.slice(1));
+    activePage = $derived(router.location.slice(1));
     setActivePage(route: string) {
         const id = route.startsWith('/') ? route.slice(1) : route;
         push(`/${id}`);
