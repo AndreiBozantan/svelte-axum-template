@@ -30,16 +30,16 @@ jobs:
         env:
             RUSTC_WRAPPER: "" # bypasses sccache
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - name: Install system dependencies
               run: sudo apt-get update && sudo apt-get install -y lld
 
             - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.96.0
+              uses: dtolnay/rust-toolchain@c0e9df88980754dd93e5833b8dcb1b304c1fe173 # 1.96.0
 
             - name: Cache Cargo dependencies
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
             - name: Check markdown links
-              run: cargo xtask check-md-links
+              run: cargo -q xtask check docs

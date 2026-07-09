@@ -53,18 +53,18 @@ pub fn ensure_cargo_watch() {
     }
 }
 
-pub fn db_create() -> std::io::Result<ExitStatus> {
+pub fn create() -> std::io::Result<ExitStatus> {
     fs::create_dir_all("data")?;
     println!("Creating database...");
     crate::run_command("cargo", &["sqlx", "database", "create"], None)
 }
 
-pub fn db_migrate() -> std::io::Result<ExitStatus> {
+pub fn migrate() -> std::io::Result<ExitStatus> {
     println!("Running migrations...");
     crate::run_command("cargo", &["sqlx", "migrate", "run", "--source", "migrations"], None)
 }
 
-pub fn db_prepare() -> std::io::Result<ExitStatus> {
+pub fn prepare() -> std::io::Result<ExitStatus> {
     println!("Preparing SQLx offline queries metadata...");
     crate::run_command(
         "cargo",
@@ -80,7 +80,7 @@ pub fn db_prepare() -> std::io::Result<ExitStatus> {
     )
 }
 
-pub fn db_prepare_check() -> std::io::Result<ExitStatus> {
+pub fn check_sqlx_queries() -> std::io::Result<ExitStatus> {
     ensure_sqlx_cli();
     println!("Checking if SQLx offline queries metadata is up to date...");
     crate::run_command(
@@ -98,20 +98,58 @@ pub fn db_prepare_check() -> std::io::Result<ExitStatus> {
     )
 }
 
-pub fn db_drop() -> std::io::Result<ExitStatus> {
+pub fn drop() -> std::io::Result<ExitStatus> {
     println!("Dropping database...");
     crate::run_command("cargo", &["sqlx", "database", "drop", "-y"], None)
 }
 
-pub fn db_init() {
+pub fn init() {
     ensure_sqlx_cli();
-    db_create().expect("failed to create database");
-    db_migrate().expect("failed to run migrations");
-    db_prepare().expect("failed to prepare offline queries");
+    create().expect("failed to create database");
+    migrate().expect("failed to run migrations");
+    prepare().expect("failed to prepare offline queries");
+
+    let seed_path = std::path::Path::new("data/test-data.sql");
+    if seed_path.exists() {
+        println!("Seeding database with data/test-data.sql...");
+        if let Ok(file) = std::fs::File::open(seed_path) {
+            let status = Command::new("sqlite3").arg("data/db.sqlite").stdin(file).status();
+            match status {
+                Ok(s) if s.success() => println!("Database seeded successfully."),
+                _ => eprintln!("Failed to seed database."),
+            }
+        }
+    }
+
     println!("Database initialized successfully.");
 }
 
-pub fn db_reset() {
-    let _ = db_drop();
-    db_init();
+pub fn reset() {
+    let _ = drop();
+    init();
+}
+
+pub fn run(args: &[String]) {
+    let subcommand = args.get(2).map(String::as_str);
+    match subcommand {
+        Some("init") => init(),
+        Some("reset") => reset(),
+        Some("prepare") => {
+            prepare().expect("failed to prepare sqlx queries");
+        },
+        Some("check") => {
+            check_sqlx_queries().expect("failed to check sqlx queries");
+        },
+        _ => {
+            println!("SQLx Utility Actions:");
+            println!(
+                "  cargo xtask sqlx init    - Installs sqlx-cli if missing, creates DB, runs migrations, and prepares queries"
+            );
+            println!("  cargo xtask sqlx reset   - Drops database and re-initializes it");
+            println!("  cargo xtask sqlx prepare - Prepares SQLx offline metadata (.sqlx/)");
+            println!("  cargo xtask sqlx check   - Checks if SQLx offline metadata (.sqlx/) is up to date");
+            println!("\nError: Please specify a valid sqlx action.");
+            std::process::exit(1);
+        },
+    }
 }

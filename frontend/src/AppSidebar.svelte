@@ -117,7 +117,7 @@
 
     <nav class="sidebar-nav">
         <ul>
-            {#each topItems() as item}
+            {#each topItems() as item (item.id)}
                 <li class:active={AppState.activePage === item.id}>
                     <a
                         href={getPagePath(item.id)}
@@ -137,7 +137,7 @@
 
     <div class="sidebar-footer">
         <div class="footer-content">
-            {#each footerLinks() as item}
+            {#each footerLinks() as item (item.id)}
                 <a
                     href={getPagePath(item.id)}
                     use:link
@@ -163,7 +163,6 @@
                 </button>
 
                 <!-- Logout Confirm Popup -->
-                <!-- svelte-ignore a11y_mouse_events_have_key_events -->
                 <div
                     bind:this={popupElement}
                     class="logout-confirm-tooltip-popup"

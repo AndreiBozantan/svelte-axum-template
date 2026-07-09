@@ -20,26 +20,45 @@ end
 # Helpful Development Abbreviations
 abbr -a cld "claude"
 
+# Git shortcuts
 abbr -a gs "git status"
 abbr -a gd "git diff"
 abbr -a ga "git add"
+abbr -a gc "git commit"
 abbr -a gca "git commit -a"
+abbr -a gco "git checkout"
+abbr -a gb "git branch"
 abbr -a gp "git push"
+abbr -a gpl "git pull"
 abbr -a gl "git log --oneline -n 10"
 abbr -a gcb "git-cleanup-branches"
 
+# Cargo shortcuts
 abbr -a cr "cargo run --package app --all-features"
 abbr -a ct "cargo test --workspace --all-targets --all-features"
 abbr -a cb "cargo build --workspace --all-targets --all-features"
-abbr -a cc "cargo -q xtask ci-backend && cargo -q xtask ci-frontend"
-abbr -a ccb "cargo -q xtask ci-backend"
-abbr -a ccf "cargo -q xtask ci-frontend"
+abbr -a cl "cargo clippy --workspace --all-targets --all-features"
 abbr -a cf "cargo -q fmt --workspace"
-abbr -a cx "cargo -q xtask"
-abbr -a cxd "cargo -q xtask dev"
-abbr -a cxs "cargo -q xtask status"
-abbr -a cxdbpr "cargo -q xtask db-prepare"
-abbr -a cxapi "cargo -q xtask openapi"
+
+# Cargo Xtask shortcuts
+abbr -a x "cargo -q xtask"
+abbr -a xh "cargo -q xtask help"
+abbr -a xd "cargo -q xtask dev"
+abbr -a xm "cargo -q xtask make"
+abbr -a xma "cargo -q xtask make openapi"
+abbr -a xmc "cargo -q xtask make clean"
+abbr -a xmb "cargo -q xtask make backend"
+abbr -a xmf "cargo -q xtask make frontend"
+abbr -a xmr "cargo -q xtask make release"
+abbr -a xc "cargo -q xtask check"
+abbr -a xcb "cargo -q xtask check backend"
+abbr -a xcf "cargo -q xtask check frontend"
+abbr -a xcs "cargo -q xtask check security"
+abbr -a xcd "cargo -q xtask check docs"
+abbr -a xcx "cargo -q xtask check sqlx"
+abbr -a xs "cargo -q xtask sqlx"
+abbr -a xsp "cargo -q xtask sqlx prepare"
+abbr -a xp "cargo -q xtask prod"
 
 # Directory navigation shortcuts
 abbr -a .. "cd .."
@@ -50,9 +69,10 @@ abbr -a .... "cd ../../.."
 set -g fish_color_command green --bold
 set -g fish_color_keyword green --bold
 
-# Cargo xtask completions
-complete -c cargo -n "__fish_seen_subcommand_from xtask" -f
-complete -c cargo -n "__fish_seen_subcommand_from xtask" -a "(/workspaces/svelaxum/target/debug/xtask help | string match -r '^\s{2,}[a-z0-9-]+' | string trim)"
+# Load cargo-xtask completions
+if test -f ~/.config/fish/completions/cargo-xtask.fish
+    source ~/.config/fish/completions/cargo-xtask.fish
+end
 
 
 # Prune local branches tracking remote branches deleted on GitHub (> 1 week old)
@@ -135,6 +155,8 @@ fi
 if command -v uv &> /dev/null; then
     uv generate-shell-completion fish > "$COMPLETIONS_DIR/uv.fish"
 fi
+
+/workspaces/svelaxum/target/debug/xtask completions > "$COMPLETIONS_DIR/cargo-xtask.fish"
 
 echo "Fish configuration complete."
 
@@ -234,10 +256,11 @@ cat << 'EOF' > "$REPO_DIR/.claude/settings.json"
       "Bash(cargo check:*)",
       "Bash(cargo test:*)",
       "Bash(cargo build:*)",
-      "Bash(cargo xtask ci-backend:*)",
-      "Bash(cargo xtask ci-frontend:*)",
-      "Bash(cargo xtask openapi:*)",
-      "Bash(cargo xtask db-prepare-check:*)",
+      "Bash(cargo xtask check:*)",
+      "Bash(cargo xtask sqlx:*)",
+      "Bash(cargo xtask dev:*)",
+      "Bash(cargo xtask make:*)",
+      "Bash(cargo xtask prod:*)",
       "Bash(npx prettier:*)",
       "Bash(npx svelte-check:*)",
       "Bash(npx vitest run:*)",

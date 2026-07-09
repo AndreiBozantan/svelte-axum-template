@@ -6,20 +6,8 @@ CD/release automation.
 
 ---
 
-## 17.1 — Security scanning is not a required PR gate
-- **GitHub Issue:** [#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206)
-
-- **Severity:** Important (cross-listed with 06.1)
-- **Location:** `.github/workflows/semgrep.yml:3-11` (manual + weekly only; push/PR triggers
-  commented out); `.github/workflows/ci.yml` (no `cargo audit`/`npm audit`).
-- **Finding:** Semgrep runs weekly/manually, not on PRs, and no dependency-vuln scan runs in CI.
-  Nothing blocks merging code with a newly-flagged vulnerability or a known-vulnerable dep.
-- **Recommendation:** Enable Semgrep on `pull_request`, and add `cargo audit` + `npm audit` (+
-  optionally `cargo deny`) as a CI job. See [06](06-dependency-supply-chain.md).
-
----
-
 ## 17.2 — `sqlx prepare --check` is skipped in CI
+
 - **GitHub Issue:** [#253](https://github.com/AndreiBozantan/svelte-axum-template/issues/253)
 
 - **Severity:** Minor
@@ -27,7 +15,7 @@ CD/release automation.
   skipped in CI"), relies on clippy validating queries against `.sqlx/` under `SQLX_OFFLINE=true`.
 - **Finding:** The reasoning (clippy + `SQLX_OFFLINE` validates queries against cached metadata,
   so stale/missing `.sqlx/` is caught) is mostly sound, but `sqlx prepare --check` also catches
-  `.sqlx/` files that are stale relative to the *current* queries in a way clippy may accept if the
+  `.sqlx/` files that are stale relative to the _current_ queries in a way clippy may accept if the
   cached file still parses. The pre-push hook runs it locally, but hooks are advisory. So the
   authoritative gate (CI) is slightly weaker than local.
 - **Recommendation:** Either run `sqlx prepare --check` in CI (it can run offline against the
@@ -37,6 +25,7 @@ CD/release automation.
 ---
 
 ## 17.3 — No CD / release pipeline, versioning, or rollback automation
+
 - **GitHub Issue:** [#255](https://github.com/AndreiBozantan/svelte-axum-template/issues/255)
 
 - **Severity:** Important

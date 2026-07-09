@@ -1,3 +1,5 @@
+use crate::docs;
+use crate::sqlx;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -152,6 +154,15 @@ pub fn check_frontend_fmt() -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn check_frontend_lint() -> std::io::Result<()> {
+    println!("Running frontend lints (ESLint)...");
+    let status = crate::run_command("npm", &["run", "lint:check"], Some("frontend"))?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
+    Ok(())
+}
+
 pub fn check_frontend_diagnostics() -> std::io::Result<()> {
     println!("Checking frontend types (svelte-check)...");
     let status = crate::run_command("npm", &["run", "check"], Some("frontend"))?;
@@ -208,7 +219,7 @@ pub fn check_backend_openapi_drift() -> std::io::Result<()> {
 
     if !status.success() {
         eprintln!(
-            "Error: openapi.json is out of sync with backend code. Run 'cargo xtask openapi' and commit the changes."
+            "Error: openapi.json is out of sync with backend code. Run 'cargo xtask make openapi' and commit the changes."
         );
         std::process::exit(1);
     }
@@ -233,7 +244,7 @@ pub fn check_frontend_openapi_drift() -> std::io::Result<()> {
 
     if !diff_status.success() {
         eprintln!(
-            "Error: frontend/src/lib/generated/ is out of sync with openapi.json. Run 'cargo xtask openapi' and commit the changes."
+            "Error: frontend/src/lib/generated/ is out of sync with openapi.json. Run 'cargo xtask make openapi' and commit the changes."
         );
         std::process::exit(1);
     }
@@ -242,7 +253,7 @@ pub fn check_frontend_openapi_drift() -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn ci_backend() -> std::io::Result<()> {
+pub fn backend() -> std::io::Result<()> {
     println!("Running all backend CI checks...");
     check_backend_fmt()?;
     check_backend_lint()?;
@@ -256,14 +267,24 @@ pub fn ci_backend() -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn ci_frontend() -> std::io::Result<()> {
+pub fn frontend() -> std::io::Result<()> {
     println!("Running all frontend CI checks...");
     check_frontend_fmt()?;
+    check_frontend_lint()?;
     check_frontend_diagnostics()?;
     check_frontend_build()?;
     check_frontend_test()?;
     check_frontend_openapi_drift()?;
     println!("All frontend CI checks passed!");
+    Ok(())
+}
+
+pub fn security() -> std::io::Result<()> {
+    println!("Running Semgrep security scan...");
+    let status = crate::run_command("semgrep", &["--config", "r/all"], None)?;
+    if !status.success() {
+        std::process::exit(status.code().unwrap_or(1));
+    }
     Ok(())
 }
 
@@ -309,13 +330,14 @@ pub fn pre_commit() -> std::io::Result<()> {
 
     if has_frontend {
         check_frontend_fmt()?;
+        check_frontend_lint()?;
         check_frontend_openapi_drift()?;
     } else {
         println!("No frontend changes detected. Skipping frontend formatting and client drift check.");
     }
 
     if has_docs {
-        crate::lintmd::check_md_links()?;
+        crate::docs::check_links()?;
     } else {
         println!("No markdown changes detected. Skipping markdown link check.");
     }
@@ -361,6 +383,7 @@ pub fn pre_push() -> std::io::Result<()> {
     }
 
     if has_frontend {
+        check_frontend_lint()?;
         check_frontend_diagnostics()?;
         check_frontend_test()?;
         check_frontend_openapi_drift()?;
@@ -370,4 +393,53 @@ pub fn pre_push() -> std::io::Result<()> {
 
     println!("All lints, checks, tests, and drift checks passed!");
     Ok(())
+}
+
+pub fn run(args: &[String]) {
+    let subcommand = args.get(2).map(String::as_str).unwrap_or("all");
+    match subcommand {
+        "backend" => {
+            backend().expect("failed to run backend checks");
+        },
+        "frontend" => {
+            frontend().expect("failed to run frontend checks");
+        },
+        "security" => {
+            security().expect("failed to run security checks");
+        },
+        "docs" => {
+            docs::check_links().expect("failed to check markdown links");
+        },
+        "sqlx" => {
+            sqlx::check_sqlx_queries().expect("failed to check sqlx queries");
+        },
+        "commit" => {
+            pre_commit().expect("failed to run pre-commit checks");
+        },
+        "push" => {
+            pre_push().expect("failed to run pre-push checks");
+        },
+        "all" => {
+            println!("Running all verification checks...");
+            backend().expect("failed to run backend checks");
+            frontend().expect("failed to run frontend checks");
+            if let Err(e) = security() {
+                eprintln!("Warning: semgrep security scan failed: {e}");
+            }
+            docs::check_links().expect("failed to check markdown links");
+        },
+        _ => {
+            println!("CI Verification Actions:");
+            println!("  cargo xtask check          - Runs all CI checks");
+            println!("  cargo xtask check backend  - Runs all backend CI checks (fmt, clippy, tests, drift)");
+            println!("  cargo xtask check frontend - Runs all frontend CI checks (prettier, typecheck, tests, build)");
+            println!("  cargo xtask check security - Runs semgrep security scan");
+            println!("  cargo xtask check docs     - Validates markdown relative links and heading anchors");
+            println!("  cargo xtask check sqlx     - Checks if SQLx offline metadata is up to date (alias)");
+            println!("  cargo xtask check commit   - Runs pre-commit formatting and OpenAPI drift checks");
+            println!("  cargo xtask check push     - Runs intelligent pre-push checks (lints, tests, and drift)");
+            println!("\nError: Please specify a valid check target.");
+            std::process::exit(1);
+        },
+    }
 }

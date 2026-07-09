@@ -10,7 +10,7 @@
         {
             "type": "shell",
             "label": "xtask: dev - run dev environment",
-            "command": "cargo run -p xtask dev",
+            "command": "cargo run -p xtask dev run",
             "problemMatcher": [],
             "group": {
                 "kind": "build",
@@ -20,25 +20,25 @@
         {
             "type": "shell",
             "label": "xtask: initialize dev environment",
-            "command": "cargo run -p xtask dev-init",
+            "command": "cargo run -p xtask dev init",
             "problemMatcher": []
         },
         {
             "type": "shell",
             "label": "xtask: reset database",
-            "command": "cargo run -p xtask db-reset",
+            "command": "cargo run -p xtask sqlx reset",
             "problemMatcher": []
         },
         {
             "type": "shell",
             "label": "xtask: status - run status check",
-            "command": "cargo run -p xtask status",
+            "command": "cargo run -p xtask dev status",
             "problemMatcher": []
         },
         {
             "type": "shell",
             "label": "xtask: release - build release container",
-            "command": "cargo run -p xtask release",
+            "command": "cargo run -p xtask make release",
             "problemMatcher": ["$rustc"]
         },
         {

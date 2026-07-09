@@ -10,7 +10,7 @@ use std::process::Command;
 /// repo's tracked markdown files. External `http(s)`/`mailto` links are ignored.
 /// Anchors follow the GitHub algorithm: lowercase, punctuation stripped, spaces to
 /// hyphens, `-N` suffix for duplicates.
-pub fn check_md_links() -> std::io::Result<()> {
+pub fn check_links() -> std::io::Result<()> {
     println!("Checking markdown links...");
     let md_files = git_ls_md_files()?;
 

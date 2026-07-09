@@ -2,10 +2,24 @@ name: Semgrep
 
 on:
   workflow_dispatch: # Enables manual triggering from the GitHub UI/API
-  # push:
-  #   branches: [ main, master ]
-  # pull_request:
-  #   branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".vscode/**"
+  pull_request:
+    branches: [ main, master ]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".gitattributes"
+      - ".vscode/**"
   schedule:
     - cron: '0 0 * * 1' # Weekly on Mondays
 
@@ -16,7 +30,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # Ensure you fetch enough history if semgrep needs to diff, 
           # though for manual full scans, default fetch-depth is usually fine.

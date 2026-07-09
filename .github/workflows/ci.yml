@@ -32,7 +32,7 @@ jobs:
             SQLX_OFFLINE: true
             RUSTC_WRAPPER: "" # bypasses sccache
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - name: Create placeholder frontend dist directory
               # mock frontend/dist for rust-embed so backend compiles & tests pass in CI
@@ -47,22 +47,22 @@ jobs:
               run: sudo apt-get update && sudo apt-get install -y lld
 
             - name: Install Rust toolchain
-              uses: dtolnay/rust-toolchain@1.96.0
+              uses: dtolnay/rust-toolchain@c0e9df88980754dd93e5833b8dcb1b304c1fe173 # 1.96.0
               with:
                   components: clippy, rustfmt
 
             - name: Cache Cargo dependencies
-              uses: Swatinem/rust-cache@v2
+              uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
             - name: Run all backend checks
-              run: cargo xtask ci-backend
+              run: cargo xtask check backend
 
     frontend-checks:
         name: Frontend (Svelte)
         runs-on: ubuntu-latest
         timeout-minutes: 10
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@v7
 
             - name: Install Node.js
               uses: actions/setup-node@v6
@@ -76,7 +76,37 @@ jobs:
               working-directory: frontend
 
             - name: Run all frontend checks
-              run: cargo xtask ci-frontend
+              run: cargo xtask check frontend
               env:
                   RUSTC_WRAPPER: "" # bypasses sccache for compiling xtask
                   RUSTFLAGS: "-C linker=cc" # override repository-level config, to compile the xtask with the cc linker - avoids installing lld
+
+    security-checks:
+        name: Security Audit
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        # audit-check creates a check run (and issues on scheduled runs); needs write scopes
+        permissions:
+            contents: read
+            checks: write
+            issues: write
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Run Cargo Audit
+              uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Install Node.js
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: "npm"
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Run NPM Audit
+              # run even if cargo audit failed, so both signals surface in one run
+              if: ${{ !cancelled() }}
+              run: npm audit --audit-level=high
+              working-directory: frontend

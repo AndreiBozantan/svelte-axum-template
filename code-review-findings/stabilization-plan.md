@@ -62,8 +62,7 @@ These supersede the "pick a direction" recommendations in
 - **Scaffolding: a real `projects` + `tasks` reference feature** in `backend/app/` replaces the
   `sample` placeholder and becomes the copy-me pattern for new features.
 - **Environment selection:** `env` comes only from the process environment, never from a config
-  file — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
-  [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none).
+  file
 
 ---
 
@@ -100,9 +99,6 @@ decided:
   routing decision and its rationale; the rune-based `AppState` pattern; the "generated API
   client only, never raw `fetch`" rule; the capability model (`can(permission)` derived from
   `UserInfo`); the auth-refresh-manager contract (cross-linked to `authentication.md`).
-- **`docs/config.md`** — _Stage E._ Reference rather than design: TOML layering and
-  precedence (`common` → per-env → git-ignored `local`), every key with its default, and the
-  env-only environment selection from Stage A — [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented).
 
 ## How the authorization design resolves existing findings
 
@@ -129,58 +125,12 @@ allow — after the cheap, independent work that protects and unblocks it.
 
 No ordering constraints among these; none is invalidated by the Stage B refactor.
 
-### Stage A Pull Requests (Recommended Merge Order)
-The following PRs have been created and stacked to avoid merge conflicts. Please review and merge them in this exact order:
-1. **[PR #284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284)**: `feat(auth): enforce user status check on login and refresh`
-2. **[PR #285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285)**: `feat(security): implement configurable trusted proxy verification for rate limiting`
-3. **[PR #286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286)**: `feat(security): add security response headers middleware layer`
-4. **[PR #287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287)**: `feat(security): enforce global request body limit and body length constraints`
-5. **[PR #288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288)**: `feat(reliability): add global inbound request timeout and Google OAuth client timeout`
-
-Security fixes that don't touch the auth model:
-
-- [ ] Enforce `user.status` on login and refresh; revoke tokens on suspend —
-      [01 § 1.1](01-authentication-session.md#11--suspendedarchived-users-can-still-authenticate-and-refresh) ([#195](https://github.com/AndreiBozantan/svelte-axum-template/issues/195)) **(PR: [#284](https://github.com/AndreiBozantan/svelte-axum-template/pull/284))**
-- [ ] Trusted-proxy handling: only honor `X-Forwarded-For`/`X-Real-IP` behind an explicit
-      config flag — [01 § 1.3](01-authentication-session.md#13--login-rate-limiter-is-keyed-only-by-client-ip-not-by-account),
-      [05 § 5.3](05-http-transport-security.md#53--global-rate-limit-key-can-be-spoofed-via-forwarding-headers), [19 § 19.3](19-performance-scalability.md#193--rate-limiter-key-maps-grow-unbounded-between-cleanup-ticks) ([#196](https://github.com/AndreiBozantan/svelte-axum-template/issues/196)) **(PR: [#285](https://github.com/AndreiBozantan/svelte-axum-template/pull/285))**
-- [ ] Security response headers (nosniff, frame-ancestors, CSP, HSTS, Referrer-Policy) —
-      [05 § 5.1](05-http-transport-security.md#51--no-security-headers-csp-x-content-type-options-x-frame-options-hsts-referrer-policy-permissions-policy) ([#197](https://github.com/AndreiBozantan/svelte-axum-template/issues/197)) **(PR: [#286](https://github.com/AndreiBozantan/svelte-axum-template/pull/286))**
-- [ ] Request body limit + password/name max-length validation (hash-amplification DoS) —
-      [03 § 3.1/3.2](03-input-validation-injection.md#31--no-request-body-size-limit-json-payloads-are-unbounded) ([#198](https://github.com/AndreiBozantan/svelte-axum-template/issues/198)) **(PR: [#287](https://github.com/AndreiBozantan/svelte-axum-template/pull/287))**
-- [ ] Request timeout layer; timeout on the OAuth token exchange —
-      [13 § 13.1/13.2](13-error-handling-resilience.md#131--no-timeout-on-inbound-request-handling-or-db-queries) ([#199](https://github.com/AndreiBozantan/svelte-axum-template/issues/199)) **(PR: [#288](https://github.com/AndreiBozantan/svelte-axum-template/pull/288))**
-- [ ] Graceful shutdown on SIGTERM (container rollouts) —
-      [13 § 13.3](13-error-handling-resilience.md#133--graceful-shutdown-only-listens-for-ctrl-c-not-sigterm) ([#200](https://github.com/AndreiBozantan/svelte-axum-template/issues/200))
-- [ ] Start `docs/design/operations.md` with the mandatory TLS-terminating proxy assumption
-      and the trusted-proxy header config (from the item above) —
-      [05 § 5.2](05-http-transport-security.md#52--https-enforcement--httphttps-redirect-is-undocumented-and-unimplemented-in-app); outline in [Design docs](#design-docs) ([#201](https://github.com/AndreiBozantan/svelte-axum-template/issues/201))
-- [ ] Google OAuth skips the consent/account-chooser screen: add `prompt=select_account` to
-      the authorize URL — [01 § 1.10](01-authentication-session.md#110--google-oauth-flow-skips-the-consent--account-chooser-screen) ([#202](https://github.com/AndreiBozantan/svelte-axum-template/issues/202))
-
-Configuration correctness:
-
-- [ ] Environment selection: `env` only from the process environment; remove it from all TOML
-      layers; set it in Dockerfile/compose/xtask — [15 § 15.1/15.3](15-configuration-environment.md#151--committed-configscommontoml-forces-env--development),
-      [16 § 16.1](16-containerization-deployment.md#161--configsproductiontoml-selection-depends-on-env-var-but-the-image-sets-none) ([#203](https://github.com/AndreiBozantan/svelte-axum-template/issues/203))
-- [ ] Fail-fast config validation at startup (esp. production) —
-      [15 § 15.2](15-configuration-environment.md#152--no-fail-fast-validation-of-required-configuration-at-startup) ([#204](https://github.com/AndreiBozantan/svelte-axum-template/issues/204))
-
 Decisions that gate later work:
 
 - [ ] Frontend routing: adopt `svelte-spa-router` or finish the custom router (click
       interception, shared `pathToPage()`, 404 route) — **before any new pages exist**;
       record the decision + rationale as the first section of a new `docs/design/frontend.md`
       ([Design docs](#design-docs)) — [09 § 9.4](09-frontend-code-quality.md#94--sidebar-navigation-does-full-page-reloads-spa-routing-only-half-exists) ([#205](https://github.com/AndreiBozantan/svelte-axum-template/issues/205))
-
-Tooling that protects every later commit:
-
-- [ ] CI supply-chain gating: `cargo audit`/`cargo deny` + `npm audit` as PR gates; Semgrep on
-      PRs; Dependabot/Renovate — [06 § 6.1/6.2](06-dependency-supply-chain.md#61--no-dependency-vulnerability-scanning-runs-in-ci),
-      [17 § 17.1](17-cicd.md#171--security-scanning-is-not-a-required-pr-gate) ([#206](https://github.com/AndreiBozantan/svelte-axum-template/issues/206))
-- [ ] Enforce lint-level style rules through tooling (formatting is already gated): ESLint
-      (`typescript-eslint` + `eslint-plugin-svelte`) wired into hooks + CI, and a
-      `[workspace.lints]` table in the root `Cargo.toml` — [18 § 18.6](18-documentation-dx.md#186--formatting-is-tooled-and-ci-gated-but-lint-level-style-rules-are-not) ([#207](https://github.com/AndreiBozantan/svelte-axum-template/issues/207))
 
 ## Stage B — The authorization & multi-tenancy refactor (the spine)
 
@@ -355,9 +305,6 @@ Backend hygiene (batch into few issues):
 - [ ] Import-style switch (decided): AGENTS.md convention becomes `use module::MyType;`
       (direct type imports); update AGENTS.md and sweep the backend — new code follows the new
       convention from now on — [21 § 21.4](21-general-hygiene.md#214--inconsistent-import-style-vs-the-documented-convention) ([#261](https://github.com/AndreiBozantan/svelte-axum-template/issues/261))
-- [ ] Write `docs/config.md`: TOML layering/precedence, key reference with defaults, env-only
-      environment selection ([Design docs](#design-docs)) —
-      [15 § 15.4](15-configuration-environment.md#154--not-all-config-keys-are-documented) ([#262](https://github.com/AndreiBozantan/svelte-axum-template/issues/262))
 - [ ] README architecture/testing sections; link the design docs from the README —
       [18 § 18.2/18.3](18-documentation-dx.md#182--almost-no-doc-comments-on-public-apis--complex-modules) ([#263](https://github.com/AndreiBozantan/svelte-axum-template/issues/263))
 

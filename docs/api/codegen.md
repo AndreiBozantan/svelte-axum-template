@@ -13,13 +13,13 @@ The TypeScript API types and client are generated from the Rust backend, so addi
 ## Adding an endpoint
 
 1. Add the Rust handler + DTOs, annotated with `#[utoipa::path(...)]` and `ToSchema`.
-2. Run `cargo xtask openapi` — regenerates `openapi.json` and the frontend client.
+2. Run `cargo xtask make openapi` — regenerates `openapi.json` and the frontend client.
 3. Commit the regenerated files together with the code change.
 4. Call it from the frontend via the generated client: `api.<tag>.<operation>(...)`.
 
 ## Drift checks
 
-`xtask/checks.rs` verifies that `openapi.json` matches the backend code and that `frontend/src/lib/generated/` matches the spec. These run in pre-commit/pre-push hooks and CI, so forgetting step 2 fails the build with a message telling you to run `cargo xtask openapi`.
+`xtask/checks.rs` verifies that `openapi.json` matches the backend code and that `frontend/src/lib/generated/` matches the spec. These run in pre-commit/pre-push hooks and CI, so forgetting step 2 fails the build with a message telling you to run `cargo xtask make openapi`.
 
 ## Gotchas
 

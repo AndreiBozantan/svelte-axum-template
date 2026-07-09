@@ -797,7 +797,12 @@ async fn test_begin_google_flow_adds_prompt() -> TestResult {
         },
         ..Default::default()
     };
-    let ctx = crate::platform::common::Context::create(settings, "test__secret__key__for__jwt__testing").await?;
+    let ctx = crate::platform::common::Context::create(
+        settings,
+        crate::platform::constants::env::TEST.to_string(),
+        "test__secret__key__for__jwt__testing",
+    )
+    .await?;
 
     let auth_service = crate::platform::identity::auth::Service::new(
         crate::platform::identity::users::db::Repository,

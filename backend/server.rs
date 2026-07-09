@@ -70,6 +70,7 @@ async fn start_server() -> Result<(), Error> {
     crate::openapi::export().await.map_err(Error::OpenApiGenerationFailed)?;
 
     let settings = config::AppSettings::new()?;
+    let app_env = config::get_app_env()?;
     let log_directives = get_log_directives(&settings);
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(&log_directives))
@@ -78,8 +79,8 @@ async fn start_server() -> Result<(), Error> {
 
     if !cli::is_cli_command() {
         info!("starting server... 🚀 ");
+        info!("environ: *** {} *** ", app_env.to_uppercase());
         info!("logging: {}", settings.server.log_directives);
-        info!("app_env: {}", settings.server.env);
         info!("sql_url: {}", settings.database.url);
         info!("cfg_dir: {}", settings.get_config_dir_str()?);
         info!("address: http://{}", settings.get_server_address());
@@ -87,7 +88,7 @@ async fn start_server() -> Result<(), Error> {
     }
 
     let jwt_secret = jwt::get_jwt_secret()?;
-    let ctx = common::Context::create(settings, &jwt_secret).await?;
+    let ctx = common::Context::create(settings, app_env, &jwt_secret).await?;
 
     if !cli::run_cli(&ctx).await? {
         migrations::run_migrations(&ctx).await?;
@@ -97,8 +98,6 @@ async fn start_server() -> Result<(), Error> {
         let router = router::add_swagger(router);
         let service = router.into_make_service_with_connect_info::<SocketAddr>();
         let listener = tokio::net::TcpListener::bind(addr).await?;
-
-        crate::platform::identity::oauth::check_oauth_config(&ctx.settings.oauth);
 
         start_background_cleanup_tasks(&ctx);
 

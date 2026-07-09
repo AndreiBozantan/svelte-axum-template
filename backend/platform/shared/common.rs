@@ -38,6 +38,7 @@ pub struct Context {
     pub jwt: jwt::Context,
     pub settings: config::AppSettings,
     pub http_client: reqwest::Client,
+    pub env: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -57,27 +58,23 @@ pub enum ContextCreationError {
 
 impl Context {
     #[must_use]
-    pub fn env(&self) -> &str {
-        &self.settings.server.env
-    }
-
-    #[must_use]
     pub fn is_prod_env(&self) -> bool {
-        self.settings.server.env == constants::env::PRODUCTION
+        self.env == constants::env::PRODUCTION
     }
 
     #[must_use]
     pub fn is_dev_env(&self) -> bool {
-        self.settings.server.env == constants::env::DEVELOPMENT
+        self.env == constants::env::DEVELOPMENT
     }
 
     #[must_use]
     pub fn is_test_env(&self) -> bool {
-        self.settings.server.env == constants::env::TEST
+        self.env == constants::env::TEST
     }
 
     pub async fn create(
         settings: config::AppSettings,
+        env: String,
         jwt_secret: &str,
     ) -> Result<ArcContext, ContextCreationError> {
         let db = db::create_context(&settings.database).await?;
@@ -88,6 +85,7 @@ impl Context {
             jwt,
             settings,
             http_client,
+            env,
         };
         // eagerly initialize the dummy password hash to prevent cold-start timing leaks
         let _ = crate::platform::crypto::dummy_hash();
@@ -100,10 +98,7 @@ impl Context {
                 access_token_expiry_minutes: 60,
                 refresh_token_expiry_days: 1,
             },
-            server: config::ServerSettings {
-                env: constants::env::TEST.to_string(),
-                ..Default::default()
-            },
+            server: config::ServerSettings::default(),
             database: config::DatabaseSettings {
                 url: "sqlite::memory:".to_string(),
                 min_connections: 1,
@@ -125,7 +120,7 @@ impl Context {
         };
 
         let jwt_secret = "test__secret__key__for__jwt__testing";
-        let context = Self::create(settings, jwt_secret).await?;
+        let context = Self::create(settings, constants::env::TEST.to_string(), jwt_secret).await?;
         migrations::run_migrations(&context).await?;
 
         Ok(context)

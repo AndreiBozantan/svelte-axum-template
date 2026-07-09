@@ -13,20 +13,22 @@ Work in progress (new features coming), but should be usable as a starting point
 The recommended dev environment is the VS Code devcontainer, which comes pre-configured with all toolchains, git hooks, and shell completions. Otherwise, install [NodeJs](https://nodejs.org/en/download/) and [Rust](https://www.rust-lang.org/tools/install) locally.
 
 From the project root folder:
-- `cargo xtask dev-init` — one-time initialization (installs deps, git hooks, creates the database)
-- `cargo xtask dev` — run in dev mode with hot reloading
+- `cargo xtask dev init` — one-time initialization (installs deps, git hooks, creates the database)
+- `cargo xtask dev run` (or simply `cargo xtask dev`) — run in dev mode with hot reloading
 
 The backend runs at `http://localhost:3000` and the frontend at `http://localhost:5173`. In dev mode, Vite proxies API requests to the backend, so the app is used via `http://localhost:5173`.
 
-Run `cargo xtask --help` to see all available tasks (database management, CI checks, docker, release).
+Run `cargo xtask --help` to see all available tasks (dev control, SQLx management, make targets, CI checks, prod).
 
 # Release build
 
-`cargo xtask release` builds the frontend and backend in release mode. The frontend is built **first**, because its static files are embedded into the backend binary at compile time (via `rust-embed`), producing a single self-contained executable.
+`cargo xtask make release` builds the frontend and backend in release mode. The frontend is built **first**, because its static files are embedded into the backend binary at compile time (via `rust-embed`), producing a single self-contained executable.
 
 This means: whenever frontend changes should be reflected in the backend server on port `3000`, rebuild the frontend (`cd frontend && npm run build`) and recompile the backend. During normal development with `cargo xtask dev` this doesn't matter — the Vite dev server serves the frontend directly.
 
-`cargo xtask clean` removes all build artifacts including `node_modules`; run `cargo xtask dev-init` again afterwards.
+`cargo xtask make clean` removes all build artifacts including `node_modules`; run `cargo xtask dev init` again afterwards.
+
+`cargo xtask make format` auto-formats both the backend Rust files (using `cargo fmt --all`) and the frontend files (using Prettier).
 
 # Backend
 
@@ -58,7 +60,7 @@ Do not copy the `migrations/` directory to production; the binary falls back to 
 # Frontend
 
 - Located in `./frontend`; includes login/logout, a secure page showing session info, and typed API call examples.
-- The API client is generated from the backend's OpenAPI spec — `cargo xtask openapi` regenerates `openapi.json` and the typed client in `frontend/src/lib/generated/`. See `docs/api/codegen.md`.
+- The API client is generated from the backend's OpenAPI spec — `cargo xtask make openapi` regenerates `openapi.json` and the typed client in `frontend/src/lib/generated/`. See `docs/api/codegen.md`.
 
 # OAuth2 SSO Setup (Google)
 
@@ -85,4 +87,4 @@ Alternatively, use the `APP__OAUTH__GOOGLE_CLIENT_ID` and `APP__OAUTH__GOOGLE_CL
 
 ## 3. Log in
 
-Start the app (`cargo xtask dev`), open the login page, and click "Sign in with Google". OAuth users are stored in the same `users` table (`sso_provider` = "google", `sso_id` = Google user ID, `password_hash` = NULL) and get the same JWT tokens as password login, so all auth middleware works identically.
+Start the app (`cargo xtask dev run` or simply `cargo xtask dev`), open the login page, and click "Sign in with Google". OAuth users are stored in the same `users` table (`sso_provider` = "google", `sso_id` = Google user ID, `password_hash` = NULL) and get the same JWT tokens as password login, so all auth middleware works identically.
