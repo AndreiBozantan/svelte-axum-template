@@ -116,37 +116,6 @@ fn get_log_directives(settings: &config::AppSettings) -> String {
         settings.server.log_directives.clone()
     }
 }
-
-fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
-    // expired refresh tokens cleanup task
-    let db = ctx.db.clone();
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        loop {
-            ticker.tick().await;
-            perform_refresh_tokens_cleanup(&db).await;
-        }
-    });
-
-    // expired rate limiter keys cleanup task
-    tokio::spawn(async move {
-        let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-
-        loop {
-            ticker.tick().await;
-            if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
-                config.limiter().retain_recent();
-            }
-            if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
-                config.limiter().retain_recent();
-            }
-        }
-    });
-}
-
 async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
     let now = chrono::Utc::now().naive_utc();
 
@@ -162,6 +131,58 @@ async fn perform_refresh_tokens_cleanup(db: &crate::platform::db::Context) {
                 "expired_refresh_tokens_cleanup_failed"
             );
         },
+    }
+}
+async fn run_rate_limiter_cleanup_loop() {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_mins(15));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        if let Some(config) = crate::platform::rate_limiter::GLOBAL_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+        if let Some(config) = crate::platform::rate_limiter::LOGIN_LIMITER_CONFIG.get() {
+            config.limiter().retain_recent();
+        }
+    }
+}
+
+fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
+    let db = ctx.db.clone();
+
+    spawn_supervised_task("refresh_tokens_cleanup_task", move || {
+        run_refresh_tokens_cleanup_loop(db.clone())
+    });
+    spawn_supervised_task("rate_limiter_cleanup_task", run_rate_limiter_cleanup_loop);
+
+}
+
+fn spawn_supervised_task<F, Fut>(task_name: &'static str, task_factory: F)
+where
+    F: Fn() -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            let reason = match tokio::spawn(task_factory()).await {
+                Ok(()) => "exited unexpectedly".to_string(),
+                Err(e) if e.is_panic() => "panicked".to_string(),
+                Err(e) => format!("was cancelled/forcefully stopped: {e}"),
+            };
+            error!("{task_name} {reason}. Restarting...");
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        }
+    });
+}
+
+async fn run_refresh_tokens_cleanup_loop(db: crate::platform::db::Context) {
+    let mut ticker = tokio::time::interval(std::time::Duration::from_hours(1));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    loop {
+        ticker.tick().await;
+        perform_refresh_tokens_cleanup(&db).await;
     }
 }
 
