@@ -7,6 +7,10 @@
     import AppSidebar from './AppSidebar.svelte';
 
     onMount(() => {
+        if (window.location.pathname !== '/') {
+            const cleanUrl = '/' + window.location.hash;
+            window.history.replaceState(null, '', cleanUrl);
+        }
         AppState.stopLoading();
     });
 
