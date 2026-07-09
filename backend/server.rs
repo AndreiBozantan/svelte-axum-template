@@ -159,34 +159,19 @@ fn start_background_cleanup_tasks(ctx: &common::ArcContext) {
     spawn_supervised_task("rate_limiter_cleanup_task", || run_rate_limiter_cleanup_loop());
 }
 
-fn spawn_supervised_task<F, Fut>(
-    task_name: &'static str,
-    task_factory: F,
-) where
+fn spawn_supervised_task<F, Fut>(task_name: &'static str, task_factory: F)
+where
     F: Fn() -> Fut + Send + 'static,
     Fut: std::future::Future<Output = ()> + Send + 'static,
 {
     tokio::spawn(async move {
         loop {
-            let handle = tokio::spawn(task_factory());
-
-            match handle.await {
-                Ok(()) => {
-                    error!("{} exited unexpectedly. Attempting to restart...", task_name);
-                },
-                Err(join_err) => {
-                    if join_err.is_panic() {
-                        error!("CRITICAL: {} panicked! Attempting to recover and restart...", task_name);
-                    } else {
-                        error!(
-                            error = %join_err,
-                            "{} was cancelled/forcefully stopped. Attempting to restart...",
-                            task_name
-                        );
-                    }
-                },
-            }
-
+            let reason = match tokio::spawn(task_factory()).await {
+                Ok(()) => "exited unexpectedly".to_string(),
+                Err(e) if e.is_panic() => "panicked".to_string(),
+                Err(e) => format!("was cancelled/forcefully stopped: {e}"),
+            };
+            error!("{task_name} {reason}. Restarting...");
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         }
     });
