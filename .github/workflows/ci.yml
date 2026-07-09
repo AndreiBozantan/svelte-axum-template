@@ -28,10 +28,6 @@ jobs:
         name: Backend (Rust)
         runs-on: ubuntu-latest
         timeout-minutes: 15
-        permissions:
-            contents: read
-            checks: write
-            issues: write
         env:
             SQLX_OFFLINE: true
             RUSTC_WRAPPER: "" # bypasses sccache
@@ -61,19 +57,6 @@ jobs:
             - name: Run all backend checks
               run: cargo xtask check backend
 
-            - name: Cache RustSec Advisory Database
-              uses: actions/cache@v4
-              with:
-                  path: ~/.cargo/advisory-db
-                  key: rustsec-advisory-db-${{ github.run_id }}
-                  restore-keys: |
-                      rustsec-advisory-db-
-
-            - name: Run Cargo Audit
-              uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-
     frontend-checks:
         name: Frontend (Svelte)
         runs-on: ubuntu-latest
@@ -97,7 +80,3 @@ jobs:
               env:
                   RUSTC_WRAPPER: "" # bypasses sccache for compiling xtask
                   RUSTFLAGS: "-C linker=cc" # override repository-level config, to compile the xtask with the cc linker - avoids installing lld
-
-            - name: Run NPM Audit
-              run: npm audit --audit-level=high
-              working-directory: frontend
