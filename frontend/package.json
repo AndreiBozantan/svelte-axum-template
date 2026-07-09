@@ -41,8 +41,8 @@
         "vitest": "^4.1.10"
     },
     "dependencies": {
-        "@fortawesome/fontawesome-svg-core": "^7.2.0",
-        "@fortawesome/free-solid-svg-icons": "^7.2.0",
+        "@fortawesome/fontawesome-svg-core": "^7.3.0",
+        "@fortawesome/free-solid-svg-icons": "^7.3.0",
         "openapi-fetch": "^0.17.0",
         "svelte-fa": "^4.0.4",
         "svelte-spa-router": "^5.1.1"
