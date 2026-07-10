@@ -171,12 +171,13 @@ async fn test_security_headers() -> TestResult {
 async fn test_request_validation() -> TestResult {
     let server = create_test_server().await?;
 
-    // test password too short in registration (should be 400 Bad Request)
+    // test password too short in registration (should be 400 Bad Request);
+    // empty password violates the minimum length in both debug and release builds
     let response = server
         .post("/api/auth/register")
         .json(&json!({
             "email": "valid@example.com",
-            "password": "short", // < 8 characters
+            "password": "",
             "first_name": "Test",
             "last_name": "User"
         }))
@@ -190,7 +191,7 @@ async fn test_request_validation() -> TestResult {
         .post("/api/auth/register")
         .json(&json!({
             "email": "valid@example.com",
-            "password": "a".repeat(73), // > 72 characters
+            "password": "a".repeat(1025), // > 1024 characters
             "first_name": "Test",
             "last_name": "User"
         }))
@@ -202,7 +203,7 @@ async fn test_request_validation() -> TestResult {
         .post("/api/auth/login")
         .json(&json!({
             "email": "valid@example.com",
-            "password": "a".repeat(73), // > 72 characters
+            "password": "a".repeat(1025), // > 1024 characters
         }))
         .await;
     response_login.assert_status(StatusCode::BAD_REQUEST);

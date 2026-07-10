@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { PageDefinition } from './AppPages.svelte';
-    import { Pages } from './AppPages.svelte';
-    import { AppState } from '$lib/AppState.svelte';
+    import type { PageDefinition } from './Router.svelte';
+    import { Pages, Router } from './Router.svelte';
+    import { AppState } from './AppState.svelte';
     import type { Action } from 'svelte/action';
 
     import { Fa } from 'svelte-fa';
@@ -22,7 +22,7 @@
                 return;
             event.preventDefault();
             const url = new URL(node.href);
-            AppState.setActivePage(url.pathname + url.search);
+            Router.setActivePage(url.pathname + url.search);
         };
         node.addEventListener('click', onClick);
         return { destroy: () => node.removeEventListener('click', onClick) };
@@ -38,15 +38,20 @@
         return `/${id}`;
     }
 
-    function topItems(): PageDefinition[] {
-        return Pages.filter((item) => item.navPosition === 'top' && item.visible());
-    }
+    const topItems: PageDefinition[] = $derived(
+        Pages.filter(
+            (item) => item.navPosition === 'top' && Router.isPageVisible(item, AppState.isLoggedIn)
+        )
+    );
 
-    function footerLinks(): PageDefinition[] {
-        return Pages.filter(
-            (item) => item.navPosition === 'footer' && item.visible() && item.id !== 'logout'
-        );
-    }
+    const footerLinks: PageDefinition[] = $derived(
+        Pages.filter(
+            (item) =>
+                item.navPosition === 'footer' &&
+                Router.isPageVisible(item, AppState.isLoggedIn) &&
+                item.id !== 'logout'
+        )
+    );
 
     function pickRandomHover() {
         // Pick a random number between 1 and 5, ensuring it's different from the last one if possible
@@ -60,7 +65,7 @@
         setTimeout(() => {
             isConfirmAnimating = false;
             showLogoutConfirm = false;
-            AppState.setActivePage('logout');
+            Router.setActivePage('logout');
         }, 150);
     }
 
@@ -72,7 +77,7 @@
                 isConfirmAnimating = false;
             }, 150);
         } else {
-            AppState.setActivePage('logout');
+            Router.setActivePage('logout');
         }
     }
 
@@ -138,8 +143,8 @@
 
     <nav class="sidebar-nav">
         <ul>
-            {#each topItems() as item (item.id)}
-                <li class:active={AppState.activePage === item.id}>
+            {#each topItems as item (item.id)}
+                <li class:active={Router.activePage === item.id}>
                     <a
                         href={getPagePath(item.id)}
                         use:link
@@ -158,12 +163,12 @@
 
     <div class="sidebar-footer">
         <div class="footer-content">
-            {#each footerLinks() as item (item.id)}
+            {#each footerLinks as item (item.id)}
                 <a
                     href={getPagePath(item.id)}
                     use:link
                     class="footer-btn"
-                    class:active={AppState.activePage === item.id}
+                    class:active={Router.activePage === item.id}
                     onmouseenter={() => (showLogoutConfirm = false)}
                 >
                     <span class="footer-icon"><Fa icon={item.icon} /></span>

@@ -175,10 +175,9 @@ button:focus {
     border-color: #555;
 }
 
-.btn-primary {
+.btn-primary,
+.btn-secondary {
     border: none;
-    background: #10b981;
-    color: white;
     padding: 12px 24px;
     border-radius: 10px;
     font-size: 1rem;
@@ -189,6 +188,11 @@ button:focus {
     font-weight: 600;
 }
 
+.btn-primary {
+    background: #10b981;
+    color: white;
+}
+
 .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
@@ -197,6 +201,15 @@ button:focus {
 
 .btn-primary:hover:not(:disabled) {
     background: #059669;
+}
+
+.btn-secondary {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #e2e8f0;
 }
 
 /* --- Migrated from global.css --- */

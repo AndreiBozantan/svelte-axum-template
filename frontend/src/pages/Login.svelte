@@ -2,7 +2,8 @@
     import { onMount, tick } from 'svelte';
 
     import { api } from '$lib/api';
-    import { AppState } from '$lib/AppState.svelte';
+    import { Router } from '$src/Router.svelte';
+    import { AppState } from '$src/AppState.svelte';
     import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
     let email = $state('');
@@ -35,8 +36,10 @@
 
     function handleGoogleLogin() {
         // the SSO round trip is a full-page navigation, so the in-memory intended
-        // page would be lost; send it to the backend as the post-login redirect
-        const redirectUrl = encodeURIComponent(`/${AppState.intendedPage ?? ''}`);
+        // page would be lost; send it to the backend as the post-login redirect;
+        // without an intended page, send '/' and let the routing guard forward
+        // the logged-in user to the default page
+        const redirectUrl = encodeURIComponent(`/${Router.intendedPage ?? ''}`);
         window.location.href = `/api/oauth/google?redirect_url=${redirectUrl}`;
     }
 </script>

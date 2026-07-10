@@ -1,32 +1,32 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { AppState } from '$lib/AppState.svelte';
-    import { Pages, resolveRedirect } from './AppPages.svelte';
+    import { Router } from './Router.svelte';
+    import { AppState } from './AppState.svelte';
     import AppSidebar from './AppSidebar.svelte';
+    import NotFound from './pages/NotFound.svelte';
 
-    const pageMap = Object.fromEntries(Pages.map((item) => [item.id, item]));
-    const CurrentPage = $derived(pageMap[AppState.activePage]);
+    // derived redirect target
+    const redirectTarget = $derived(Router.getRedirectTarget(AppState.isLoggedIn));
+
+    // get the page component definition for the active route
+    const currentPage = $derived(Router.getPageById(Router.activePage));
 
     onMount(() => {
         AppState.stopLoading();
 
         // keep the active page in sync with browser back/forward
         window.addEventListener('popstate', () => {
-            AppState.setActivePage(window.location.pathname, false);
+            Router.setActivePage(window.location.pathname, false);
         });
     });
 
-    // routing guards: bounce anonymous users off protected pages (remembering the
-    // destination) and send logged-in users away from anonymous-only pages
+    // routing guards: bounce anonymous users off protected pages (remembering the destination)
+    // and send logged-in users away from anonymous-only pages
     $effect(() => {
-        const target = resolveRedirect(
-            AppState.activePage,
-            AppState.isLoggedIn,
-            AppState.intendedPage
-        );
-        if (target === null) return;
-        AppState.setIntendedPage(target === 'login' ? AppState.activePage : null);
-        AppState.setActivePage(target);
+        if (redirectTarget === null) return;
+        // remember where an anonymous user was headed; clear it once they're back in
+        Router.setIntendedPage(AppState.isLoggedIn ? null : Router.activePage);
+        Router.setActivePage(redirectTarget);
     });
 </script>
 
@@ -34,8 +34,13 @@
     <AppSidebar />
 
     <main class="content">
-        {#if CurrentPage}
-            <CurrentPage.component />
+        <!-- while a redirect is pending, render nothing so guarded pages never mount -->
+        {#if redirectTarget === null}
+            {#if currentPage}
+                <currentPage.component />
+            {:else}
+                <NotFound />
+            {/if}
         {/if}
     </main>
 </div>

@@ -1,60 +1,78 @@
 import { describe, expect, it } from 'vitest';
 
-import { AppState } from '$lib/AppState.svelte';
-import { resolveRedirect } from '../src/AppPages.svelte';
+import { RouterModel } from '../src/Router.svelte';
 
-describe('resolveRedirect', () => {
-    it('redirects an anonymous user from a protected page to login', () => {
-        expect(resolveRedirect('settings', false, null)).toBe('login');
-        expect(resolveRedirect('', false, null)).toBe('login');
+describe('getRedirectTarget', () => {
+    // fresh instance per case so the tests stay hermetic and parallel-safe
+    const redirect = (
+        activePage: string,
+        isLoggedIn: boolean,
+        intendedPage: string | null = null
+    ) => {
+        const router = new RouterModel();
+        router.activePage = activePage;
+        router.intendedPage = intendedPage;
+        return router.getRedirectTarget(isLoggedIn);
+    };
+
+    it('sends an anonymous user from a protected page to login', () => {
+        expect(redirect('settings', false)).toBe('login');
+        expect(redirect('dashboard', false)).toBe('login');
     });
 
     it('keeps an anonymous user on public pages', () => {
-        expect(resolveRedirect('about', false, null)).toBeNull();
-        expect(resolveRedirect('login', false, null)).toBeNull();
+        expect(redirect('', false)).toBeNull();
+        expect(redirect('about', false)).toBeNull();
+        expect(redirect('login', false)).toBeNull();
+        expect(redirect('register', false)).toBeNull();
     });
 
     it('keeps a logged-in user on regular pages', () => {
-        expect(resolveRedirect('', true, null)).toBeNull();
-        expect(resolveRedirect('settings', true, null)).toBeNull();
+        expect(redirect('dashboard', true)).toBeNull();
+        expect(redirect('settings', true)).toBeNull();
     });
 
-    it('redirects a logged-in user from login to the intended page', () => {
-        expect(resolveRedirect('login', true, 'settings')).toBe('settings');
+    it('sends a logged-in user from login to the intended page', () => {
+        expect(redirect('login', true, 'settings')).toBe('settings');
     });
 
-    it('redirects a logged-in user from login to home when there is no intended page', () => {
-        expect(resolveRedirect('login', true, null)).toBe('');
+    it('sends a logged-in user from anonymous-only pages to the dashboard', () => {
+        expect(redirect('', true)).toBe('dashboard');
+        expect(redirect('login', true)).toBe('dashboard');
+        expect(redirect('register', true)).toBe('dashboard');
     });
 
-    it('redirects an unknown page to home when logged in, otherwise to about', () => {
-        expect(resolveRedirect('does-not-exist', true, null)).toBe('');
-        expect(resolveRedirect('does-not-exist', false, null)).toBe('about');
+    it('stays on an unknown page so the app renders NotFound', () => {
+        expect(redirect('does-not-exist', true)).toBeNull();
+        expect(redirect('does-not-exist', false)).toBeNull();
     });
 });
 
-describe('AppState.setActivePage', () => {
+describe('RouterModel.setActivePage', () => {
     it('accepts routes with or without a leading slash', () => {
-        AppState.setActivePage('settings');
-        expect(AppState.activePage).toBe('settings');
+        const router = new RouterModel();
+        router.setActivePage('settings');
+        expect(router.activePage).toBe('settings');
         expect(window.location.pathname).toBe('/settings');
 
-        AppState.setActivePage('/about');
-        expect(AppState.activePage).toBe('about');
+        router.setActivePage('/about');
+        expect(router.activePage).toBe('about');
         expect(window.location.pathname).toBe('/about');
     });
 
     it('preserves the query string in the browser url', () => {
-        AppState.setActivePage('/settings?tab=profile');
-        expect(AppState.activePage).toBe('settings');
+        const router = new RouterModel();
+        router.setActivePage('/settings?tab=profile');
+        expect(router.activePage).toBe('settings');
         expect(window.location.pathname).toBe('/settings');
         expect(window.location.search).toBe('?tab=profile');
     });
 
     it('does not touch history when updateHistory is false', () => {
-        AppState.setActivePage('/about');
-        AppState.setActivePage('secure', false);
-        expect(AppState.activePage).toBe('secure');
+        const router = new RouterModel();
+        router.setActivePage('/about');
+        router.setActivePage('secure', false);
+        expect(router.activePage).toBe('secure');
         expect(window.location.pathname).toBe('/about');
     });
 });

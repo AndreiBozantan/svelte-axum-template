@@ -3,7 +3,7 @@ import './app.css';
 import { mount } from 'svelte';
 
 import { api } from '$lib/api';
-import { AppState } from '$lib/AppState.svelte';
+import { AppState } from './AppState.svelte';
 import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 import type { UserInfo } from '$lib/generated/api';
 

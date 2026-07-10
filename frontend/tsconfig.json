@@ -11,7 +11,8 @@
         "isolatedModules": true,
         "noEmit": true,
         "paths": {
-            "$lib/*": ["./src/lib/*"]
+            "$lib/*": ["./src/lib/*"],
+            "$src/*": ["./src/*"]
         },
         "verbatimModuleSyntax": true,
         "allowImportingTsExtensions": false

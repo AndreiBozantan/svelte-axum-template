@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { AppState } from '$lib/AppState.svelte';
+    import { Router } from '../Router.svelte';
+    import { AppState } from '$src/AppState.svelte';
     import { api } from '$lib/api';
     import { onMount } from 'svelte';
     import { Fa } from 'svelte-fa';
@@ -39,11 +40,11 @@
     });
 
     function navigateToLogin() {
-        AppState.setActivePage('login');
+        Router.setActivePage('login');
     }
 
     function navigateToHome() {
-        AppState.setActivePage('');
+        Router.setActivePage('');
     }
 </script>
 
