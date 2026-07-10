@@ -1,38 +1,17 @@
 <script lang="ts">
     import type { PageDefinition } from './Router.svelte';
-    import { Pages, Router } from './Router.svelte';
+    import { Pages, Router, link } from './Router.svelte';
     import { AppState } from './AppState.svelte';
-    import type { Action } from 'svelte/action';
 
     import { Fa } from 'svelte-fa';
-    import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
-
-    // intercepts clicks on internal anchors so SPA navigation happens
-    // via pushState instead of a full page reload
-    const link: Action<HTMLAnchorElement> = (node) => {
-        const onClick = (event: MouseEvent) => {
-            // let the browser handle modified clicks and non-primary buttons
-            if (
-                event.ctrlKey ||
-                event.metaKey ||
-                event.shiftKey ||
-                event.altKey ||
-                event.button !== 0
-            )
-                return;
-            event.preventDefault();
-            const url = new URL(node.href);
-            Router.setActivePage(url.pathname + url.search);
-        };
-        node.addEventListener('click', onClick);
-        return { destroy: () => node.removeEventListener('click', onClick) };
-    };
+    import { faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
 
     let showLogoutConfirm = $state(false);
     let isConfirmAnimating = $state(false);
     let logoHoverType = $state(0);
     let popupElement = $state<HTMLElement | null>(null);
     let logoutButton = $state<HTMLElement | null>(null);
+    const logoutPage = Router.getPageById('logout')!;
 
     function getPagePath(id: string) {
         return `/${id}`;
@@ -185,7 +164,7 @@
                     onmouseenter={() => (showLogoutConfirm = true)}
                     onclick={handleLogoutSidebarClick}
                 >
-                    <span class="footer-icon"><Fa icon={faSignOutAlt} /></span>
+                    <span class="footer-icon"><Fa icon={logoutPage.icon} /></span>
                 </button>
 
                 <!-- Logout Confirm Popup -->

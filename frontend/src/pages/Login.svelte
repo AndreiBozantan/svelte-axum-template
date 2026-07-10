@@ -2,7 +2,7 @@
     import { onMount, tick } from 'svelte';
 
     import { api } from '$lib/api';
-    import { Router } from '$src/Router.svelte';
+    import { Router, link } from '$src/Router.svelte';
     import { AppState } from '$src/AppState.svelte';
     import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
@@ -120,6 +120,12 @@
             </svg>
             Google
         </button>
+
+        <div class="divider">
+            <span>or</span>
+        </div>
+
+        <a href="/register" use:link class="btn-outline"> Register </a>
     </div>
 </div>
 
@@ -270,5 +276,28 @@
         to {
             transform: rotate(360deg);
         }
+    }
+    .btn-outline {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px;
+        border: 2px solid #10b981;
+        border-radius: 8px;
+        background: transparent;
+        color: #10b981;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        box-sizing: border-box;
+        transition: all 0.2s ease-in-out;
+    }
+    .btn-outline:hover {
+        background: #ecfdf5;
+        border-color: #059669;
+        color: #059669;
     }
 </style>

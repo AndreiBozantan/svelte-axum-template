@@ -7,16 +7,16 @@ import Register from './pages/Register.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import type { Component } from 'svelte';
+import type { Action } from 'svelte/action';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
-    faSignOutAlt,
     faCog,
-    faSignInAlt,
     faHome,
     faGauge,
     faUserPlus,
     faCheckCircle,
     faInfoCircle,
+    faLock,
 } from '@fortawesome/free-solid-svg-icons';
 
 export type PageDefinition = {
@@ -79,7 +79,7 @@ export const Pages: PageDefinition[] = [
         label: 'login',
         component: LogIn,
         public: true,
-        icon: faSignInAlt,
+        icon: faLock,
         navPosition: 'footer',
         anonymousOnly: true,
     },
@@ -89,7 +89,7 @@ export const Pages: PageDefinition[] = [
         component: Register,
         public: true,
         icon: faUserPlus,
-        navPosition: 'footer',
+        navPosition: 'none',
         anonymousOnly: true,
     },
     {
@@ -97,7 +97,7 @@ export const Pages: PageDefinition[] = [
         label: 'logout',
         component: LogOut,
         public: true,
-        icon: faSignOutAlt,
+        icon: faLock,
         navPosition: 'footer',
         authenticatedOnly: true,
     },
@@ -170,3 +170,19 @@ export class RouterModel {
 }
 
 export const Router = new RouterModel();
+
+// intercepts clicks on internal anchors so SPA navigation happens
+// via pushState instead of a full page reload
+export const link: Action<HTMLAnchorElement> = (node) => {
+    const onClick = (event: MouseEvent) => {
+        // let the browser handle modified clicks and non-primary buttons
+        if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.button !== 0)
+            return;
+        event.preventDefault();
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity
+        const url = new URL(node.href);
+        Router.setActivePage(url.pathname + url.search);
+    };
+    node.addEventListener('click', onClick);
+    return { destroy: () => node.removeEventListener('click', onClick) };
+};
