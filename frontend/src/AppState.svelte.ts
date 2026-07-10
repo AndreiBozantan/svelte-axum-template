@@ -5,7 +5,7 @@ import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 class AppStateModel {
     user = $state<UserInfo | null>(null);
     isLoggedIn = $derived(this.user != null);
-    isAdmin = $derived(this.user?.id === 1);
+    isAdmin = $derived(this.user?.id === 0);
 
     setUser(user: UserInfo | null) {
         this.user = user;
