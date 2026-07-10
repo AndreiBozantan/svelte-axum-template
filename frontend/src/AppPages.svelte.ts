@@ -5,8 +5,9 @@ import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import { AppState } from '$lib/AppState.svelte';
-import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
+import { wrap, type WrappedComponent } from 'svelte-spa-router/wrap';
 import type { Component } from 'svelte';
+import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
     faSignOutAlt,
     faCog,
@@ -84,3 +85,28 @@ export const Pages: PageDefinition[] = [
         visible: () => AppState.isLoggedIn,
     },
 ];
+
+// Dynamically generate the route map from the Pages array to avoid duplication
+export const routes: Record<string, Component | WrappedComponent> = Object.fromEntries(
+    Pages.map((page) => {
+        const path = page.id === '' ? '/' : `/${page.id}`;
+
+        if (page.public) {
+            return [path, page.component];
+        }
+
+        return [
+            path,
+            wrap({
+                component: page.component,
+                conditions: [() => AppState.isLoggedIn],
+            }),
+        ];
+    })
+);
+
+// Fallback (404 / catch-all) route: redirect to Home if logged in, otherwise to About if public
+routes['*'] = wrap({
+    component: Home,
+    conditions: [() => AppState.isLoggedIn],
+});

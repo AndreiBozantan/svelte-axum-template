@@ -2,6 +2,7 @@
     import type { PageDefinition } from './AppPages.svelte';
     import { Pages } from './AppPages.svelte';
     import { AppState } from '$lib/AppState.svelte';
+    import { link } from 'svelte-spa-router';
 
     import { Fa } from 'svelte-fa';
     import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
@@ -120,6 +121,7 @@
                 <li class:active={AppState.activePage === item.id}>
                     <a
                         href={getPagePath(item.id)}
+                        use:link
                         class="nav-link"
                         onmouseenter={() => (showLogoutConfirm = false)}
                     >
@@ -138,6 +140,7 @@
             {#each footerLinks() as item (item.id)}
                 <a
                     href={getPagePath(item.id)}
+                    use:link
                     class="footer-btn"
                     class:active={AppState.activePage === item.id}
                     onmouseenter={() => (showLogoutConfirm = false)}
