@@ -31,6 +31,17 @@ COPY --from=node-env /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
+# Install Playwright Chromium and its system deps, for browser-in-the-loop
+# testing and agent-driven UI verification. The browser is stored in a shared
+# path so it is usable by any user and independent of node_modules.
+# Keep the pinned version in sync with @playwright/test in frontend/package.json
+# once that dependency exists.
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/local/ms-playwright
+RUN npx -y playwright@1.61.1 install --with-deps chromium \
+    && chmod -R a+rX "$PLAYWRIGHT_BROWSERS_PATH" \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy uv (Python package manager)
 COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 \
     /uv /usr/local/bin/uv
