@@ -72,6 +72,21 @@ impl Context {
         self.env == constants::env::TEST
     }
 
+    #[must_use]
+    pub fn is_dev() -> bool {
+        config::get_app_env().is_ok_and(|env| env == constants::env::DEVELOPMENT)
+    }
+
+    #[must_use]
+    pub fn is_prod() -> bool {
+        config::get_app_env().is_ok_and(|env| env == constants::env::PRODUCTION)
+    }
+
+    #[must_use]
+    pub fn is_test() -> bool {
+        config::get_app_env().is_ok_and(|env| env == constants::env::TEST)
+    }
+
     pub async fn create(
         settings: config::AppSettings,
         env: String,
