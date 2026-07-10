@@ -2,10 +2,31 @@
     import type { PageDefinition } from './AppPages.svelte';
     import { Pages } from './AppPages.svelte';
     import { AppState } from '$lib/AppState.svelte';
-    import { link } from 'svelte-spa-router';
+    import type { Action } from 'svelte/action';
 
     import { Fa } from 'svelte-fa';
     import { faSignOutAlt, faUserShield, faUser } from '@fortawesome/free-solid-svg-icons';
+
+    // intercepts clicks on internal anchors so SPA navigation happens
+    // via pushState instead of a full page reload
+    const link: Action<HTMLAnchorElement> = (node) => {
+        const onClick = (event: MouseEvent) => {
+            // let the browser handle modified clicks and non-primary buttons
+            if (
+                event.ctrlKey ||
+                event.metaKey ||
+                event.shiftKey ||
+                event.altKey ||
+                event.button !== 0
+            )
+                return;
+            event.preventDefault();
+            const url = new URL(node.href);
+            AppState.setActivePage(url.pathname + url.search);
+        };
+        node.addEventListener('click', onClick);
+        return { destroy: () => node.removeEventListener('click', onClick) };
+    };
 
     let showLogoutConfirm = $state(false);
     let isConfirmAnimating = $state(false);

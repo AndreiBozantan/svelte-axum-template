@@ -1,37 +1,32 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import Router, { push } from 'svelte-spa-router';
-    import type { RouteDetail } from 'svelte-spa-router';
     import { AppState } from '$lib/AppState.svelte';
-    import { routes } from './AppPages.svelte';
+    import { Pages, resolveRedirect } from './AppPages.svelte';
     import AppSidebar from './AppSidebar.svelte';
 
+    const pageMap = Object.fromEntries(Pages.map((item) => [item.id, item]));
+    const CurrentPage = $derived(pageMap[AppState.activePage]);
+
     onMount(() => {
-        if (window.location.pathname !== '/') {
-            const cleanUrl = '/' + window.location.hash;
-            window.history.replaceState(null, '', cleanUrl);
-        }
         AppState.stopLoading();
+
+        // keep the active page in sync with browser back/forward
+        window.addEventListener('popstate', () => {
+            AppState.setActivePage(window.location.pathname, false);
+        });
     });
 
-    function handleConditionsFailed(detail: RouteDetail) {
-        if (AppState.isLoggedIn) {
-            // logged-in user hit an anonymous-only route (e.g. /login) -> send them home
-            push('/');
-        } else {
-            // anonymous user hit a protected route -> remember it and bounce to login
-            AppState.setIntendedPage(detail.location);
-            push('/login');
-        }
-    }
-
-    // once login completes while sitting on the Login page, go to the originally intended page
+    // routing guards: bounce anonymous users off protected pages (remembering the
+    // destination) and send logged-in users away from anonymous-only pages
     $effect(() => {
-        if (AppState.isLoggedIn && AppState.activePage === 'login') {
-            const target = AppState.intendedPage || '';
-            AppState.setIntendedPage(null);
-            AppState.setActivePage(target);
-        }
+        const target = resolveRedirect(
+            AppState.activePage,
+            AppState.isLoggedIn,
+            AppState.intendedPage
+        );
+        if (target === null) return;
+        AppState.setIntendedPage(target === 'login' ? AppState.activePage : null);
+        AppState.setActivePage(target);
     });
 </script>
 
@@ -39,7 +34,9 @@
     <AppSidebar />
 
     <main class="content">
-        <Router {routes} onConditionsFailed={handleConditionsFailed} />
+        {#if CurrentPage}
+            <CurrentPage.component />
+        {/if}
     </main>
 </div>
 

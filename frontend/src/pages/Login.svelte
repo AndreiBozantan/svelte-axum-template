@@ -34,7 +34,9 @@
     }
 
     function handleGoogleLogin() {
-        const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        // the SSO round trip is a full-page navigation, so the in-memory intended
+        // page would be lost; send it to the backend as the post-login redirect
+        const redirectUrl = encodeURIComponent(`/${AppState.intendedPage ?? ''}`);
         window.location.href = `/api/oauth/google?redirect_url=${redirectUrl}`;
     }
 </script>

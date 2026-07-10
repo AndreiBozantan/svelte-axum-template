@@ -5,7 +5,6 @@ import LogOut from './pages/Logout.svelte';
 import SecureApi from './pages/SecureApi.svelte';
 import Settings from './pages/Settings.svelte';
 import { AppState } from '$lib/AppState.svelte';
-import { wrap, type WrappedComponent } from 'svelte-spa-router/wrap';
 import type { Component } from 'svelte';
 import type { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
@@ -27,6 +26,7 @@ export type PageDefinition = {
     icon: IconDefinition;
     navPosition?: 'top' | 'footer' | 'none';
     visible: VisibilityFn;
+    anonymousOnly?: boolean;
 };
 
 export const Pages: PageDefinition[] = [
@@ -74,6 +74,7 @@ export const Pages: PageDefinition[] = [
         icon: faSignInAlt,
         navPosition: 'footer',
         visible: () => !AppState.isLoggedIn,
+        anonymousOnly: true,
     },
     {
         id: 'logout',
@@ -86,27 +87,29 @@ export const Pages: PageDefinition[] = [
     },
 ];
 
-// Dynamically generate the route map from the Pages array to avoid duplication
-export const routes: Record<string, Component | WrappedComponent> = Object.fromEntries(
-    Pages.map((page) => {
-        const path = page.id === '' ? '/' : `/${page.id}`;
+// pure routing-guard logic: returns the page id to redirect to, or null to stay
+export function resolveRedirect(
+    pageId: string,
+    isLoggedIn: boolean,
+    intendedPage: string | null,
+    pages: PageDefinition[] = Pages
+): string | null {
+    const page = pages.find((p) => p.id === pageId);
 
-        if (page.public) {
-            return [path, page.component];
-        }
+    // unknown page: send to home when logged in, otherwise to about
+    if (!page) {
+        return isLoggedIn ? '' : 'about';
+    }
 
-        return [
-            path,
-            wrap({
-                component: page.component,
-                conditions: [() => AppState.isLoggedIn],
-            }),
-        ];
-    })
-);
+    // anonymous user on a protected page: send to login
+    if (!page.public && !isLoggedIn) {
+        return 'login';
+    }
 
-// Fallback (404 / catch-all) route: redirect to Home if logged in, otherwise to About if public
-routes['*'] = wrap({
-    component: Home,
-    conditions: [() => AppState.isLoggedIn],
-});
+    // logged-in user on an anonymous-only page (e.g. login): send to the intended page or home
+    if (page.anonymousOnly && isLoggedIn) {
+        return intendedPage ?? '';
+    }
+
+    return null;
+}
