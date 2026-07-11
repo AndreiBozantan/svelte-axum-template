@@ -13,6 +13,11 @@ mod sqlx;
 mod status;
 mod xmenu;
 
+// dev server ports; keep in sync with data/configs.common.toml ([server] port),
+// frontend/vite.config.ts (server.port and proxy targets), and .devcontainer/devcontainer.json (forwardPorts)
+pub(crate) const BACKEND_PORT: u16 = 3000;
+pub(crate) const FRONTEND_PORT: u16 = 5173;
+
 pub(crate) struct XtaskCommand {
     pub(crate) name: &'static str,
     pub(crate) description: &'static str,

@@ -38,7 +38,7 @@
     "portsAttributes": {
         "5173": {
             "label": "Frontend",
-            "onAutoForward": "notify"
+            "onAutoForward": "silent"
         },
         "3000": {
             "label": "Backend",
