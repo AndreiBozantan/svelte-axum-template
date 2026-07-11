@@ -7,6 +7,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.1 — `synchronous` pragma not set; durability under WAL is at SQLite default
+
 - **GitHub Issue:** [#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229)
 
 - **Severity:** Important
@@ -44,6 +45,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.3 — `email UNIQUE` globally conflicts with the multi-tenant model
+
 - **GitHub Issue:** [#209](https://github.com/AndreiBozantan/svelte-axum-template/issues/209)
 
 - **Severity:** Important
@@ -58,9 +60,9 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 - **Risk:** Architectural ambiguity that will force a painful migration later; SSO-linking
   logic is coupled to the global-unique assumption.
 - **Decided:** the maintainer chose **real multi-tenancy with many-to-many memberships**
-  (see [docs/design/authorization.md](../docs/design/authorization.md)). Under that model users are
+  (see [docs/design/authz-design.md](/docs/design/authz-design.md)). Under that model users are
   **global accounts** and the user↔tenant link moves to a `memberships` table — so the
-  global `UNIQUE(email)` is actually *correct* (one account, many tenants) and this tension
+  global `UNIQUE(email)` is actually _correct_ (one account, many tenants) and this tension
   resolves without a composite key. The work is: drop the single `tenant_id` FK from `users`,
   add `memberships`, and rework `link_sso_user` (SSO links a global user, not a tenant-scoped
   one). Tracked in the authorization design's build order, backend plan Phase 0.
@@ -68,6 +70,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.4 — `updated_at` trigger causes double writes / recursion risk; and `RETURNING` may not reflect it
+
 - **GitHub Issue:** [#259](https://github.com/AndreiBozantan/svelte-axum-template/issues/259)
 
 - **Severity:** Minor
@@ -78,7 +81,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
   so the trigger fires redundantly on top of the explicit set (an extra write per update). SQLite
   won't infinitely recurse (recursive triggers are off by default), but this is wasteful and
   means the two mechanisms can disagree on the exact timestamp.
-- **Recommendation:** Pick one mechanism — either the trigger *or* explicit `updated_at` in the
+- **Recommendation:** Pick one mechanism — either the trigger _or_ explicit `updated_at` in the
   app queries, not both. The trigger alone is cleaner (can't be forgotten).
 
 ---
@@ -90,7 +93,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
   `tokens_service.rs`, `auth_service.rs:289-291` (`Utc::now().naive_utc()` compared to
   `revoked_at`), `tokens_db.rs:61-63,146-148` (epoch written as `naive_utc`).
 - **Finding:** SQLite `CURRENT_TIMESTAMP` yields UTC text; the app uses `NaiveDateTime` and
-  `Utc::now().naive_utc()` consistently, so comparisons are correct *as long as* every writer
+  `Utc::now().naive_utc()` consistently, so comparisons are correct _as long as_ every writer
   uses UTC. It works today, but naive timestamps carry no timezone and one non-UTC writer would
   silently corrupt lockout/grace-period math. The review criteria specifically call out
   timezone/clock-skew correctness.
@@ -101,6 +104,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.6 — Cascade deletes are configured; anonymization/lifecycle is not
+
 - **GitHub Issue:** [#240](https://github.com/AndreiBozantan/svelte-axum-template/issues/240)
 
 - **Severity:** Minor
@@ -118,6 +122,7 @@ missing pragmas, transaction gaps, and the `email UNIQUE` vs multi-tenant tensio
 ---
 
 ## 10.7 — Connection pool sizing and backup strategy
+
 - **GitHub Issue:** [#229](https://github.com/AndreiBozantan/svelte-axum-template/issues/229)
 
 - **Severity:** Minor

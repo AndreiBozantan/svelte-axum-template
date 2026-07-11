@@ -6,7 +6,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 > **Target design chosen:** the maintainer has decided the authorization model —
 > DB-driven roles, many-to-many tenant memberships, a generic ACL for entity-level access,
 > shipped via a `projects`/`tasks` reference feature. The full architecture (schema, claims,
-> enforcement pattern) is in **[docs/design/authorization.md](../docs/design/authorization.md)**;
+> enforcement pattern) is in **[/docs/design/authz-design.md](/docs/design/authz-design.md)**;
 > the build order is Stage B of the [Stabilization Master Plan](stabilization-plan.md).
 > The recommendations in 2.1/2.2 below are the minimum fixes; the design doc
 > supersedes them.
@@ -14,6 +14,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 ---
 
 ## 2.1 — `GET /api/users` discloses every user in the shared default tenant
+
 - **GitHub Issue:** [#220](https://github.com/AndreiBozantan/svelte-axum-template/issues/220)
 
 - **Severity:** Critical
@@ -31,22 +32,23 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
   users share one tenant.
 - **Recommendation:** This is a product decision, but it must be made **now**, while there
   are no users and no deployments — the migration is free today and painful later:
-  - **Option A (recommended for the template): drop the half-implemented multi-tenancy.**
-    Remove `tenant_id` from `users` and the tenants table, or reduce it to a single implicit
-    tenant. The current state is the worst of both worlds: multi-tenant complexity in every
-    query with zero actual isolation. A single-tenant template is simpler, honest, and easy
-    to extend later when a real tenancy requirement exists (YAGNI).
-  - **Option B: make tenancy real.** Each self-signup creates its own tenant/organization
-    (row in `tenants`), `UNIQUE(tenant_id, email)` replaces the global unique (see
-    [10](10-database-data-layer.md) 10.3), SSO linking is reworked, and a membership/invite
-    flow is added. Substantially more work; only choose this if multi-org SaaS is the goal.
-  - In both cases: gate `list_users` behind the admin role from 2.2 (it is an admin
-    operation, not a user-facing one), and add a test asserting a normal user cannot
-    enumerate other users.
+    - **Option A (recommended for the template): drop the half-implemented multi-tenancy.**
+      Remove `tenant_id` from `users` and the tenants table, or reduce it to a single implicit
+      tenant. The current state is the worst of both worlds: multi-tenant complexity in every
+      query with zero actual isolation. A single-tenant template is simpler, honest, and easy
+      to extend later when a real tenancy requirement exists (YAGNI).
+    - **Option B: make tenancy real.** Each self-signup creates its own tenant/organization
+      (row in `tenants`), `UNIQUE(tenant_id, email)` replaces the global unique (see
+      [10](10-database-data-layer.md) 10.3), SSO linking is reworked, and a membership/invite
+      flow is added. Substantially more work; only choose this if multi-org SaaS is the goal.
+    - In both cases: gate `list_users` behind the admin role from 2.2 (it is an admin
+      operation, not a user-facing one), and add a test asserting a normal user cannot
+      enumerate other users.
 
 ---
 
 ## 2.2 — No role/authorization model exists; "admin" is not enforced anywhere on the backend
+
 - **GitHub Issue:** [#248](https://github.com/AndreiBozantan/svelte-axum-template/issues/248)
 
 - **Severity:** Critical
@@ -86,6 +88,7 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
 ---
 
 ## 2.4 — IDOR surface is currently small but unguarded by design
+
 - **GitHub Issue:** [#216](https://github.com/AndreiBozantan/svelte-axum-template/issues/216)
 
 - **Severity:** Minor (forward-looking)
@@ -95,5 +98,5 @@ This is the weakest area relative to the "production SaaS" bar. Authentication i
   resource owned by X"). The moment a resource with a path `id` is added, developers have
   no shared helper to enforce ownership and will likely re-derive it ad hoc.
 - **Recommendation:** Establish an ownership-check convention now (a helper that verifies
-  `resource.tenant_id == claims.tenant_id` *and* ownership where applicable) so new endpoints
+  `resource.tenant_id == claims.tenant_id` _and_ ownership where applicable) so new endpoints
   inherit it. Return `404` on failure per `conventions.md` §6.
