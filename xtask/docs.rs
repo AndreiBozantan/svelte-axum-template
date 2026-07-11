@@ -21,13 +21,8 @@ pub fn check_links() -> std::io::Result<()> {
         let Ok(text) = fs::read_to_string(file) else {
             continue;
         };
-        let dir = file.parent().unwrap_or(Path::new("."));
         for (target, anchor) in extract_links(&text) {
-            let resolved = if target.is_empty() {
-                file.clone()
-            } else {
-                normalize(&dir.join(&target))
-            };
+            let resolved = resolve_link(file, &target);
             if !resolved.is_file() {
                 errors.push(format!("{}: broken link -> {}", file.display(), target));
             } else if !anchor.is_empty() {
@@ -180,4 +175,37 @@ fn normalize(path: &Path) -> PathBuf {
         }
     }
     out
+}
+
+fn resolve_link(
+    file: &Path,
+    target: &str,
+) -> PathBuf {
+    let dir = file.parent().unwrap_or(Path::new("."));
+    if target.is_empty() {
+        file.to_path_buf()
+    } else if let Some(stripped) = target.strip_prefix('/') {
+        normalize(Path::new(stripped))
+    } else {
+        normalize(&dir.join(target))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_link_relative() {
+        let file = Path::new("code-review-findings/some-finding.md");
+        let resolved = resolve_link(file, "../docs/design/authz-design.md");
+        assert_eq!(resolved, PathBuf::from("docs/design/authz-design.md"));
+    }
+
+    #[test]
+    fn test_resolve_link_absolute() {
+        let file = Path::new("code-review-findings/some-finding.md");
+        let resolved = resolve_link(file, "/docs/design/authz-design.md");
+        assert_eq!(resolved, PathBuf::from("docs/design/authz-design.md"));
+    }
 }
