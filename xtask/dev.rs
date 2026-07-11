@@ -360,8 +360,10 @@ fn run_servers() {
         .spawn()
         .expect("failed to start frontend dev server");
 
-    // Wait for frontend dev server
-    wait_for_port(5173);
+    // Wait for frontend dev server, then open the app in the browser
+    if wait_for_port(crate::FRONTEND_PORT) {
+        open_browser(&format!("http://localhost:{}", crate::FRONTEND_PORT));
+    }
 
     // Monitor processes
     loop {
@@ -411,15 +413,49 @@ fn run_servers() {
     }
 }
 
-fn wait_for_port(port: u16) {
+fn wait_for_port(port: u16) -> bool {
     let addr = format!("127.0.0.1:{}", port);
     println!("Waiting for port {} to open...", port);
     for _ in 0..150 {
         if TcpStream::connect(&addr).is_ok() {
             println!("Port {} is open.", port);
-            return;
+            return true;
         }
         thread::sleep(Duration::from_millis(200));
     }
     eprintln!("Timeout waiting for port {}.", port);
+    false
+}
+
+// devcontainers set $BROWSER to a helper that opens URLs in the host browser
+fn open_browser(url: &str) {
+    match env::var("BROWSER") {
+        Ok(browser) if !browser.is_empty() => {
+            if Command::new(&browser).arg(url).spawn().is_err() {
+                eprintln!("Failed to open browser. App is running at {}", url);
+            }
+        },
+        _ => println!("App is running at {}", url),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    #[test]
+    fn test_wait_for_port_returns_when_port_is_open() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let start = std::time::Instant::now();
+        let open = wait_for_port(port);
+        // an already-open port must be detected on the first probe, before any poll delay
+        assert!(open, "wait_for_port should report an open port as open");
+        assert!(
+            start.elapsed() < Duration::from_millis(200),
+            "wait_for_port should return immediately for an open port"
+        );
+    }
 }
