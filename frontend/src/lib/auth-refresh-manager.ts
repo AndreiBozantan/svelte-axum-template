@@ -85,6 +85,10 @@ export class AuthRefreshManager {
      * Post-lock double check shared by both lock strategies: skip the network
      * call when the expiry changed (another tab refreshed while we waited) or,
      * when a leadTime is given, the token is currently fresh.
+     *
+     * When we skip, this tab deliberately does not reschedule its own proactive
+     * timer here — the 'storage' event listener at the bottom of this file
+     * fires on the other tab's expiry write and reschedules for us.
      */
     private async refreshUnlessRedundant(
         initialExpiry: string | null,
@@ -99,6 +103,17 @@ export class AuthRefreshManager {
         return this.doRefresh();
     }
 
+    /**
+     * Best-effort cross-tab lock built on localStorage, for browsers without
+     * the Web Locks API. Each tab tries to claim FALLBACK_LOCK_KEY and polls
+     * until the holder finishes (detected via the expiry write), the key goes
+     * stale (holder crashed), or the TTL elapses.
+     *
+     * Unlike Web Locks this is not a true mutex — the settle-sleep tiebreak
+     * below makes duplicate refreshes unlikely, not impossible. A duplicate
+     * refresh is safe (the server just rotates the token again); this fallback
+     * only exists to avoid the wasted request in the common case.
+     */
     private async refreshWithLocalStorageLock(
         initialExpiry: string | null,
         leadTime?: number
@@ -111,7 +126,9 @@ export class AuthRefreshManager {
             const isLockHeld = activeLock !== null && Date.now() - lockTime < FALLBACK_LOCK_TTL_MS;
 
             if (!isLockHeld) {
-                // try to acquire the lock, then sleep to let concurrent writes settle
+                // localStorage has no atomic compare-and-set, so claim the lock
+                // by writing our token, sleeping so concurrent claimants' writes
+                // become visible, then verifying we are still the last writer
                 const myToken = Date.now().toString();
                 localStorage.setItem(FALLBACK_LOCK_KEY, myToken);
                 await sleep(FALLBACK_LOCK_SETTLE_MS);
@@ -259,6 +276,16 @@ export class AuthRefreshManager {
         return typeof navigator !== 'undefined' && !!navigator.locks;
     }
 
+    /**
+     * Retry the proactive refresh after a fixed delay.
+     *
+     * Rescheduling via setupRefreshTimer() would be wrong here: the stored
+     * expiry is still stale, so it would compute a delay <= 0 and re-enter
+     * proactiveRefresh() immediately — an infinite tight loop while another
+     * tab holds the lock. The fixed delay gives the holder time to finish
+     * (its expiry write then reschedules us via the 'storage' listener), and
+     * still retries soon in case the holder's refresh failed.
+     */
     private scheduleRetry(leadTime: number) {
         this.clearTimer();
         this.refreshTimer = setTimeout(() => this.proactiveRefresh(leadTime), LOCK_RETRY_DELAY_MS);
@@ -317,9 +344,13 @@ export class AuthRefreshManager {
 
 if (typeof window !== 'undefined') {
     window.addEventListener('storage', (e) => {
+        // when another tab refreshes the token it writes the new expiry, and
+        // this listener reschedules our proactive timer from it — tabs that
+        // skip a refresh (see refreshUnlessRedundant/scheduleRetry) rely on
+        // this instead of rescheduling themselves.
         // guard against key deletion (e.g. clearRefreshTimer) which fires with
         // newValue === null — setupRefreshTimer would no-op but this avoids
-        // the redundant round-trip through resolveExpiresAt
+        // the redundant round-trip through resolveRefreshParams
         if (e.key === 'auth_expires_at' && e.newValue !== null) {
             AuthRefreshManager.instance.setupRefreshTimer();
         }
