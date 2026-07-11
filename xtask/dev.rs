@@ -211,8 +211,8 @@ fn find_dev_pids() -> Vec<u32> {
     let current_dir = env::current_dir().ok();
     let current_dir_str = current_dir.as_ref().and_then(|p| p.to_str());
 
-    // 1. Check port 3000 (backend)
-    if let Some(pid) = status::get_pid_for_port(3000) {
+    // 1. Check backend port
+    if let Some(pid) = status::get_pid_for_port(crate::BACKEND_PORT) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -242,8 +242,8 @@ fn find_dev_pids() -> Vec<u32> {
         }
     }
 
-    // 2. Check port 5173 (frontend)
-    if let Some(pid) = status::get_pid_for_port(5173) {
+    // 2. Check frontend port
+    if let Some(pid) = status::get_pid_for_port(crate::FRONTEND_PORT) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -350,7 +350,7 @@ fn run_servers() {
         .expect("failed to start backend watch");
 
     // Wait for backend to start up before starting frontend dev server
-    wait_for_port(3000);
+    wait_for_port(crate::BACKEND_PORT);
 
     println!("Starting frontend dev server...");
     let mut frontend = Command::new("npm")

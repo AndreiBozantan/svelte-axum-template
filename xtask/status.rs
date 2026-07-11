@@ -429,10 +429,10 @@ pub fn status(
     let db_info = get_db_info();
     print_row("DB:", &db_info);
 
-    let backend_info = get_service_info(3000);
+    let backend_info = get_service_info(crate::BACKEND_PORT);
     print_row("Backend:", &backend_info);
 
-    let frontend_info = get_service_info(5173);
+    let frontend_info = get_service_info(crate::FRONTEND_PORT);
     print_row("Frontend:", &frontend_info);
 
     let dirty_info = get_dirty_files_info();
