@@ -1,3 +1,18 @@
+// name of the cross-tab Web Locks lock guarding token refresh
+const REFRESH_LOCK_NAME = 'auth_refresh_lock';
+
+// localStorage fallback lock (used when the Web Locks API is unavailable);
+// the TTL bounds both how long a crashed tab can hold the lock and how long a waiter polls
+const FALLBACK_LOCK_KEY = 'auth_refresh_in_progress';
+const FALLBACK_LOCK_TTL_MS = 10_000;
+const FALLBACK_LOCK_POLL_MS = 200;
+const FALLBACK_LOCK_SETTLE_MS = 50;
+
+// retry delay when another tab holds the refresh lock during a proactive refresh
+const LOCK_RETRY_DELAY_MS = 5_000;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 /**
  * Encapsulates token-refresh state to allow:
  * 1. Isolated unit testing (avoiding global state pollution).
@@ -26,18 +41,99 @@ export class AuthRefreshManager {
     }
 
     /**
-     * Coalesce concurrent refresh calls into a single in-flight request.
+     * Coalesce concurrent refresh calls into a single in-flight request,
+     * serialized against other tabs via the cross-tab lock.
      * Does NOT call onAuthFailure — that responsibility belongs to the caller
      * so it is invoked exactly once per failure scenario.
-     *
-     * Note on ??= semantics: doRefresh() clears this.refreshPromise in its
-     * finally block before awaiting callers resume. A caller arriving after
-     * finally but before earlier awaiters resume will start a new refresh —
-     * this is correct behavior (the previous token is already consumed).
      */
-    async coalescedRefresh(): Promise<boolean> {
-        this.refreshPromise ??= this.doRefresh();
-        return this.refreshPromise;
+    async coalescedRefresh(leadTime?: number): Promise<boolean> {
+        return this.coalesced(() => this.refreshUnderCrossTabLock(leadTime));
+    }
+
+    /**
+     * Dedup concurrent refresh calls in this tab into one in-flight promise.
+     *
+     * Note: the finally below clears refreshPromise before earlier awaiters
+     * resume. A caller arriving after finally but before earlier awaiters
+     * resume will start a new refresh — this is correct behavior (the
+     * previous token is already consumed).
+     */
+    private async coalesced(refresh: () => Promise<boolean>): Promise<boolean> {
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+        this.refreshPromise = refresh();
+        try {
+            return await this.refreshPromise;
+        } finally {
+            this.refreshPromise = null;
+        }
+    }
+
+    /** acquire the cross-tab lock (Web Locks or localStorage fallback), then refresh. */
+    private async refreshUnderCrossTabLock(leadTime?: number): Promise<boolean> {
+        const initialExpiry = localStorage.getItem('auth_expires_at');
+        if (!this.hasWebLocks()) {
+            return this.refreshWithLocalStorageLock(initialExpiry, leadTime);
+        }
+        return navigator.locks.request(REFRESH_LOCK_NAME, () =>
+            this.refreshUnlessRedundant(initialExpiry, leadTime)
+        );
+    }
+
+    /**
+     * Post-lock double check shared by both lock strategies: skip the network
+     * call when the expiry changed (another tab refreshed while we waited) or,
+     * when a leadTime is given, the token is currently fresh.
+     */
+    private async refreshUnlessRedundant(
+        initialExpiry: string | null,
+        leadTime?: number
+    ): Promise<boolean> {
+        if (localStorage.getItem('auth_expires_at') !== initialExpiry) {
+            return true;
+        }
+        if (leadTime !== undefined && this.isTokenFresh(leadTime)) {
+            return true;
+        }
+        return this.doRefresh();
+    }
+
+    private async refreshWithLocalStorageLock(
+        initialExpiry: string | null,
+        leadTime?: number
+    ): Promise<boolean> {
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < FALLBACK_LOCK_TTL_MS) {
+            const activeLock = localStorage.getItem(FALLBACK_LOCK_KEY);
+            const lockTime = activeLock ? parseInt(activeLock, 10) : 0;
+            const isLockHeld = activeLock !== null && Date.now() - lockTime < FALLBACK_LOCK_TTL_MS;
+
+            if (!isLockHeld) {
+                // try to acquire the lock, then sleep to let concurrent writes settle
+                const myToken = Date.now().toString();
+                localStorage.setItem(FALLBACK_LOCK_KEY, myToken);
+                await sleep(FALLBACK_LOCK_SETTLE_MS);
+
+                if (localStorage.getItem(FALLBACK_LOCK_KEY) === myToken) {
+                    try {
+                        return await this.refreshUnlessRedundant(initialExpiry, leadTime);
+                    } finally {
+                        localStorage.removeItem(FALLBACK_LOCK_KEY);
+                    }
+                }
+            }
+
+            // lock is held by another tab — wait, then check whether it refreshed
+            await sleep(FALLBACK_LOCK_POLL_MS);
+            if (localStorage.getItem('auth_expires_at') !== initialExpiry) {
+                return true;
+            }
+        }
+
+        // timeout fallback — refresh anyway so the tab doesn't hang forever
+        return this.doRefresh();
     }
 
     private async doRefresh(): Promise<boolean> {
@@ -68,8 +164,6 @@ export class AuthRefreshManager {
             console.error('Token refresh request failed', err);
             this.clearRefreshTimer();
             return false;
-        } finally {
-            this.refreshPromise = null;
         }
     }
 
@@ -131,8 +225,9 @@ export class AuthRefreshManager {
     }
 
     /**
-     * Check whether another tab already refreshed the token, then call
-     * coalescedRefresh() under the Web Locks API when available.
+     * Check whether another tab already refreshed the token, then refresh
+     * under the cross-tab lock. On the Web Locks path the lock is acquired
+     * here (non-blocking), so the refresh task must not re-acquire it.
      */
     private async proactiveRefresh(leadTime: number) {
         // if another tab already refreshed (expiry pushed out), just reschedule
@@ -141,15 +236,16 @@ export class AuthRefreshManager {
             return;
         }
 
-        const refresh = () => this.refreshIfStale(leadTime);
-
         if (!this.hasWebLocks()) {
-            // no Web Locks API — refresh directly (single-tab fallback)
-            await refresh();
+            // no Web Locks API — coalescedRefresh serializes via the localStorage lock
+            await this.refreshIfStale(leadTime, () => this.coalescedRefresh(leadTime));
             return;
         }
 
-        await this.withRefreshLock(refresh);
+        // the lock is already held inside the task — only coalesce within this tab
+        await this.withRefreshLock(leadTime, () =>
+            this.refreshIfStale(leadTime, () => this.coalesced(() => this.doRefresh()))
+        );
     }
 
     /** True when the stored expiry is still far enough in the future. */
@@ -163,49 +259,54 @@ export class AuthRefreshManager {
         return typeof navigator !== 'undefined' && !!navigator.locks;
     }
 
+    private scheduleRetry(leadTime: number) {
+        this.clearTimer();
+        this.refreshTimer = setTimeout(() => this.proactiveRefresh(leadTime), LOCK_RETRY_DELAY_MS);
+    }
+
     /**
      * Acquire the cross-tab refresh lock without blocking and run `task`
      * while the lock is held. Reschedules the timer when the lock is
      * unavailable or the API throws.
      */
-    private async withRefreshLock(task: () => Promise<void>) {
+    private async withRefreshLock(leadTime: number, task: () => Promise<void>) {
         try {
             await navigator.locks.request(
-                'auth_refresh_lock',
+                REFRESH_LOCK_NAME,
                 { ifAvailable: true },
                 async (lock) => {
                     if (!lock) {
-                        // another tab holds the lock — reschedule
-                        this.setupRefreshTimer();
+                        // another tab holds the lock — reschedule with retry delay
+                        this.scheduleRetry(leadTime);
                         return;
                     }
                     await task();
                 }
             );
         } catch (err) {
-            // lock API failure — reschedule instead of bypassing the lock
+            // lock API failure — reschedule with retry delay instead of bypassing the lock
             console.error('Web lock request failed, rescheduling refresh', err);
-            this.setupRefreshTimer();
+            this.scheduleRetry(leadTime);
         }
     }
 
     /**
      * Re-check freshness (another tab may have finished between our initial
-     * check and lock acquisition) and refresh if still stale.
+     * check and lock acquisition) and run `refresh` if still stale.
      *
      * Deliberately no notifyAuthFailure() — the proactive path runs before the
      * user triggers a request, so redirecting to login unprompted would be
      * jarring. The next actual API call will 401, hit the middleware, and
      * notify then.
      */
-    private async refreshIfStale(leadTime: number) {
+    private async refreshIfStale(leadTime: number, refresh: () => Promise<boolean>) {
         if (this.isTokenFresh(leadTime)) {
             this.setupRefreshTimer();
             return;
         }
 
         console.log('Proactively refreshing access token...');
-        const ok = await this.coalescedRefresh();
+        const ok = await refresh();
         if (!ok) console.warn('Proactive token refresh failed.');
     }
 }

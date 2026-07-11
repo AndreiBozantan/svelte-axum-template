@@ -57,6 +57,14 @@ describe('AuthRefreshManager', () => {
         vi.useFakeTimers();
         vi.spyOn(Math, 'random').mockReturnValue(0); // deterministic jitter
         vi.stubGlobal('localStorage', createStorageMock());
+        vi.stubGlobal('navigator', {
+            locks: {
+                request: vi.fn((name: string, arg2: unknown, arg3?: unknown) => {
+                    const callback = typeof arg2 === 'function' ? arg2 : arg3;
+                    return (callback as (lock: unknown) => Promise<void>)({});
+                }),
+            },
+        });
         mockFetch = vi.fn() as ReturnType<typeof vi.fn> & typeof fetch;
         manager = new AuthRefreshManager(mockFetch);
     });
@@ -306,6 +314,111 @@ describe('AuthRefreshManager', () => {
 
             // Token was fresh by the time refreshIfStale ran — no fetch
             expect(mockFetch).not.toHaveBeenCalled();
+        });
+
+        it('schedules retry when lock is busy without infinite recursion', async () => {
+            vi.setSystemTime(0);
+            localStorage.setItem('auth_expires_at', '10000');
+            localStorage.setItem('auth_lead_time_ms', '60000');
+
+            vi.stubGlobal('navigator', {
+                locks: {
+                    request: vi.fn(
+                        async (
+                            _name: string,
+                            options: { ifAvailable?: boolean },
+                            callback: (lock: unknown) => Promise<void>
+                        ) => {
+                            if (options?.ifAvailable) {
+                                await callback(null); // lock not available
+                            } else {
+                                await callback({});
+                            }
+                        }
+                    ),
+                },
+            });
+
+            manager.setupRefreshTimer(); // delay <= 0 -> proactiveRefresh
+            await vi.advanceTimersByTimeAsync(0);
+
+            // Fetch should not have been called because lock was busy
+            expect(mockFetch).not.toHaveBeenCalled();
+
+            // After 4.9 seconds, still no call
+            await vi.advanceTimersByTimeAsync(4900);
+            expect(mockFetch).not.toHaveBeenCalled();
+
+            // After 5 seconds, should attempt proactiveRefresh again
+            await vi.advanceTimersByTimeAsync(100);
+            expect(navigator.locks.request).toHaveBeenCalledTimes(2);
+        });
+
+        it('coalesces refresh requests across tabs using web locks', async () => {
+            const manager1 = new AuthRefreshManager(mockFetch);
+            const manager2 = new AuthRefreshManager(mockFetch);
+
+            localStorage.setItem('auth_expires_at', '10000'); // stale
+
+            // serializing lock mock: queued requests run strictly one after another
+            let queue: Promise<unknown> = Promise.resolve();
+            vi.stubGlobal('navigator', {
+                locks: {
+                    request: vi.fn((_name: string, arg2: unknown, arg3?: unknown) => {
+                        const callback = (typeof arg2 === 'function' ? arg2 : arg3) as (
+                            lock: unknown
+                        ) => Promise<unknown>;
+                        queue = queue.then(() => callback({}));
+                        return queue;
+                    }),
+                },
+            });
+
+            mockFetch.mockResolvedValueOnce(jsonResponse({ expires_in: 300 }));
+
+            const p1 = manager1.coalescedRefresh(); // Tab 1
+            const p2 = manager2.coalescedRefresh(); // Tab 2
+
+            const [r1, r2] = await Promise.all([p1, p2]);
+
+            expect(r1).toBe(true);
+            expect(r2).toBe(true);
+
+            // Tab 1 refreshed and pushed the expiry out; Tab 2 saw the changed
+            // expiry inside the lock and skipped its own fetch.
+            expect(localStorage.getItem('auth_expires_at')).not.toBe('10000');
+            expect(mockFetch).toHaveBeenCalledTimes(1);
+        });
+
+        it('coalesces refresh requests across tabs using localStorage fallback (when web locks are unavailable)', async () => {
+            vi.useRealTimers();
+            try {
+                const manager1 = new AuthRefreshManager(mockFetch);
+                const manager2 = new AuthRefreshManager(mockFetch);
+
+                localStorage.setItem('auth_expires_at', '10000'); // stale
+
+                vi.stubGlobal('navigator', {
+                    locks: undefined,
+                });
+
+                // Start refresh on manager1
+                mockFetch.mockResolvedValueOnce(jsonResponse({ expires_in: 300 }));
+
+                const p1 = manager1.coalescedRefresh();
+                const p2 = manager2.coalescedRefresh();
+
+                // Await both promises to complete
+                const [r1, r2] = await Promise.all([p1, p2]);
+
+                expect(r1).toBe(true);
+                expect(r2).toBe(true);
+
+                // Fetch should have been called only ONCE (by Tab 1)!
+                expect(mockFetch).toHaveBeenCalledTimes(1);
+            } finally {
+                vi.useFakeTimers();
+            }
         });
     });
 
