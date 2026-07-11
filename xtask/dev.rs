@@ -211,8 +211,8 @@ fn find_dev_pids() -> Vec<u32> {
     let current_dir = env::current_dir().ok();
     let current_dir_str = current_dir.as_ref().and_then(|p| p.to_str());
 
-    // 1. Check port 3000 (backend)
-    if let Some(pid) = status::get_pid_for_port(3000) {
+    // 1. Check backend port
+    if let Some(pid) = status::get_pid_for_port(crate::BACKEND_PORT) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -242,8 +242,8 @@ fn find_dev_pids() -> Vec<u32> {
         }
     }
 
-    // 2. Check port 5173 (frontend)
-    if let Some(pid) = status::get_pid_for_port(5173) {
+    // 2. Check frontend port
+    if let Some(pid) = status::get_pid_for_port(crate::FRONTEND_PORT) {
         if !pids.contains(&pid) {
             pids.push(pid);
         }
@@ -350,7 +350,7 @@ fn run_servers() {
         .expect("failed to start backend watch");
 
     // Wait for backend to start up before starting frontend dev server
-    wait_for_port(3000);
+    wait_for_port(crate::BACKEND_PORT);
 
     println!("Starting frontend dev server...");
     let mut frontend = Command::new("npm")
@@ -360,8 +360,10 @@ fn run_servers() {
         .spawn()
         .expect("failed to start frontend dev server");
 
-    // Wait for frontend dev server
-    wait_for_port(5173);
+    // Wait for frontend dev server, then open the app in the browser
+    if wait_for_port(crate::FRONTEND_PORT) {
+        open_browser(&format!("http://localhost:{}", crate::FRONTEND_PORT));
+    }
 
     // Monitor processes
     loop {
@@ -411,15 +413,49 @@ fn run_servers() {
     }
 }
 
-fn wait_for_port(port: u16) {
+fn wait_for_port(port: u16) -> bool {
     let addr = format!("127.0.0.1:{}", port);
     println!("Waiting for port {} to open...", port);
     for _ in 0..150 {
         if TcpStream::connect(&addr).is_ok() {
             println!("Port {} is open.", port);
-            return;
+            return true;
         }
         thread::sleep(Duration::from_millis(200));
     }
     eprintln!("Timeout waiting for port {}.", port);
+    false
+}
+
+// devcontainers set $BROWSER to a helper that opens URLs in the host browser
+fn open_browser(url: &str) {
+    match env::var("BROWSER") {
+        Ok(browser) if !browser.is_empty() => {
+            if Command::new(&browser).arg(url).spawn().is_err() {
+                eprintln!("Failed to open browser. App is running at {}", url);
+            }
+        },
+        _ => println!("App is running at {}", url),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    #[test]
+    fn test_wait_for_port_returns_when_port_is_open() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let start = std::time::Instant::now();
+        let open = wait_for_port(port);
+        // an already-open port must be detected on the first probe, before any poll delay
+        assert!(open, "wait_for_port should report an open port as open");
+        assert!(
+            start.elapsed() < Duration::from_millis(200),
+            "wait_for_port should return immediately for an open port"
+        );
+    }
 }
