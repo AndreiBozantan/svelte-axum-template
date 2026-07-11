@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { AppState } from '$lib/AppState.svelte';
+    import { AppState } from '$src/AppState.svelte';
     import { api } from '$lib/api';
 
     let response = $state('');

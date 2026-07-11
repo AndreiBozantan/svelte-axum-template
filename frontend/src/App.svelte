@@ -1,37 +1,32 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import Router, { push } from 'svelte-spa-router';
-    import type { RouteDetail } from 'svelte-spa-router';
-    import { AppState } from '$lib/AppState.svelte';
-    import { routes } from './AppPages.svelte';
+    import { Router } from './Router.svelte';
+    import { AppState } from './AppState.svelte';
     import AppSidebar from './AppSidebar.svelte';
+    import NotFound from './pages/NotFound.svelte';
+
+    // derived redirect target
+    const redirectTarget = $derived(Router.getRedirectTarget(AppState.isLoggedIn));
+
+    // get the page component definition for the active route
+    const currentPage = $derived(Router.getPageById(Router.activePage));
 
     onMount(() => {
-        if (window.location.pathname !== '/') {
-            const cleanUrl = '/' + window.location.hash;
-            window.history.replaceState(null, '', cleanUrl);
-        }
         AppState.stopLoading();
+
+        // keep the active page in sync with browser back/forward
+        window.addEventListener('popstate', () => {
+            Router.setActivePage(window.location.pathname, false);
+        });
     });
 
-    function handleConditionsFailed(detail: RouteDetail) {
-        if (AppState.isLoggedIn) {
-            // logged-in user hit an anonymous-only route (e.g. /login) -> send them home
-            push('/');
-        } else {
-            // anonymous user hit a protected route -> remember it and bounce to login
-            AppState.setIntendedPage(detail.location);
-            push('/login');
-        }
-    }
-
-    // once login completes while sitting on the Login page, go to the originally intended page
+    // routing guards: bounce anonymous users off protected pages (remembering the destination)
+    // and send logged-in users away from anonymous-only pages
     $effect(() => {
-        if (AppState.isLoggedIn && AppState.activePage === 'login') {
-            const target = AppState.intendedPage || '';
-            AppState.setIntendedPage(null);
-            AppState.setActivePage(target);
-        }
+        if (redirectTarget === null) return;
+        // remember where an anonymous user was headed; clear it once they're back in
+        Router.setIntendedPage(AppState.isLoggedIn ? null : Router.activePage);
+        Router.setActivePage(redirectTarget);
     });
 </script>
 
@@ -39,7 +34,14 @@
     <AppSidebar />
 
     <main class="content">
-        <Router {routes} onConditionsFailed={handleConditionsFailed} />
+        <!-- while a redirect is pending, render nothing so guarded pages never mount -->
+        {#if redirectTarget === null}
+            {#if currentPage}
+                <currentPage.component />
+            {:else}
+                <NotFound />
+            {/if}
+        {/if}
     </main>
 </div>
 

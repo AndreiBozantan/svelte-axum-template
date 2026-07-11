@@ -15,6 +15,11 @@ use crate::platform::crypto;
 use crate::platform::identity::auth;
 use crate::platform::identity::users;
 
+#[cfg(debug_assertions)]
+const MIN_PASSWORD_CHARS: u64 = 1;
+#[cfg(not(debug_assertions))]
+const MIN_PASSWORD_CHARS: u64 = 8;
+
 pub fn router(service: auth::Service) -> utoipax::router::OpenApiRouter<common::ArcContext> {
     use utoipax::routes;
 
@@ -43,8 +48,8 @@ pub struct RegisterRequest {
     #[schema(example = "alice@example.com", format = "email", max_length = 254)]
     pub email: String,
 
-    #[validate(length(min = 8, max = 72, message = "password must be between 8 and 72 characters"))]
-    #[schema(min_length = 8, max_length = 72)]
+    #[validate(length(min = MIN_PASSWORD_CHARS, max = 1024, message = "password must be between 8 and 1024 characters"))]
+    #[schema(min_length = 8, max_length = 1024)]
     pub password: String,
 
     #[validate(length(max = 100, message = "first name must be 100 characters or less"))]
@@ -70,8 +75,8 @@ pub struct LoginRequest {
     #[schema(example = "alice@example.com", format = "email", max_length = 254)]
     pub email: String,
 
-    #[validate(length(min = 8, max = 72, message = "password must be between 8 and 72 characters"))]
-    #[schema(min_length = 8, max_length = 72)]
+    #[validate(length(min = MIN_PASSWORD_CHARS, max = 1024, message = "password must be between 8 and 1024 characters"))]
+    #[schema(min_length = 8, max_length = 1024)]
     pub password: String,
 }
 

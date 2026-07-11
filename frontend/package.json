@@ -45,8 +45,7 @@
         "@fortawesome/fontawesome-svg-core": "^7.3.0",
         "@fortawesome/free-solid-svg-icons": "^7.3.0",
         "openapi-fetch": "^0.17.0",
-        "svelte-fa": "^4.0.4",
-        "svelte-spa-router": "^5.1.1"
+        "svelte-fa": "^4.0.4"
     },
     "overrides": {
         "postcss": "^8.5.10"

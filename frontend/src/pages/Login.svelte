@@ -2,7 +2,8 @@
     import { onMount, tick } from 'svelte';
 
     import { api } from '$lib/api';
-    import { AppState } from '$lib/AppState.svelte';
+    import { Router, link } from '$src/Router.svelte';
+    import { AppState } from '$src/AppState.svelte';
     import { AuthRefreshManager } from '$lib/auth-refresh-manager';
 
     let email = $state('');
@@ -34,7 +35,11 @@
     }
 
     function handleGoogleLogin() {
-        const redirectUrl = encodeURIComponent(window.location.pathname + window.location.search);
+        // the SSO round trip is a full-page navigation, so the in-memory intended
+        // page would be lost; send it to the backend as the post-login redirect;
+        // without an intended page, send '/' and let the routing guard forward
+        // the logged-in user to the default page
+        const redirectUrl = encodeURIComponent(`/${Router.intendedPage ?? ''}`);
         window.location.href = `/api/oauth/google?redirect_url=${redirectUrl}`;
     }
 </script>
@@ -115,6 +120,12 @@
             </svg>
             Google
         </button>
+
+        <div class="divider">
+            <span>or</span>
+        </div>
+
+        <a href="/register" use:link class="btn-outline"> Register </a>
     </div>
 </div>
 
@@ -265,5 +276,28 @@
         to {
             transform: rotate(360deg);
         }
+    }
+    .btn-outline {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px;
+        border: 2px solid #10b981;
+        border-radius: 8px;
+        background: transparent;
+        color: #10b981;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        box-sizing: border-box;
+        transition: all 0.2s ease-in-out;
+    }
+    .btn-outline:hover {
+        background: #ecfdf5;
+        border-color: #059669;
+        color: #059669;
     }
 </style>

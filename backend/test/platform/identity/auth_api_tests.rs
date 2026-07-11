@@ -421,7 +421,8 @@ async fn register_invalid_password() -> TestResult {
         .post("/api/auth/register")
         .json(&json!({
             "email": "valid_but_new@example.com",
-            "password": "short",
+            // empty password violates the minimum length in both debug and release builds
+            "password": "",
             "first_name": "Test",
             "last_name": "User"
         }))
@@ -431,7 +432,7 @@ async fn register_invalid_password() -> TestResult {
     assert_eq!(r["code"], "validation_failed");
     assert_eq!(
         r["details"]["password"][0],
-        "password must be between 8 and 72 characters"
+        "password must be between 8 and 1024 characters"
     );
     Ok(())
 }

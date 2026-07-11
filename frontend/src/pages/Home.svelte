@@ -1,30 +1,26 @@
 <script lang="ts">
-    import { AppState } from '$lib/AppState.svelte';
+    import { Router } from '../Router.svelte';
 </script>
 
 <div class="page">
     <div class="content-container">
-        <!-- Page Header Group -->
         <div class="page-header-block">
-            <h1 class="page-main-header">home</h1>
+            <h1 class="page-main-header">svelaxum</h1>
             <p class="header-desc">
-                You are successfully logged in as <strong>{AppState.user?.email}</strong>.
+                A modern full-stack template built with <strong>Svelte 5</strong> and
+                <strong>Axum</strong>.
             </p>
         </div>
 
-        <!-- Main Content Group -->
         <div class="content-group">
             <div class="group-body">
-                <div class="item-block text-center">
-                    <div class="icon-container">
-                        <svg viewBox="0 0 24 24" width="64" height="64">
-                            <path
-                                fill="#10b981"
-                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
-                            />
-                        </svg>
-                    </div>
-                    <p class="hint">Use the sidebar or the user menu to explore the application.</p>
+                <div class="item-block landing-actions">
+                    <button class="btn-primary" onclick={() => Router.setActivePage('login')}>
+                        Sign In
+                    </button>
+                    <button class="btn-secondary" onclick={() => Router.setActivePage('register')}>
+                        Register
+                    </button>
                 </div>
             </div>
         </div>
@@ -32,15 +28,11 @@
 </div>
 
 <style>
-    /* Specialized local styles */
-    .text-center {
-        text-align: center;
-    }
-    .icon-container {
-        margin: 20px 0;
-    }
-    .hint {
-        color: #64748b;
-        font-size: 1rem;
+    /* .btn-primary and .btn-secondary come from the global styles in app.css */
+    .landing-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        padding: 24px 0;
     }
 </style>

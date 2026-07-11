@@ -1,7 +1,7 @@
 import createClient from 'openapi-fetch';
 import type { Middleware } from 'openapi-fetch';
 import type { paths } from './generated/api';
-import { AppState } from './AppState.svelte';
+import { AppState } from '../AppState.svelte';
 import { AuthRefreshManager } from './auth-refresh-manager';
 
 export const fetchClient = createClient<paths>({

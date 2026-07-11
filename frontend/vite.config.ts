@@ -16,6 +16,7 @@ export default defineConfig({
     resolve: {
         alias: {
             $lib: fileURLToPath(new URL('./src/lib', import.meta.url)),
+            $src: fileURLToPath(new URL('./src', import.meta.url)),
         },
     },
     build: {
