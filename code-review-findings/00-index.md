@@ -36,7 +36,7 @@ Cross-cutting plan:
 - **[Stabilization Master Plan](stabilization-plan.md) — start here.** The single plan for all
   backend and frontend work: the settled architecture decisions and one staged timeline
   (Stages A–E) covering every finding.
-- [Authorization design](../docs/design/authorization.md) — the target design (DB-driven
+- [Authorization design](/docs/design/authz-design.md) — the target design (DB-driven
   roles, many-to-many memberships, generic ACL, projects/tasks reference feature); kept under
   `docs/` as a durable reference that GitHub issues link to.
 

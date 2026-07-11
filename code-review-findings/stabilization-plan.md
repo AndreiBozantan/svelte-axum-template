@@ -17,7 +17,7 @@ seen these planning docs, or an AI coding agent — without further clarificatio
 - **Body:** copy the linked finding section(s) **verbatim** — they carry the file paths
   (Location), the problem (Finding), why it matters (Risk), and the fix (Recommendation).
   For Stage B items, link the _design:_ section(s) of
-  [docs/design/authorization.md](../docs/design/authorization.md) — the design doc lives in
+  [docs/design/authz-design.md](/docs/design/authz-design.md) — the design doc lives in
   the repo precisely so issues can reference it.
 - **Acceptance criteria:** state observable behavior, not implementation — e.g. "login as a
   suspended user returns 403 with code `account_suspended`; their refresh token no longer
@@ -75,7 +75,7 @@ drifted-`conventions.md` finding [18 § 18.1](18-documentation-dx.md#181--docs-a
 One exists; four more are created by plan items in the stages where their content gets
 decided:
 
-- **[docs/design/authorization.md](../docs/design/authorization.md)** — _exists._ The three
+- **[docs/design/authz-design.md](/docs/design/authz-design.md)** — _exists._ The three
   authorization layers, resource-access resolution rule, data model, JWT claims, enforcement
   pattern. Backs the Stage B issues, and provides the shared authorization convention
   [02 § 2.4](02-authorization-access-control.md#24--idor-surface-is-currently-small-but-unguarded-by-design) asks for.
@@ -134,7 +134,7 @@ Decisions that gate later work:
 
 ## Stage B — The authorization & multi-tenancy refactor (the spine)
 
-Implements the [authorization design](../docs/design/authorization.md), landed as
+Implements the [authorization design](/docs/design/authz-design.md), landed as
 **small, individually green PRs** in this order. Resolves
 [02 § 2.1/2.2](02-authorization-access-control.md#21--get-apiusers-discloses-every-user-in-the-shared-default-tenant), [10 § 10.3](10-database-data-layer.md#103--email-unique-globally-conflicts-with-the-multi-tenant-model),
 [20 § 20.1/20.2](20-business-logic-correctness.md#201--admin-identity-is-inconsistent-across-the-system). Multi-write flows (signup→tenant→membership,
@@ -142,7 +142,7 @@ invite acceptance) are wrapped in transactions **as they are written**, not retr
 [10 § 10.2](10-database-data-layer.md#102--multi-operation-flows-are-not-wrapped-in-transactions), [20 § 20.5](20-business-logic-correctness.md#205--partial-failure-consistency-in-multi-step-flows).
 
 The checklist items below are short summaries; their actual spec (schema, queries, enforcement
-convention) is [docs/design/authorization.md](../docs/design/authorization.md) — with the
+convention) is [docs/design/authz-design.md](/docs/design/authz-design.md) — with the
 concrete DDL, permission catalog, access view, and invariants in its `# Implementation Plan`
 half. **When creating GitHub issues from these items, link that design doc in the issue body**
 (and quote the relevant schema/queries, since the Implementation Plan half is deleted after this
