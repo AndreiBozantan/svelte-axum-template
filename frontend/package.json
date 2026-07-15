@@ -33,7 +33,7 @@
         "prettier": "^3.8.4",
         "prettier-plugin-svelte": "^4.1.1",
         "svelte": "^5.55.10",
-        "svelte-check": "^4.7.2",
+        "svelte-check": "^4.7.3",
         "svelte-preprocess": "^6.0.5",
         "tslib": "^2.8.1",
         "typescript": "^5.9.3",
@@ -42,8 +42,8 @@
         "vitest": "^4.1.10"
     },
     "dependencies": {
-        "@fortawesome/fontawesome-svg-core": "^7.3.0",
-        "@fortawesome/free-solid-svg-icons": "^7.3.0",
+        "@fortawesome/fontawesome-svg-core": "^7.3.1",
+        "@fortawesome/free-solid-svg-icons": "^7.3.1",
         "openapi-fetch": "^0.17.0",
         "svelte-fa": "^4.0.4"
     },
