@@ -34,7 +34,7 @@ jobs:
                   tool: cargo-audit
 
             - name: Cache RustSec Advisory Database
-              uses: actions/cache@v4
+              uses: actions/cache@v6
               with:
                   path: ~/.cargo/advisory-db
                   key: rustsec-advisory-db-${{ github.run_id }}
