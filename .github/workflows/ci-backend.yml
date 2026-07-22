@@ -35,7 +35,7 @@ jobs:
             SQLX_OFFLINE: true
             RUSTC_WRAPPER: "" # bypasses sccache
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@v7.0.1
 
             - name: Create placeholder frontend dist directory
               # mock frontend/dist for rust-embed so backend compiles & tests pass in CI

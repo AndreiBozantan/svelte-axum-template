@@ -26,7 +26,7 @@ jobs:
             checks: write
             issues: write
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@v7.0.1
 
             - name: Install cargo-audit precompiled binary
               uses: taiki-e/install-action@v2
